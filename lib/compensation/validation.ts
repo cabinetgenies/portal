@@ -112,6 +112,26 @@ export const projectCategorySchema = z.object({
 
 export type ProjectCategoryInput = z.infer<typeof projectCategorySchema>;
 
+/**
+ * Commission engine settings. Values are entered as percent points (50 for 50%,
+ * 5 for five percentage points) and stored as decimals.
+ */
+export const commissionSettingsSchema = z.object({
+  effectiveFrom: requiredDateField("Effective from"),
+  depositPayoutPercent: z.coerce
+    .number({ error: "Deposit payout must be a number." })
+    .min(0, "Deposit payout must be between 0% and 100%.")
+    .max(100, "Deposit payout must be between 0% and 100%."),
+  drawRateReduction: z.coerce
+    .number({ error: "Draw rate reduction must be a number." })
+    .min(0, "Draw rate reduction must be between 0 and 100 percentage points.")
+    .max(100, "Draw rate reduction must be between 0 and 100 percentage points."),
+  drawEnabled: booleanField("Draw system enabled"),
+  notes: optionalText(400),
+});
+
+export type CommissionSettingsInput = z.infer<typeof commissionSettingsSchema>;
+
 export const compensationPlanSchema = z.object({
   id: z.preprocess(
     (value) => (value === "" || value === null || value === undefined ? undefined : value),

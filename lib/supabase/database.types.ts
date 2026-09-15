@@ -362,6 +362,178 @@ export type AuditEventInsert = {
 
 export type AuditEventUpdate = Partial<AuditEventInsert>;
 
+export type CommissionSettingsRow = {
+  id: string;
+  effective_from: string;
+  deposit_payout_percent: number;
+  draw_rate_reduction: number;
+  draw_enabled: boolean;
+  notes: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type CommissionSettingsInsert = {
+  id?: string;
+  effective_from: string;
+  deposit_payout_percent?: number;
+  draw_rate_reduction?: number;
+  draw_enabled?: boolean;
+  notes?: string | null;
+  created_by?: string | null;
+  created_at?: string;
+  updated_at?: string;
+};
+
+export type CommissionSettingsUpdate = Partial<CommissionSettingsInsert>;
+
+export type EmployeeDrawPeriodRow = {
+  id: string;
+  profile_id: string;
+  effective_from: string;
+  effective_to: string | null;
+  notes: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type EmployeeDrawPeriodInsert = {
+  id?: string;
+  profile_id: string;
+  effective_from: string;
+  effective_to?: string | null;
+  notes?: string | null;
+  created_by?: string | null;
+  created_at?: string;
+  updated_at?: string;
+};
+
+export type EmployeeDrawPeriodUpdate = Partial<EmployeeDrawPeriodInsert>;
+
+export type EmployeeDrawLedgerRow = {
+  id: string;
+  profile_id: string;
+  transaction_type: string;
+  amount: number;
+  job_id: string | null;
+  commission_event_id: string | null;
+  reason: string;
+  created_by: string | null;
+  created_at: string;
+};
+
+export type EmployeeDrawLedgerInsert = {
+  id?: string;
+  profile_id: string;
+  transaction_type: string;
+  amount: number;
+  job_id?: string | null;
+  commission_event_id?: string | null;
+  reason: string;
+  created_by?: string | null;
+  created_at?: string;
+};
+
+export type EmployeeDrawLedgerUpdate = Partial<EmployeeDrawLedgerInsert>;
+
+export type CommissionRolloverLedgerRow = {
+  id: string;
+  profile_id: string;
+  job_id: string | null;
+  commission_event_id: string | null;
+  transaction_type: string;
+  amount: number;
+  reason: string;
+  created_by: string | null;
+  created_at: string;
+};
+
+export type CommissionRolloverLedgerInsert = {
+  id?: string;
+  profile_id: string;
+  job_id?: string | null;
+  commission_event_id?: string | null;
+  transaction_type: string;
+  amount: number;
+  reason: string;
+  created_by?: string | null;
+  created_at?: string;
+};
+
+export type CommissionRolloverLedgerUpdate = Partial<CommissionRolloverLedgerInsert>;
+
+export type CommissionEventRow = {
+  id: string;
+  job_id: string;
+  profile_id: string;
+  event_type: string;
+  calculation_stage: string;
+  compensation_plan_id: string;
+  compensation_plan_version_id: string;
+  commissionable_gp: number;
+  commissionable_gp_percent: number;
+  tier_label: string | null;
+  standard_commission_rate: number;
+  draw_rate_reduction: number;
+  effective_commission_rate: number;
+  job_gross_commission: number;
+  deposit_payout_percent: number;
+  gross_commission: number;
+  previously_recognized: number;
+  rollover_offset: number;
+  draw_offset: number;
+  net_payable: number;
+  status: string;
+  void_reason: string | null;
+  voided_by: string | null;
+  voided_at: string | null;
+  calculation_metadata: Json;
+  created_by: string | null;
+  approved_by: string | null;
+  approved_at: string | null;
+  paid_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type CommissionEventInsert = {
+  id?: string;
+  job_id: string;
+  profile_id: string;
+  event_type: string;
+  calculation_stage: string;
+  compensation_plan_id: string;
+  compensation_plan_version_id: string;
+  commissionable_gp?: number;
+  commissionable_gp_percent?: number;
+  tier_label?: string | null;
+  standard_commission_rate?: number;
+  draw_rate_reduction?: number;
+  effective_commission_rate?: number;
+  job_gross_commission?: number;
+  deposit_payout_percent?: number;
+  gross_commission?: number;
+  previously_recognized?: number;
+  rollover_offset?: number;
+  draw_offset?: number;
+  net_payable?: number;
+  status?: string;
+  void_reason?: string | null;
+  voided_by?: string | null;
+  voided_at?: string | null;
+  calculation_metadata?: Json;
+  created_by?: string | null;
+  approved_by?: string | null;
+  approved_at?: string | null;
+  paid_at?: string | null;
+  created_at?: string;
+  updated_at?: string;
+};
+
+export type CommissionEventUpdate = Partial<CommissionEventInsert>;
+
 export type Database = {
   public: {
     Tables: {
@@ -555,6 +727,125 @@ export type Database = {
             columns: ["changed_by"];
             isOneToOne: false;
             referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      commission_settings: {
+        Row: CommissionSettingsRow;
+        Insert: CommissionSettingsInsert;
+        Update: CommissionSettingsUpdate;
+        Relationships: [
+          {
+            foreignKeyName: "commission_settings_created_by_fkey";
+            columns: ["created_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      employee_draw_periods: {
+        Row: EmployeeDrawPeriodRow;
+        Insert: EmployeeDrawPeriodInsert;
+        Update: EmployeeDrawPeriodUpdate;
+        Relationships: [
+          {
+            foreignKeyName: "employee_draw_periods_profile_id_fkey";
+            columns: ["profile_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      employee_draw_ledger: {
+        Row: EmployeeDrawLedgerRow;
+        Insert: EmployeeDrawLedgerInsert;
+        Update: EmployeeDrawLedgerUpdate;
+        Relationships: [
+          {
+            foreignKeyName: "employee_draw_ledger_profile_id_fkey";
+            columns: ["profile_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "employee_draw_ledger_job_id_fkey";
+            columns: ["job_id"];
+            isOneToOne: false;
+            referencedRelation: "jobs";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "employee_draw_ledger_commission_event_id_fkey";
+            columns: ["commission_event_id"];
+            isOneToOne: false;
+            referencedRelation: "commission_events";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      commission_rollover_ledger: {
+        Row: CommissionRolloverLedgerRow;
+        Insert: CommissionRolloverLedgerInsert;
+        Update: CommissionRolloverLedgerUpdate;
+        Relationships: [
+          {
+            foreignKeyName: "commission_rollover_ledger_profile_id_fkey";
+            columns: ["profile_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "commission_rollover_ledger_job_id_fkey";
+            columns: ["job_id"];
+            isOneToOne: false;
+            referencedRelation: "jobs";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "commission_rollover_ledger_commission_event_id_fkey";
+            columns: ["commission_event_id"];
+            isOneToOne: false;
+            referencedRelation: "commission_events";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      commission_events: {
+        Row: CommissionEventRow;
+        Insert: CommissionEventInsert;
+        Update: CommissionEventUpdate;
+        Relationships: [
+          {
+            foreignKeyName: "commission_events_job_id_fkey";
+            columns: ["job_id"];
+            isOneToOne: false;
+            referencedRelation: "jobs";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "commission_events_profile_id_fkey";
+            columns: ["profile_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "commission_events_compensation_plan_id_fkey";
+            columns: ["compensation_plan_id"];
+            isOneToOne: false;
+            referencedRelation: "compensation_plans";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "commission_events_compensation_plan_version_id_fkey";
+            columns: ["compensation_plan_version_id"];
+            isOneToOne: false;
+            referencedRelation: "compensation_plan_versions";
             referencedColumns: ["id"];
           },
         ];

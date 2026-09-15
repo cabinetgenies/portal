@@ -9,7 +9,10 @@ export type MutationContext =
   | "settings"
   | "reporting"
   | "job"
-  | "adjustment";
+  | "adjustment"
+  | "commission_event"
+  | "draw"
+  | "rollover";
 
 /**
  * Turns database constraint failures into something a person can act on.

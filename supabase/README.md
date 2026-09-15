@@ -13,8 +13,14 @@ generalise the shared structures for future Sales Manager compensation (see
 | 4 | `migrations/20260915120200_seed_sen_straight_gp_example.sql` | optional, editable sample plan (`SEN Straight GP Example`) |
 | 5 | `migrations/20260915130000_generalize_compensation_domain.sql` | renames the shared tables and columns to compensation terminology, adds `participant_kind`, guards jobs against manager plans, neutralises policy and audit names |
 | 6 | `migrations/20260915140000_employee_reporting_periods.sql` | effective-dated manager relationships, `manager_of_profile_at`, `direct_report_ids_at` |
+| 7 | `migrations/20260915150000_commission_engine.sql` | commission settings, commission events, draw periods, draw ledger, rollover ledger, balance guards, workflow triggers, audit triggers |
+| 8 | `migrations/20260915150100_commission_engine_rls.sql` | Row Level Security for settings, events and both ledgers |
+| 9 | `migrations/20260915150200_seed_cabinet_genies_standard_plan.sql` | production plan `Cabinet Genies Standard GP Commission` (50% → 30%, 45% → 20%, 35% → 10%, below → 0%) |
 
 Every script is idempotent, so re-running one is safe.
+
+The commission engine is documented in
+[docs/commission-engine.md](../docs/commission-engine.md).
 
 Migration 4 deliberately uses the Phase 2 table names: it runs *before* the
 rename in migration 5, which carries its rows across unchanged. Some constraint
@@ -153,6 +159,56 @@ attribution:
 
 `lib/compensation/attribution.ts` mirrors both in TypeScript and is unit tested.
 Nothing calculates or pays a manager bonus yet.
+
+## Commission engine verification
+
+After applying migrations 7–9, these read-only queries confirm the engine is in
+place:
+
+```sql
+-- 1. Default rule inputs: 50% deposit payout, 5 point draw reduction, draw enabled.
+select effective_from, deposit_payout_percent, draw_rate_reduction, draw_enabled
+from public.commission_settings
+order by effective_from;
+
+-- 2. Production tiers: 30 / 20 / 10 / 0 with the expected GP bands.
+select p.name, v.version_name, t.sort_order, t.lower_gp_percent, t.upper_gp_percent, t.rate, t.label
+from public.compensation_plans p
+join public.compensation_plan_versions v on v.compensation_plan_id = p.id
+join public.compensation_plan_tiers t on t.compensation_plan_version_id = v.id
+where p.name = 'Cabinet Genies Standard GP Commission'
+order by v.effective_from desc, t.sort_order;
+
+-- 3. Engine tables exist.
+select table_name from information_schema.tables
+where table_schema = 'public'
+  and table_name in ('commission_events', 'employee_draw_periods', 'employee_draw_ledger', 'commission_rollover_ledger', 'commission_settings')
+order by table_name;
+
+-- 4. Idempotency indexes exist: at most one deposit and one final true-up per job,
+--    and at most one offset of each kind per event.
+select indexname from pg_indexes
+where schemaname = 'public'
+  and indexname in ('commission_events_job_stage_key', 'employee_draw_ledger_event_key', 'commission_rollover_ledger_event_key')
+order by indexname;
+
+-- 5. Ledger balances are derived, never stored.
+select public.employee_draw_balance('<profile-uuid>') as outstanding_draw,
+       public.employee_rollover_balance('<profile-uuid>') as outstanding_rollover,
+       public.is_profile_on_draw_at('<profile-uuid>', current_date) as on_draw;
+
+-- 6. Commission events for a job, with the snapshot each was calculated under.
+select created_at, event_type, calculation_stage, status,
+       commissionable_gp_percent, standard_commission_rate, draw_rate_reduction,
+       effective_commission_rate, gross_commission, rollover_offset, draw_offset, net_payable
+from public.commission_events
+where job_id = '<job-uuid>'
+order by created_at desc;
+```
+
+Applying the migrations does not create commission events. Events are created by
+the application when a deposit is recorded (deposit event) and when a job is
+GP-audited (final true-up); until then the dashboard shows empty queues.
 
 ## Derived job figures
 

@@ -14,17 +14,25 @@ Internal operations portal for Cabinet Genies.
   future Sales Manager compensation — a participant kind on plans, effective-dated
   manager relationships with attribution primitives, and a documented extension
   point. No manager bonus is calculated, approved or paid.
+- **Phase 3 (done):** the sales designer commission engine — configurable tiers,
+  projected and final audited commission, deposit payout, final true-up, negative
+  true-up rollover, draw against commission with immutable ledgers, approval and
+  payment workflow, employee commission dashboard and commission settings UI.
 
-Commission *payout* math, sales manager bonus calculation, the 50% deposit
-payout, true-up, payroll batching, Buildertrend integration, split commissions,
-payment approvals, the sales pipeline, project management, production scheduling
-and notifications are intentionally **not** implemented yet.
+Sales manager bonus calculation and payout, support designer bonuses, split
+commissions, production performance bonuses, payroll batching, Buildertrend
+integration, the sales pipeline, project management, production scheduling and
+notifications are intentionally **not** implemented yet.
 
 Two rules are structural, not conventions: a job has exactly **one** sales
 designer and Cabinet Genies does **not** split commissions, so there is no split
 table and no share-of-someone-else column anywhere. Manager compensation will be
 its own bonus/override on qualifying jobs. See
 [docs/compensation-architecture.md](docs/compensation-architecture.md).
+
+The commission engine itself — tier resolution, deposit payout, final true-up,
+rollover, draw and the canonical offset order — is documented in
+[docs/commission-engine.md](docs/commission-engine.md).
 
 ## Stack
 
@@ -69,16 +77,18 @@ first administrator, are in [`supabase/README.md`](supabase/README.md).
 | --- | --- | --- |
 | `/login` | public | Email and password sign-in |
 | `/home` | authenticated | Dashboard shell, workspace cards, activity empty state |
-| `/commissions` | authenticated | Module dashboard. Payments and reports remain placeholders |
+| `/commissions` | authenticated | Commission dashboard: projected, pending, approved, paid, draw and rollover cards plus action queues (employees see their own commission instead) |
+| `/commissions/payments` | accounting+ | Approval and payment workflow, void-with-reason, immutable paid history |
 | `/commissions/jobs` | scoped by role | Live job list: revenue, GP, GP %, commissionable GP |
 | `/commissions/jobs/new` | admin / CEO | Create a job |
-| `/commissions/jobs/[id]` | scoped by role | Overview, Financials, Commission setup, Audit / adjustments |
-| `/commissions/employees` | accounting+ | Commission eligibility and dated plan assignments |
-| `/commissions/rules` | accounting+ | Read-only plans, versions and tiers |
+| `/commissions/jobs/[id]` | scoped by role | Overview, Financials, Commission setup, Commission (projected/final breakdown, events, workflow), Audit / adjustments |
+| `/commissions/employees` | accounting+ | Eligibility, plan, draw status, balances, projected/pending/paid figures and per-employee ledgers |
+| `/commissions/rules` | accounting+ | Read-only plan tiers plus the current rule inputs |
 | `/sales`, `/projects`, `/production`, `/reports` | authenticated | Placeholder module screens |
 | `/admin`, `/admin/users` | admin / CEO | Administration shell, current profile, role model |
 | `/admin/project-categories` | admin / CEO | Manage project categories and minimum GP standards |
 | `/admin/compensation-plans` | admin / CEO | Manage compensation plans, versions and tiers (sales designer plans today; manager plans reserved) |
+| `/admin/commission-settings` | admin / CEO | Deposit payout %, draw rate reduction, draw system on/off, effective-dated history |
 | `/` | public | Redirects to `/home` or `/login` based on session |
 
 ## Architecture
@@ -90,7 +100,8 @@ app/
   error.tsx, global-error.tsx, not-found.tsx
 components/
   app-shell/             Sidebar, mobile drawer, user panel, nav list
-  commission/            Job, plan, category and employee commission forms
+  commission/            Job, commission engine, draw and ledger form components
+  compensation/          Plan, category and settings form components
   commissions/, admin/   Module-specific navigation
   page-header/, metric-card/, empty-state/, module-card/, configuration-notice/
   ui/                    Small shared primitives (form fields, tables, panels, badges)
@@ -98,8 +109,9 @@ lib/
   auth/                  Data access layer (session checks) and Server Actions
   compensation/          Compensation vocabulary, effective-dated plan resolution,
                          manager attribution, validation, queries, Server Actions
-  commission/            Job domain: types, financial math, validation, queries,
-                         Server Actions
+  commission/            Job domain and commission engine: financial math, tier
+                         and offset engine, event workflow, draw/rollover
+                         ledgers, queries, Server Actions and unit tests
   forms/                 Shared action-state and database-error helpers
   permissions/           Roles, capabilities, navigation configuration
   supabase/              Browser, server, proxy and admin clients plus DB types

@@ -5,6 +5,7 @@ const TABS = [
   { label: "Users", href: "/admin/users" },
   { label: "Project categories", href: "/admin/project-categories" },
   { label: "Compensation plans", href: "/admin/compensation-plans" },
+  { label: "Commission settings", href: "/admin/commission-settings" },
 ];
 
 export function AdminNav() {

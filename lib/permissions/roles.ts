@@ -41,11 +41,23 @@ export type Capability =
   | "create:job-adjustments"
   | "view:compensation-config"
   | "manage:compensation-config"
-  | "manage:employee-compensation";
+  | "manage:employee-compensation"
+  | "view:own-commission"
+  | "calculate:commission"
+  | "submit:commission"
+  | "approve:commission"
+  | "pay:commission"
+  | "void:commission"
+  | "manage:draw";
 
 const CAPABILITIES_BY_ROLE: Record<Role, readonly Capability[]> = {
-  employee: ["view:own-profile", "view:jobs-own"],
-  supervisor: ["view:own-profile", "view:team-profiles", "view:jobs-team"],
+  employee: ["view:own-profile", "view:jobs-own", "view:own-commission"],
+  supervisor: [
+    "view:own-profile",
+    "view:team-profiles",
+    "view:jobs-team",
+    "view:own-commission",
+  ],
   accounting: [
     "view:own-profile",
     "view:financials",
@@ -53,6 +65,8 @@ const CAPABILITIES_BY_ROLE: Record<Role, readonly Capability[]> = {
     "edit:job-financials",
     "create:job-adjustments",
     "view:compensation-config",
+    "calculate:commission",
+    "submit:commission",
   ],
   admin: [
     "view:own-profile",
@@ -67,6 +81,12 @@ const CAPABILITIES_BY_ROLE: Record<Role, readonly Capability[]> = {
     "view:compensation-config",
     "manage:compensation-config",
     "manage:employee-compensation",
+    "calculate:commission",
+    "submit:commission",
+    "approve:commission",
+    "pay:commission",
+    "void:commission",
+    "manage:draw",
     "administer:portal",
   ],
   ceo: [
@@ -82,6 +102,12 @@ const CAPABILITIES_BY_ROLE: Record<Role, readonly Capability[]> = {
     "view:compensation-config",
     "manage:compensation-config",
     "manage:employee-compensation",
+    "calculate:commission",
+    "submit:commission",
+    "approve:commission",
+    "pay:commission",
+    "void:commission",
+    "manage:draw",
     "administer:portal",
   ],
 };

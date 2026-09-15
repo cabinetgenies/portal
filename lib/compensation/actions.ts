@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 
 import { authorizeCapability } from "@/lib/auth/authorize";
 import {
+  commissionSettingsSchema,
   compensationPlanSchema,
   compensationPlanVersionSchema,
   compensationTierSchema,
@@ -36,6 +37,48 @@ function revalidateCompensation() {
   revalidatePath("/commissions/rules");
   revalidatePath("/commissions/employees");
   revalidatePath("/commissions/jobs");
+}
+
+// ---------------------------------------------------------------------------
+// Commission engine settings (deposit payout, draw reduction, draw enabled)
+// ---------------------------------------------------------------------------
+
+export async function saveCommissionSettings(
+  _previousState: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const auth = await authorizeCapability("manage:compensation-config");
+  if ("denied" in auth) return auth.denied;
+
+  const parsed = commissionSettingsSchema.safeParse(formDataToObject(formData));
+  if (!parsed.success) return validationErrorState(parsed.error);
+
+  const { effectiveFrom, depositPayoutPercent, drawRateReduction, drawEnabled, notes } =
+    parsed.data;
+
+  const supabase = await createSupabaseServerClient();
+  const { error } = await supabase.from("commission_settings").upsert(
+    {
+      effective_from: effectiveFrom,
+      deposit_payout_percent: toDecimalPercent(depositPayoutPercent),
+      draw_rate_reduction: toDecimalPercent(drawRateReduction),
+      draw_enabled: drawEnabled,
+      notes,
+      created_by: auth.userId,
+    },
+    { onConflict: "effective_from" },
+  );
+
+  if (error) return mutationErrorState(error, "settings");
+
+  revalidatePath("/commissions/rules");
+  revalidatePath("/admin/commission-settings");
+  revalidatePath("/commissions");
+  revalidatePath("/commissions/jobs");
+
+  return successState(
+    "Commission settings saved. These values apply to calculations made from the effective date onward; existing commission events keep their snapshot.",
+  );
 }
 
 // ---------------------------------------------------------------------------

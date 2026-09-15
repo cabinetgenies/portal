@@ -143,3 +143,136 @@ export function jobFinancialInputsFromRow(row: JobRow): JobFinancialInputs {
     warrantyServiceContingency: row.warranty_service_contingency,
   };
 }
+
+// ---------------------------------------------------------------------------
+// Commission events, payout stages and ledger vocabulary
+// ---------------------------------------------------------------------------
+
+export const COMMISSION_EVENT_TYPES = [
+  "deposit",
+  "final_true_up",
+  "manual_adjustment",
+  "rollover_application",
+] as const;
+
+export type CommissionEventType = (typeof COMMISSION_EVENT_TYPES)[number];
+
+export const COMMISSION_EVENT_TYPE_LABELS: Record<CommissionEventType, string> = {
+  deposit: "Deposit commission",
+  final_true_up: "Final true-up",
+  manual_adjustment: "Manual adjustment",
+  rollover_application: "Rollover application",
+};
+
+export const CALCULATION_STAGES = ["projected", "final"] as const;
+
+export type CalculationStage = (typeof CALCULATION_STAGES)[number];
+
+export const CALCULATION_STAGE_LABELS: Record<CalculationStage, string> = {
+  projected: "Projected",
+  final: "Final (audited)",
+};
+
+export const COMMISSION_EVENT_STATUSES = [
+  "calculated",
+  "pending_approval",
+  "approved",
+  "paid",
+  "voided",
+] as const;
+
+export type CommissionEventStatus = (typeof COMMISSION_EVENT_STATUSES)[number];
+
+export const COMMISSION_EVENT_STATUS_LABELS: Record<CommissionEventStatus, string> = {
+  calculated: "Calculated",
+  pending_approval: "Pending approval",
+  approved: "Approved / awaiting payment",
+  paid: "Paid",
+  voided: "Voided",
+};
+
+export const COMMISSION_EVENT_STATUS_TONES: Record<CommissionEventStatus, StatusTone> = {
+  calculated: "neutral",
+  pending_approval: "warning",
+  approved: "info",
+  paid: "positive",
+  voided: "critical",
+};
+
+export function isCommissionEventType(value: unknown): value is CommissionEventType {
+  return (
+    typeof value === "string" &&
+    (COMMISSION_EVENT_TYPES as readonly string[]).includes(value)
+  );
+}
+
+export function isCommissionEventStatus(
+  value: unknown,
+): value is CommissionEventStatus {
+  return (
+    typeof value === "string" &&
+    (COMMISSION_EVENT_STATUSES as readonly string[]).includes(value)
+  );
+}
+
+export function commissionEventTypeLabel(value: string | null | undefined) {
+  return isCommissionEventType(value) ? COMMISSION_EVENT_TYPE_LABELS[value] : "Unknown";
+}
+
+export function commissionEventStatusLabel(value: string | null | undefined) {
+  return isCommissionEventStatus(value)
+    ? COMMISSION_EVENT_STATUS_LABELS[value]
+    : "Unknown";
+}
+
+export function commissionEventStatusTone(
+  value: string | null | undefined,
+): StatusTone {
+  return isCommissionEventStatus(value) ? COMMISSION_EVENT_STATUS_TONES[value] : "neutral";
+}
+
+export const DRAW_TRANSACTION_TYPES = [
+  "draw_advance",
+  "commission_offset",
+  "manual_adjustment",
+  "repayment",
+] as const;
+
+export type DrawTransactionType = (typeof DRAW_TRANSACTION_TYPES)[number];
+
+export const DRAW_TRANSACTION_TYPE_LABELS: Record<DrawTransactionType, string> = {
+  draw_advance: "Draw advance",
+  commission_offset: "Commission offset",
+  manual_adjustment: "Manual adjustment",
+  repayment: "Repayment",
+};
+
+export const ROLLOVER_TRANSACTION_TYPES = [
+  "negative_true_up",
+  "future_commission_offset",
+  "manual_adjustment",
+] as const;
+
+export type RolloverTransactionType = (typeof ROLLOVER_TRANSACTION_TYPES)[number];
+
+export const ROLLOVER_TRANSACTION_TYPE_LABELS: Record<RolloverTransactionType, string> = {
+  negative_true_up: "Negative true-up",
+  future_commission_offset: "Future commission offset",
+  manual_adjustment: "Manual adjustment",
+};
+
+export function isDrawTransactionType(value: unknown): value is DrawTransactionType {
+  return (
+    typeof value === "string" &&
+    (DRAW_TRANSACTION_TYPES as readonly string[]).includes(value)
+  );
+}
+
+export function isRolloverTransactionType(
+  value: unknown,
+): value is RolloverTransactionType {
+  return (
+    typeof value === "string" &&
+    (ROLLOVER_TRANSACTION_TYPES as readonly string[]).includes(value)
+  );
+}

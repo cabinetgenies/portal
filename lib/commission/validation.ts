@@ -54,6 +54,11 @@ const dateField = (label: string) =>
     z.string().regex(ISO_DATE, `${label} must be a valid date.`).nullable(),
   );
 
+const requiredDateField = (label: string) =>
+  z
+    .string({ error: `${label} is required.` })
+    .regex(ISO_DATE, `${label} must be a valid date.`);
+
 const uuidField = (label: string) =>
   z.string({ error: `${label} is required.` }).trim().min(1, `${label} is required.`);
 
@@ -129,3 +134,52 @@ export const jobCompensationPlanSchema = z.object({
 });
 
 export type JobCompensationPlanInput = z.infer<typeof jobCompensationPlanSchema>;
+
+// ---------------------------------------------------------------------------
+// Draw against commission and ledger adjustments
+// ---------------------------------------------------------------------------
+
+/** Placing an employee on draw, or closing an existing draw period. */
+export const drawPeriodSchema = z
+  .object({
+    profileId: uuidField("Employee"),
+    effectiveFrom: requiredDateField("Effective from"),
+    effectiveTo: dateField("Effective to"),
+    notes: optionalText(400),
+  })
+  .superRefine((value, ctx) => {
+    if (value.effectiveTo && value.effectiveTo < value.effectiveFrom) {
+      ctx.addIssue({
+        code: "custom",
+        message: "The end date cannot be before the start date.",
+        path: ["effectiveTo"],
+      });
+    }
+  });
+
+export const endDrawPeriodSchema = z.object({
+  profileId: uuidField("Employee"),
+  effectiveTo: requiredDateField("Effective to"),
+  notes: optionalText(400),
+});
+
+/** A draw advance increases the outstanding draw; the amount is always positive. */
+export const drawAdvanceSchema = z.object({
+  profileId: uuidField("Employee"),
+  amount: moneyField("Draw advance").refine(
+    (value) => Math.round(value * 100) > 0,
+    "Enter a draw advance amount greater than zero.",
+  ),
+  reason: requiredText("Reason", 300),
+  jobId: optionalUuid,
+});
+
+/** Documented manual adjustments may be positive or negative but never zero. */
+export const ledgerAdjustmentSchema = z.object({
+  profileId: uuidField("Employee"),
+  amount: signedMoneyField("Amount").refine(
+    (value) => Math.round(value * 100) !== 0,
+    "Enter a non-zero amount.",
+  ),
+  reason: requiredText("Reason", 300),
+});

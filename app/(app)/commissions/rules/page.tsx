@@ -7,6 +7,12 @@ import { PageHeader } from "@/components/page-header/page-header";
 import { buttonClassName } from "@/components/ui/button";
 import { requireSession } from "@/lib/auth/dal";
 import { listCompensationPlans, todayIso } from "@/lib/compensation/queries";
+import {
+  getCommissionSettings,
+  listCommissionSettingsHistory,
+} from "@/lib/commission/event-queries";
+import { Panel } from "@/components/ui/panel";
+import { formatDate, formatPercent } from "@/lib/utils/format";
 
 export const metadata = {
   title: "Commission Rules",
@@ -29,6 +35,10 @@ export default async function CommissionRulesPage() {
 
   const plans = await listCompensationPlans();
   const today = todayIso();
+  const [settings, history] = await Promise.all([
+    getCommissionSettings(),
+    listCommissionSettingsHistory(),
+  ]);
 
   return (
     <div className="space-y-6">
@@ -49,6 +59,69 @@ export default async function CommissionRulesPage() {
       />
 
       <PlanList plans={plans} canEdit={false} today={today} />
+
+      <Panel
+        id="rule-inputs"
+        title="Rule inputs"
+        description="Deposit payout percentage, draw rate reduction and whether the draw system is enabled. Every commission event snapshots the values it used."
+        actions={
+          canEdit ? (
+            <Link
+              href="/admin/commission-settings"
+              className={buttonClassName({ size: "sm", variant: "secondary" })}
+            >
+              Edit settings
+            </Link>
+          ) : null
+        }
+      >
+        <dl className="grid gap-x-8 gap-y-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="space-y-1">
+            <dt className="text-xs font-medium tracking-[0.12em] text-ink-subtle uppercase">
+              Deposit payout
+            </dt>
+            <dd className="text-sm text-ink">
+              {formatPercent(settings?.depositPayoutPercent ?? 0.5, 0)} of projected
+              commission
+            </dd>
+          </div>
+          <div className="space-y-1">
+            <dt className="text-xs font-medium tracking-[0.12em] text-ink-subtle uppercase">
+              Draw rate reduction
+            </dt>
+            <dd className="text-sm text-ink">
+              {((settings?.drawRateReduction ?? 0.05) * 100).toFixed(2)} percentage points
+            </dd>
+          </div>
+          <div className="space-y-1">
+            <dt className="text-xs font-medium tracking-[0.12em] text-ink-subtle uppercase">
+              Draw system
+            </dt>
+            <dd className="text-sm text-ink">
+              {settings?.drawEnabled ?? true ? "Enabled" : "Disabled"}
+            </dd>
+          </div>
+          <div className="space-y-1">
+            <dt className="text-xs font-medium tracking-[0.12em] text-ink-subtle uppercase">
+              Effective
+            </dt>
+            <dd className="text-sm text-ink">{formatDate(settings?.effectiveFrom ?? null)}</dd>
+          </div>
+        </dl>
+
+        {history.length > 1 ? (
+          <ul className="mt-4 space-y-1 border-t border-line pt-3 text-xs text-ink-muted">
+            {history.slice(1).map((row) => (
+              <li key={row.id}>
+                Effective {formatDate(row.effectiveFrom)} · deposit{" "}
+                {formatPercent(row.depositPayoutPercent, 0)} · draw reduction{" "}
+                {(row.drawRateReduction * 100).toFixed(2)} points ·{" "}
+                {row.drawEnabled ? "draw enabled" : "draw disabled"}
+              </li>
+            ))}
+          </ul>
+        ) : null}
+      </Panel>
     </div>
   );
 }

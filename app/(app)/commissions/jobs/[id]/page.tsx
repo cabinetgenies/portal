@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
 
 import { JobAdjustmentForm } from "@/components/commission/job-adjustment-form";
+import { JobCommissionPanel } from "@/components/commission/job-commission-panel";
 import { JobFinancialsForm } from "@/components/commission/job-financials-form";
 import { JobOverviewForm } from "@/components/commission/job-forms";
 import { JobCompensationPlanForm } from "@/components/commission/job-plan-form";
@@ -26,6 +27,7 @@ import {
 import {
   getJobDetail,
 } from "@/lib/commission/queries";
+import { getJobCommissionContext } from "@/lib/commission/event-queries";
 import {
   ADJUSTMENT_TYPE_LABELS,
   isAdjustmentType,
@@ -44,6 +46,7 @@ const SECTIONS = [
   { href: "#overview", label: "Overview" },
   { href: "#financials", label: "Financials" },
   { href: "#commission-setup", label: "Commission setup" },
+  { href: "#commission", label: "Commission" },
   { href: "#audit", label: "Audit / adjustments" },
 ];
 
@@ -63,6 +66,13 @@ export default async function JobDetailPage(props: PageProps<"/commissions/jobs/
   const canEditFinancials = session.capabilities.includes("edit:job-financials");
   const canAdjust = session.capabilities.includes("create:job-adjustments");
   const canViewConfig = session.capabilities.includes("view:compensation-config");
+  const canCalculate = session.capabilities.includes("calculate:commission");
+  const canSubmit = session.capabilities.includes("submit:commission");
+  const canApprove = session.capabilities.includes("approve:commission");
+  const canPay = session.capabilities.includes("pay:commission");
+  const canVoid = session.capabilities.includes("void:commission");
+
+  const commissionContext = await getJobCommissionContext(id);
 
   const [categories, designers, planOptions] = await Promise.all([
     canManageJobs ? listProjectCategories() : Promise.resolve([]),
@@ -260,6 +270,18 @@ export default async function JobDetailPage(props: PageProps<"/commissions/jobs/
           />
         )}
       </Panel>
+
+      {commissionContext ? (
+        <JobCommissionPanel
+          context={commissionContext}
+          canCalculate={canCalculate}
+          canViewConfig={canViewConfig}
+          canSubmit={canSubmit}
+          canApprove={canApprove}
+          canPay={canPay}
+          canVoid={canVoid}
+        />
+      ) : null}
 
       {canViewConfig ? (
         <Panel
