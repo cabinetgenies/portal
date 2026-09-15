@@ -45,6 +45,10 @@ Internal operations portal for Cabinet Genies.
   rates, burden and warranty percentages and the resulting true-up. The final true-up
   is created separately from that snapshot, and a GP audit date on its own no longer
   unlocks it.
+- **Phase 4 (done):** the Sales Designer commission bands changed to seven fixed
+  gross-profit bands (0% below 30% GP, then 5/10/15/20/25/30% from 30/35/40/45/47/49%),
+  seeded as a new effective-dated version of the production plan with a rate card on
+  the commission rules page. No interpolation, and no band rate in code.
 
 Sales manager bonus calculation and payout, support designer bonuses, split
 commissions, production performance bonuses, payroll batching, Buildertrend

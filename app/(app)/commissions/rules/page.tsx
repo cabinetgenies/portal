@@ -1,11 +1,13 @@
 import Link from "next/link";
 
+import { CommissionRateCard } from "@/components/compensation/commission-rate-card";
 import { PlanList } from "@/components/compensation/plan-list";
 import { EmptyState } from "@/components/empty-state/empty-state";
 import { LockIcon } from "@/components/icons";
 import { PageHeader } from "@/components/page-header/page-header";
 import { buttonClassName } from "@/components/ui/button";
 import { requireSession } from "@/lib/auth/dal";
+import { resolveApplicablePlanVersion } from "@/lib/compensation/plan-resolution";
 import { listCompensationPlans, todayIso } from "@/lib/compensation/queries";
 import {
   getCommissionSettings,
@@ -17,6 +19,8 @@ import { formatDate, formatPercent } from "@/lib/utils/format";
 export const metadata = {
   title: "Commission Rules",
 };
+
+const PRODUCTION_PLAN_NAME = "Cabinet Genies Standard GP Commission";
 
 export default async function CommissionRulesPage() {
   const session = await requireSession();
@@ -40,12 +44,32 @@ export default async function CommissionRulesPage() {
     listCommissionSettingsHistory(),
   ]);
 
+  // The bands in force today, read from the plan version that governs new work.
+  const productionPlan =
+    plans.find((plan) => plan.name === PRODUCTION_PLAN_NAME) ?? null;
+  const currentVersion = productionPlan
+    ? resolveApplicablePlanVersion(
+        productionPlan.versions.map((version) => ({
+          id: version.id,
+          commissionPlanId: version.compensation_plan_id,
+          versionName: version.version_name,
+          effectiveFrom: version.effective_from,
+          effectiveTo: version.effective_to,
+          active: version.active,
+        })),
+        today,
+      )
+    : null;
+  const currentVersionTiers = currentVersion
+    ? productionPlan?.versions.find((version) => version.id === currentVersion.id)?.tiers ?? []
+    : [];
+
   return (
     <div className="space-y-6">
       <PageHeader
         eyebrow="Commissions"
         title="Rules"
-        description="The compensation plans, effective-dated versions and GP tiers that payments will be calculated from. Payout math itself is not implemented yet, for sales designers or sales managers."
+        description="The commission bands in force today, then the plans, effective-dated versions and GP tiers that payments are calculated from. Commission is a percentage of commissionable gross profit; sales manager compensation is not implemented."
         actions={
           canEdit ? (
             <Link
@@ -57,6 +81,17 @@ export default async function CommissionRulesPage() {
           ) : null
         }
       />
+
+      {productionPlan && currentVersion ? (
+        <CommissionRateCard
+          versionName={currentVersion.versionName}
+          effectiveFrom={currentVersion.effectiveFrom}
+          effectiveTo={currentVersion.effectiveTo}
+          tiers={currentVersionTiers}
+          canEdit={canEdit}
+          editHref="/admin/compensation-plans"
+        />
+      ) : null}
 
       <PlanList plans={plans} canEdit={false} today={today} />
 

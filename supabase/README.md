@@ -20,6 +20,7 @@ generalise the shared structures for future Sales Manager compensation (see
 | 11 | `migrations/20260915170000_percentage_based_job_costs.sql` | percentage-based burden and warranty / service contingency: company defaults on `commission_settings`, per-job snapshots on `jobs`, derived dollars kept, and range constraints |
 | 12 | `migrations/20260915180000_change_orders_and_original_cost.sql` | simplified job financials: `jobs.original_cost` and `jobs.change_order_cost`, the `job_change_orders` table with RLS and audit, and an audit trigger for the financial inputs |
 | 13 | `migrations/20260915190000_final_commission_audit.sql` | the final commission audit: `commission_audits` snapshot table with revisions, RLS, audit trigger, one open audit per job, and finalized-requires-actor constraints |
+| 14 | `migrations/20260915200000_sales_designer_commission_bands_v2.sql` | new Sales Designer band schedule as version `v2` of the production plan: seven fixed GP bands (0/5/10/15/20/25/30%) with inclusive lower and exclusive upper bounds, and the previous version closed the day before it starts |
 
 Every script is idempotent, so re-running one is safe.
 

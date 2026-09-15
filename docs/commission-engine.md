@@ -93,18 +93,29 @@ The tier comes from the plan version attached to the job
 (`jobs.compensation_plan_version_id`), which must belong to a plan whose
 `participant_kind` is `sales_designer`:
 
+Current bands (version `v2`, effective 2026-09-15):
+
 | Commissionable GP % | Standard rate |
 | --- | --- |
-| ≥ 50% | 30% |
-| ≥ 45% and < 50% | 20% |
-| ≥ 35% and < 45% | 10% |
-| < 35% | 0% |
+| ≥ 49% | 30% |
+| ≥ 47% and < 49% | 25% |
+| ≥ 45% and < 47% | 20% |
+| ≥ 40% and < 45% | 15% |
+| ≥ 35% and < 40% | 10% |
+| ≥ 30% and < 35% | 5% |
+| < 30% | 0% |
 
-Those numbers are **configuration** (`compensation_plan_tiers`), seeded by the
-`Cabinet Genies Standard GP Commission` plan. Admin/CEO edit them through
-Admin → Commission settings / Compensation plans. Bands are inclusive on the
-lower bound and exclusive on the upper bound, and tiers are evaluated in
-`sort_order` (highest band first).
+Below 30% GP is a hard floor: the rate is exactly zero, with no interpolation or
+curve between bands, and the outcome for a loss-making job is the same 0%.
+
+Those numbers are **configuration** (`compensation_plan_tiers`), not constants in
+code — `lib/commission/financials.ts` and the engine resolve the rate from the rows.
+Admin/CEO edit them through Admin → Compensation plans, and editing a schedule means
+adding a new effective-dated version: version `v1` (30/20/10/0% at 50/45/35% GP)
+stays on the record and remains the schedule every job, audit and commission event
+calculated before 2026-09-15 was measured against. Bands are inclusive on the lower
+bound and exclusive on the upper bound, and tiers are evaluated in `sort_order`
+(highest band first).
 
 `effective rate` = max(standard rate − draw reduction, 0)
 
