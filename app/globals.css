@@ -1,26 +1,52 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
+/*
+ * Cabinet Genies portal design tokens.
+ *
+ * Restrained, warm-neutral surfaces with a single bronze accent — built for a
+ * dense internal operating system rather than a marketing site.
+ */
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-canvas: #f6f6f3;
+  --color-surface: #ffffff;
+  --color-surface-muted: #fafaf8;
+  --color-line: #e7e6e1;
+  --color-line-strong: #d4d3cc;
+  --color-ink: #16181c;
+  --color-ink-muted: #5c6068;
+  --color-ink-subtle: #8b8f97;
+  --color-graphite: #1b1d22;
+  --color-graphite-soft: #2a2d34;
+  --color-accent: #a5712c;
+  --color-accent-strong: #85571c;
+  --color-accent-soft: #f5eee1;
+
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, monospace;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+:root {
+  color-scheme: light;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background-color: var(--color-canvas);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+::selection {
+  background-color: var(--color-accent-soft);
+  color: var(--color-accent-strong);
+}
+
+/* Keep dense module tables from breaking the shell layout. */
+:where(table) {
+  border-collapse: collapse;
 }

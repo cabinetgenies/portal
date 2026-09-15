@@ -1,36 +1,91 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Cabinet Genies Portal
 
-## Getting Started
+Internal operations portal for Cabinet Genies. Phase 1 is the production
+foundation: authentication, the user and role model, the protected application
+shell, the dashboard shell, the navigation architecture and placeholder module
+routes.
 
-First, run the development server:
+Commission calculations, sales pipeline, project management, production
+scheduling and payroll are intentionally **not** implemented yet.
+
+## Stack
+
+- Next.js 16.3 (App Router, Turbopack, `proxy.ts` instead of `middleware.ts`)
+- React 19.2
+- TypeScript
+- Tailwind CSS 4
+- Supabase (Auth + Postgres with Row Level Security)
+- Vercel
+
+## Getting started
 
 ```bash
+npm install
+cp .env.example .env.local   # then fill in the two Supabase values
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Required environment variables (see [`.env.example`](.env.example)):
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+| Variable | Required | Notes |
+| --- | --- | --- |
+| `NEXT_PUBLIC_SUPABASE_URL` | yes | Supabase project URL. Safe in the browser. |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | yes | Supabase anon (publishable) key. Safe in the browser — RLS enforces access. |
+| `SUPABASE_SERVICE_ROLE_KEY` | no | Server-only. Not required for authentication, only for privileged admin work in a later phase. |
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+If the two required variables are missing, the portal renders an explicit
+configuration notice instead of failing with a stack trace.
 
-## Learn More
+## Supabase
 
-To learn more about Next.js, take a look at the following resources:
+Run
+[`supabase/migrations/20260915090000_create_profiles.sql`](supabase/migrations/20260915090000_create_profiles.sql)
+in the Supabase SQL editor (or `supabase db push` once the CLI is linked), then
+create your first users in Supabase Auth. Details, including how to promote the
+first administrator, are in [`supabase/README.md`](supabase/README.md).
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Routes
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+| Route | Access | Phase 1 content |
+| --- | --- | --- |
+| `/login` | public | Email and password sign-in |
+| `/home` | authenticated | Dashboard shell, workspace cards, activity empty state |
+| `/commissions` | authenticated | Module shell plus Dashboard/Jobs/Employees/Payments/Rules/Reports placeholders |
+| `/sales`, `/projects`, `/production`, `/reports` | authenticated | Placeholder module screens |
+| `/admin`, `/admin/users` | admin / CEO | Administration shell, current profile, role model |
+| `/` | public | Redirects to `/home` or `/login` based on session |
 
-## Deploy on Vercel
+## Architecture
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+```
+app/
+  (auth)/login/          Public sign-in route
+  (app)/                 Authenticated shell and protected routes
+  error.tsx, global-error.tsx, not-found.tsx
+components/
+  app-shell/             Sidebar, mobile drawer, user panel, nav list
+  commissions/, admin/   Module-specific navigation
+  page-header/, metric-card/, empty-state/, module-card/, configuration-notice/
+  ui/                    Small shared primitives
+lib/
+  auth/                  Data access layer (session checks) and Server Actions
+  permissions/           Roles, capabilities, navigation configuration
+  supabase/              Browser, server, proxy and admin clients plus DB types
+  utils/                 Formatting and class-name helpers
+proxy.ts                 Session refresh and optimistic route protection
+supabase/migrations/     Database schema and RLS
+```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Security model in one line: `proxy.ts` refreshes sessions and redirects early,
+`lib/auth/dal.ts` verifies every server-side read, and Row Level Security in
+Postgres is the final authority on what any user can see.
+
+## Scripts
+
+```bash
+npm run dev      # development server
+npm run build    # production build
+npm run start    # run the production build
+npm run lint     # ESLint
+npx tsc --noEmit # type check
+```
