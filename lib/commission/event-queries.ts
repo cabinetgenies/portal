@@ -675,6 +675,7 @@ export type EmployeeCommissionSummary = {
   compensationEligible: boolean;
   compensationNotes: string | null;
   planName: string | null;
+  assignmentEffectiveFrom: string | null;
   onDraw: boolean;
   openDrawPeriodFrom: string | null;
   drawBalance: number;
@@ -732,6 +733,7 @@ export const listEmployeeCommissionSummaries = cache(
         planName: currentAssignment
           ? plansById.get(currentAssignment.compensation_plan_id)?.name ?? null
           : null,
+        assignmentEffectiveFrom: currentAssignment?.effective_from ?? null,
         onDraw: isOnDrawOn(drawPeriods, today),
         openDrawPeriodFrom:
           drawPeriods.find((period) => period.effective_to === null)?.effective_from ?? null,

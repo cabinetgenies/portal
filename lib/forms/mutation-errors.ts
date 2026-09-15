@@ -12,7 +12,8 @@ export type MutationContext =
   | "adjustment"
   | "commission_event"
   | "draw"
-  | "rollover";
+  | "rollover"
+  | "user";
 
 /**
  * Turns database constraint failures into something a person can act on.
@@ -33,7 +34,9 @@ export function mutationErrorState(
               ? "That plan already has a version with this name."
               : context === "tier"
                 ? "Another tier in this version already uses that evaluation order."
-                : "A record with those details already exists.",
+                : context === "user"
+                  ? "A portal profile with those details already exists. Check the email address, or configure the existing account in the directory."
+                  : "A record with those details already exists.",
       );
     case "23P01":
       return failureState(
@@ -48,7 +51,9 @@ export function mutationErrorState(
     case "23514":
     case "23503":
       return failureState(
-        "Those values are not valid for this record. Check the fields and try again.",
+        context === "user"
+          ? "No Supabase Auth user matches that id. Create the user in Supabase → Authentication → Users first, then paste their id here."
+          : "Those values are not valid for this record. Check the fields and try again.",
       );
     case "42501":
       return failureState("Your role is not allowed to change this record.");

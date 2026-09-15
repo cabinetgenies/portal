@@ -1,27 +1,20 @@
+import {
+  CreatePortalUserForm,
+  LinkExistingPortalUserForm,
+} from "@/components/admin/user-forms";
+import { UserDirectoryTable } from "@/components/admin/user-directory-table";
 import { EmptyState } from "@/components/empty-state/empty-state";
 import { InfoIcon, UsersIcon } from "@/components/icons";
+import { MetricCard } from "@/components/metric-card/metric-card";
+import { Panel } from "@/components/ui/panel";
+import { listRecentUserAuditEvents, listUserDirectory } from "@/lib/admin/user-queries";
 import { requireCapability } from "@/lib/auth/dal";
-import { displayNameFor } from "@/lib/auth/identity";
-import { roleLabel } from "@/lib/permissions/roles";
+import { getServiceRoleKey } from "@/lib/env";
+import { formatDateTime } from "@/lib/utils/format";
 
 export const metadata = {
   title: "Users",
 };
-
-function formatDate(value: string | null | undefined) {
-  if (!value) return "—";
-
-  return new Intl.DateTimeFormat("en-US", {
-    dateStyle: "medium",
-    timeStyle: "short",
-    timeZone: "America/New_York",
-  }).format(new Date(value));
-}
-
-function formatValue(value: string | null | undefined) {
-  const trimmed = (value ?? "").trim();
-  return trimmed.length > 0 ? trimmed : "—";
-}
 
 export default async function AdminUsersPage() {
   // Re-checked here as well as in the admin layout: authorization belongs as
@@ -34,80 +27,134 @@ export default async function AdminUsersPage() {
     return null;
   }
 
-  const { profile } = session;
-  const name = displayNameFor(profile, session.email);
+  const [directory, activity] = await Promise.all([
+    listUserDirectory(),
+    listRecentUserAuditEvents(12),
+  ]);
 
-  const details = [
-    { label: "Name", value: name },
-    { label: "Email", value: formatValue(profile?.email ?? session.email) },
-    { label: "Role", value: roleLabel(session.role) },
-    { label: "Department", value: formatValue(profile?.department) },
-    { label: "Manager", value: formatValue(profile?.manager_id) },
-    { label: "Status", value: profile?.active === false ? "Inactive" : "Active" },
-    { label: "Profile created", value: formatDate(profile?.created_at) },
-    { label: "Last updated", value: formatDate(profile?.updated_at) },
-  ];
+  // The service role key is server-only: the browser is told whether account
+  // creation is available, never the credential itself.
+  const canProvisionAccounts = getServiceRoleKey() !== null;
+  const managers = directory
+    .filter((user) => user.active)
+    .map((user) => ({ id: user.profileId, name: user.name }));
+
+  const activeCount = directory.filter((user) => user.active).length;
+  const eligibleCount = directory.filter((user) => user.compensationEligible).length;
+  const plannedCount = directory.filter((user) => user.planName !== null).length;
+  const onDrawCount = directory.filter((user) => user.onDraw).length;
 
   return (
     <div className="space-y-6">
       <section
-        aria-labelledby="current-user-heading"
-        className="space-y-4 rounded-xl border border-line bg-surface p-5"
+        aria-label="Directory summary"
+        className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"
       >
-        <div className="space-y-1">
-          <h2
-            id="current-user-heading"
-            className="text-sm font-semibold tracking-tight text-ink"
-          >
-            Your profile
-          </h2>
-          <p className="text-sm text-ink-muted">
-            The record the portal uses for your identity, role and reporting line.
-          </p>
-        </div>
-        <dl className="grid gap-x-8 gap-y-4 sm:grid-cols-2 xl:grid-cols-4">
-          {details.map((detail) => (
-            <div key={detail.label} className="space-y-1">
-              <dt className="text-xs font-medium tracking-[0.12em] text-ink-subtle uppercase">
-                {detail.label}
-              </dt>
-              <dd className="text-sm break-words text-ink">{detail.value}</dd>
-            </div>
-          ))}
-        </dl>
+        <MetricCard
+          label="Portal users"
+          value={`${activeCount} active`}
+          hint={`${directory.length} profile${directory.length === 1 ? "" : "s"} in total`}
+          placeholder={false}
+        />
+        <MetricCard
+          label="Compensation eligible"
+          value={`${eligibleCount}`}
+          hint="Marked eligible for compensation"
+          placeholder={false}
+        />
+        <MetricCard
+          label="On a plan today"
+          value={`${plannedCount}`}
+          hint="Have a compensation plan in force"
+          placeholder={false}
+        />
+        <MetricCard
+          label="On draw"
+          value={`${onDrawCount}`}
+          hint="Enrolled in draw against commission"
+          placeholder={false}
+        />
       </section>
 
-      <section aria-labelledby="directory-heading" className="space-y-4">
-        <div className="space-y-1">
-          <h2
-            id="directory-heading"
-            className="text-sm font-semibold tracking-tight text-ink"
-          >
-            User directory
-          </h2>
-          <p className="text-sm text-ink-muted">
-            The full user table with role assignment and manager changes will live
-            here.
+      <Panel
+        id="create-portal-user"
+        title="Create a portal account"
+        description="Accounts are created through the Supabase Auth Admin API from this server action. auth.users rows are never written with SQL, and the service role key stays on the server."
+      >
+        <CreatePortalUserForm managers={managers} canProvision={canProvisionAccounts} />
+      </Panel>
+
+      <Panel
+        id="link-portal-user"
+        title="Link an existing Supabase Auth user"
+        description="For accounts that already exist in Supabase Auth. Creating the account in Supabase first is always a valid route — the sign-up trigger creates the portal profile — and this form covers the case where a profile row is missing."
+      >
+        <LinkExistingPortalUserForm managers={managers} />
+      </Panel>
+
+      <Panel
+        id="user-directory"
+        title="User directory"
+        description="Every portal profile with its role, reporting line, status and commission setup. Changes are recorded in the audit trail below."
+      >
+        {directory.length === 0 ? (
+          <EmptyState
+            icon={<UsersIcon className="h-5 w-5" />}
+            title="No portal users yet."
+            description="Invite someone above, or create the account in Supabase → Authentication → Users and it will appear here."
+          />
+        ) : (
+          <UserDirectoryTable
+            users={directory}
+            managers={managers}
+            currentUserId={session.userId}
+          />
+        )}
+      </Panel>
+
+      <Panel
+        id="user-activity"
+        title="Recent user activity"
+        description="Append-only audit rows written by database triggers. Portal changes are attributed to the signed-in administrator; account creation through Supabase Auth is attributed to Supabase Auth."
+      >
+        {activity.length === 0 ? (
+          <p className="rounded-lg border border-dashed border-line-strong px-4 py-6 text-center text-sm text-ink-muted">
+            No user or commission-setup activity recorded yet.
           </p>
-        </div>
-        <EmptyState
-          icon={<UsersIcon className="h-5 w-5" />}
-          title="The user directory is being built."
-          description="Rows for every portal user, with role and status controls, arrive with the administration phase. The table component is deliberately not stubbed with sample people."
-        />
-        <div className="flex items-start gap-3 rounded-xl border border-line bg-surface p-4">
-          <InfoIcon className="mt-0.5 h-4 w-4 text-ink-subtle" />
-          <div className="space-y-1">
-            <p className="text-sm font-medium text-ink">Accounts are created in Supabase</p>
-            <p className="text-sm leading-6 text-ink-muted">
-              Portal users are created in Supabase Authentication — never from the
-              browser with privileged credentials. Row Level Security already allows
-              administrators to read every profile, so this page can switch to a live
-              query without a schema change.
-            </p>
-          </div>
-        </div>
-      </section>
+        ) : (
+          <ul className="divide-y divide-line text-sm">
+            {activity.map((entry) => (
+              <li
+                key={entry.id}
+                className="flex flex-wrap items-baseline justify-between gap-2 py-3"
+              >
+                <div className="space-y-0.5">
+                  <p className="font-medium text-ink">
+                    {entry.actionLabel}
+                    {entry.subject ? (
+                      <span className="font-normal text-ink-muted"> · {entry.subject}</span>
+                    ) : null}
+                  </p>
+                  <p className="text-xs leading-5 text-ink-subtle">
+                    {entry.entityLabel}
+                    {entry.summary ? ` · ${entry.summary}` : ""}
+                  </p>
+                </div>
+                <p className="text-xs whitespace-nowrap text-ink-subtle">
+                  {entry.actor} · {formatDateTime(entry.createdAt)}
+                </p>
+              </li>
+            ))}
+          </ul>
+        )}
+        <p className="flex items-start gap-2 text-xs leading-5 text-ink-subtle">
+          <InfoIcon className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+          <span>
+            Commission setup is logged too: eligibility changes, plan assignments and draw
+            periods each write their own audit row.
+          </span>
+        </p>
+      </Panel>
     </div>
   );
 }

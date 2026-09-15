@@ -72,7 +72,9 @@ export function EmployeeCompensationAssignmentForm({
   if (plans.length === 0) {
     return (
       <p className="text-sm text-ink-muted">
-        Create a commission plan before assigning one to this employee.
+        There are no active sales designer compensation plans to assign. Create one under
+        Admin → Compensation plans first — sales manager plans are excluded here on
+        purpose, because a job can only ever reference a sales designer plan.
       </p>
     );
   }

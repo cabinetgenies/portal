@@ -57,10 +57,13 @@ export default async function CommissionEmployeesPage() {
   const canManageDraw = session.capabilities.includes("manage:draw");
   const canManagePlans = session.capabilities.includes("manage:compensation-config");
 
-  const [employees, plans] = await Promise.all([
+  const [employees, planOptions] = await Promise.all([
     listEmployeeCommissionSummaries(),
     canManageCompensation ? listCompensationPlanOptions() : Promise.resolve([]),
   ]);
+  // A job can only reference a sales designer plan, and manager compensation is
+  // explicitly not implemented — so manager plans are not assignable here.
+  const plans = planOptions.filter((plan) => plan.participantKind === "sales_designer");
   const today = todayIso();
 
   return (
@@ -75,7 +78,7 @@ export default async function CommissionEmployeesPage() {
         <EmptyState
           icon={<UsersIcon className="h-5 w-5" />}
           title="No portal users yet."
-          description="Portal users are created in Supabase Authentication. Once they exist, eligibility, plan assignment and draw status are managed here."
+          description="Portal users are created under Admin → Users (or directly in Supabase Authentication). Once they exist, eligibility, plan assignment and draw status are managed here."
         />
       ) : (
         <TableWrap>
@@ -114,7 +117,14 @@ export default async function CommissionEmployeesPage() {
                       tone={row.compensationEligible ? "positive" : "neutral"}
                     />
                   </Td>
-                  <Td className="text-ink-muted">{formatText(row.planName)}</Td>
+                  <Td className="text-ink-muted">
+                    {formatText(row.planName)}
+                    {row.assignmentEffectiveFrom ? (
+                      <span className="block text-xs text-ink-subtle">
+                        since {formatDate(row.assignmentEffectiveFrom)}
+                      </span>
+                    ) : null}
+                  </Td>
                   <Td>
                     <StatusBadge
                       label={row.onDraw ? "On draw" : "Standard rate"}

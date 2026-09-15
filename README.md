@@ -18,6 +18,11 @@ Internal operations portal for Cabinet Genies.
   projected and final audited commission, deposit payout, final true-up, negative
   true-up rollover, draw against commission with immutable ledgers, approval and
   payment workflow, employee commission dashboard and commission settings UI.
+- **Phase 3.5 (done):** the user directory — a live table over `public.profiles`
+  with role, department, manager, status and each person's commission setup,
+  account creation through the Supabase Auth Admin API (or linking an existing
+  Auth user when the server-only service role key is not configured), and an
+  append-only audit trail for user and commission-setup changes.
 
 Sales manager bonus calculation and payout, support designer bonuses, split
 commissions, production performance bonuses, payroll batching, Buildertrend

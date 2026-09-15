@@ -16,6 +16,7 @@ generalise the shared structures for future Sales Manager compensation (see
 | 7 | `migrations/20260915150000_commission_engine.sql` | commission settings, commission events, draw periods, draw ledger, rollover ledger, balance guards, workflow triggers, audit triggers |
 | 8 | `migrations/20260915150100_commission_engine_rls.sql` | Row Level Security for settings, events and both ledgers |
 | 9 | `migrations/20260915150200_seed_cabinet_genies_standard_plan.sql` | production plan `Cabinet Genies Standard GP Commission` (50% → 30%, 45% → 20%, 35% → 10%, below → 0%) |
+| 10 | `migrations/20260915160000_user_directory_audit.sql` | profile audit trail (`user_created`, `role_changed`, `manager_changed`, `active_status_changed`, …) and the admin policy that links a profile to an existing auth user |
 
 Every script is idempotent, so re-running one is safe.
 
@@ -159,6 +160,32 @@ attribution:
 
 `lib/compensation/attribution.ts` mirrors both in TypeScript and is unit tested.
 Nothing calculates or pays a manager bonus yet.
+
+## User directory (Phase 3.5)
+
+`/admin/users` is a live table over `public.profiles` — there is no second user
+store. It shows name, email, role, department, manager, status, compensation
+eligibility, the compensation plan in force today and draw status, and it lets
+admin/CEO edit those profile fields in place.
+
+**Creating accounts.** Accounts are created through the Supabase Auth Admin API
+from a `/admin/users` Server Action, which needs `SUPABASE_SERVICE_ROLE_KEY` on
+the server. `auth.users` rows are never written with SQL, and no password material
+is stored in the portal schema. When that key is not configured the page says so
+and offers the two routes that do not need it: create the account in Supabase →
+Authentication → Users (the `on_auth_user_created` trigger writes the profile row),
+or link an existing auth user to a profile with the link form, which the
+`Profiles can be linked by administrators` policy allows. Neither the browser nor
+the anon key ever sees the service role key.
+
+**Audit.** Every profile change writes an append-only row to `public.audit_events`
+through the `profiles_audit` trigger: `user_created`, `user_name_changed`,
+`role_changed`, `department_changed`, `manager_changed`, `active_status_changed`
+and `user_email_changed`. Compensation eligibility, plan assignments and draw
+periods already carry their own audit triggers, so the directory's recent activity
+panel shows the whole setup history. Account creation through Supabase Auth is
+attributed to Supabase Auth because no portal actor exists on that connection;
+changes made through the portal are attributed to the signed-in administrator.
 
 ## Commission engine verification
 
