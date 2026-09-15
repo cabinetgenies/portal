@@ -245,3 +245,23 @@ a database trigger. They are written by the application from the single shared
 implementation in `lib/commission/financials.ts`, so exactly one calculation path
 exists. Anything that changes a job's inputs or its adjustments recomputes them in
 the same request.
+
+## Commission job entry (Phase 3.6)
+
+No migration was needed for this phase. `public.jobs` already carried every field
+the workflow uses — four revenue columns, six cost columns including burden, the
+milestone dates, and the compensation plan/version reference — and the Phase 2–3
+guard-rail triggers already cover them.
+
+`/commissions/jobs/new` writes identity, the plan version, the revenue/cost
+structure and the milestone dates in one submit, and recomputes the derived
+columns through `lib/commission/financials.ts`. The form's live preview calls the
+same functions, so the figures on screen are the figures that get stored.
+`jobs_validate_plan_reference` still refuses a manager plan, and the `jobs` INSERT
+policy still requires `created_by = auth.uid()`, so a job can only be created by
+an administrator and is always attributed to them.
+
+Recording `deposit_received_date` makes the **deposit** commission eligible and
+recording `gp_audit_completed_date` makes the **final true-up** eligible. Neither
+creates a commission event: events are still calculated deliberately from the
+job's Commission section, so the workflow stays under human control.

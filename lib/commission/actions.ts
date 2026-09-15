@@ -22,6 +22,7 @@ import { mutationErrorState } from "@/lib/forms/mutation-errors";
 import {
   jobAdjustmentSchema,
   jobCompensationPlanSchema,
+  jobEntrySchema,
   jobFinancialsSchema,
   jobOverviewSchema,
 } from "@/lib/commission/validation";
@@ -51,6 +52,59 @@ function revalidateJobs(jobId?: string) {
 function soldDateRequirement(status: string, soldDate: string | null) {
   if (status !== "presale" && !soldDate) {
     return "A sold date is required once a job moves past presale.";
+  }
+
+  return null;
+}
+
+/**
+ * A job references either both a plan and a version, or neither.
+ *
+ * The database enforces this too (`jobs_validate_plan_reference`), but checking
+ * here turns a constraint violation into a sentence an administrator can act on.
+ */
+async function validateJobPlanPairing(
+  compensationPlanId: string | null,
+  compensationPlanVersionId: string | null,
+) {
+  if ((compensationPlanId === null) !== (compensationPlanVersionId === null)) {
+    return failureState(
+      "Choose both a compensation plan and a version, or leave both empty.",
+    );
+  }
+
+  if (!compensationPlanId || !compensationPlanVersionId) {
+    return null;
+  }
+
+  const supabase = await createSupabaseServerClient();
+  const [planResult, versionResult] = await Promise.all([
+    supabase
+      .from("compensation_plans")
+      .select("id, participant_kind")
+      .eq("id", compensationPlanId)
+      .maybeSingle(),
+    supabase
+      .from("compensation_plan_versions")
+      .select("id, compensation_plan_id")
+      .eq("id", compensationPlanVersionId)
+      .maybeSingle(),
+  ]);
+
+  if (planResult.error) return mutationErrorState(planResult.error, "plan");
+  if (versionResult.error) return mutationErrorState(versionResult.error, "version");
+
+  if (!planResult.data || planResult.data.participant_kind !== "sales_designer") {
+    return failureState(
+      "A job can only reference a sales designer compensation plan. Manager plans are attributed to qualifying jobs separately.",
+    );
+  }
+
+  if (
+    !versionResult.data ||
+    versionResult.data.compensation_plan_id !== compensationPlanId
+  ) {
+    return failureState("That version does not belong to the selected plan.");
   }
 
   return null;
@@ -96,7 +150,7 @@ export async function createJob(
   const auth = await authorizeCapability("manage:jobs");
   if ("denied" in auth) return auth.denied;
 
-  const parsed = jobOverviewSchema.safeParse(formDataToObject(formData));
+  const parsed = jobEntrySchema.safeParse(formDataToObject(formData));
   if (!parsed.success) return validationErrorState(parsed.error);
 
   const data = parsed.data;
@@ -110,19 +164,26 @@ export async function createJob(
     };
   }
 
+  const planError = await validateJobPlanPairing(
+    data.compensationPlanId,
+    data.compensationPlanVersionId,
+  );
+
+  if (planError) return planError;
+
   // Derived figures are written through the canonical calculation even when the
   // job starts at zero, so a new row can never disagree with the domain rules.
   const financials = computeJobFinancials({
-    contractRevenue: 0,
-    changeOrderRevenue: 0,
-    creditAmount: 0,
-    otherRevenue: 0,
-    materialCost: 0,
-    laborCost: 0,
-    subcontractorCost: 0,
-    otherDirectCost: 0,
-    burdenCost: 0,
-    warrantyServiceContingency: 0,
+    contractRevenue: data.contractRevenue,
+    changeOrderRevenue: data.changeOrderRevenue,
+    creditAmount: data.creditAmount,
+    otherRevenue: data.otherRevenue,
+    materialCost: data.materialCost,
+    laborCost: data.laborCost,
+    subcontractorCost: data.subcontractorCost,
+    otherDirectCost: data.otherDirectCost,
+    burdenCost: data.burdenCost,
+    warrantyServiceContingency: data.warrantyServiceContingency,
   });
 
   const supabase = await createSupabaseServerClient();
@@ -139,6 +200,18 @@ export async function createJob(
       deposit_received_date: data.depositReceivedDate,
       completion_date: data.completionDate,
       gp_audit_completed_date: data.gpAuditCompletedDate,
+      contract_revenue: data.contractRevenue,
+      change_order_revenue: data.changeOrderRevenue,
+      credit_amount: data.creditAmount,
+      other_revenue: data.otherRevenue,
+      material_cost: data.materialCost,
+      labor_cost: data.laborCost,
+      subcontractor_cost: data.subcontractorCost,
+      other_direct_cost: data.otherDirectCost,
+      burden_cost: data.burdenCost,
+      warranty_service_contingency: data.warrantyServiceContingency,
+      compensation_plan_id: data.compensationPlanId,
+      compensation_plan_version_id: data.compensationPlanVersionId,
       actual_total_revenue: financials.actualTotalRevenue,
       actual_total_cost: financials.actualTotalCost,
       job_gross_profit: financials.jobGrossProfit,

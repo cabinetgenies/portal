@@ -23,6 +23,12 @@ Internal operations portal for Cabinet Genies.
   account creation through the Supabase Auth Admin API (or linking an existing
   Auth user when the server-only service role key is not configured), and an
   append-only audit trail for user and commission-setup changes.
+- **Phase 3.6 (done):** the commission job entry workflow — a job list with
+  revenue, cost, commissionable GP, deposit and GP-audit status and projected
+  commission; a New job form that captures identity, the governing plan version,
+  the revenue and cost structure and the milestone dates, with a live read-only
+  calculation from the shared engine; and a job detail page organised into
+  Overview, Financials, Commission and events/history. No migration was required.
 
 Sales manager bonus calculation and payout, support designer bonuses, split
 commissions, production performance bonuses, payroll batching, Buildertrend

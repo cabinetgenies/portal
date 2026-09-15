@@ -1,16 +1,15 @@
 import Link from "next/link";
 
-import { JobOverviewForm } from "@/components/commission/job-forms";
+import { NewJobForm } from "@/components/commission/new-job-form";
 import { EmptyState } from "@/components/empty-state/empty-state";
-import { AlertIcon, ProjectsIcon } from "@/components/icons";
+import { ProjectsIcon } from "@/components/icons";
 import { PageHeader } from "@/components/page-header/page-header";
 import { buttonClassName } from "@/components/ui/button";
 import { Panel } from "@/components/ui/panel";
 import { requireCapability } from "@/lib/auth/dal";
-import {
-  listProjectCategories,
-  listSalesDesignerOptions,
-} from "@/lib/compensation/queries";
+import { listProjectCategories, todayIso } from "@/lib/compensation/queries";
+import { loadCommissionWorkspace, settingsSnapshot } from "@/lib/commission/event-queries";
+import { buildJobEntryOptions } from "@/lib/commission/job-entry";
 
 export const metadata = {
   title: "New job",
@@ -28,19 +27,37 @@ export default async function NewJobPage() {
     );
   }
 
-  const [categories, designers] = await Promise.all([
+  const [categories, workspace] = await Promise.all([
     listProjectCategories(),
-    listSalesDesignerOptions(),
+    loadCommissionWorkspace(),
   ]);
+
+  // One pass over the compensation workspace: the designers with the plan
+  // assignment in force today, the sales designer plan catalogue with its tiers,
+  // and the rule inputs the deposit and draw figures come from.
+  const options = buildJobEntryOptions({
+    profiles: workspace.profiles,
+    compensationSettings: workspace.compensationSettings,
+    assignments: workspace.assignments,
+    plans: workspace.plans,
+    planVersions: workspace.planVersions,
+    planTiers: workspace.planTiers,
+    drawPeriods: workspace.drawPeriods,
+    settings: settingsSnapshot(workspace.settings),
+    today: todayIso(),
+  });
 
   return (
     <div className="space-y-6">
       <PageHeader
         eyebrow="Commissions"
         title="New job"
-        description="Job identity, category and sales designer. Revenue and cost are entered on the job itself, so the derived GP figures always come from one calculation."
+        description="One record per job, sized for commission and financial audit: identity, the plan version that governs it, the revenue and cost structure, and the milestone dates that make a commission eligible."
         actions={
-          <Link href="/commissions/jobs" className={buttonClassName({ variant: "secondary", size: "sm" })}>
+          <Link
+            href="/commissions/jobs"
+            className={buttonClassName({ variant: "secondary", size: "sm" })}
+          >
             Back to jobs
           </Link>
         }
@@ -50,35 +67,21 @@ export default async function NewJobPage() {
         <EmptyState
           icon={<ProjectsIcon className="h-5 w-5" />}
           title="Add a project category first."
-          description="Every job belongs to a project category, and the category carries the minimum GP standard commissions are measured against."
+          description="Every job belongs to a project category, and the category carries the minimum GP standard that commission tiers can be measured against."
           action={
-            <Link
-              href="/admin/project-categories"
-              className={buttonClassName({ size: "sm" })}
-            >
+            <Link href="/admin/project-categories" className={buttonClassName({ size: "sm" })}>
               Configure project categories
             </Link>
           }
         />
       ) : (
-        <>
-          {designers.length === 0 ? (
-            <div className="flex items-start gap-3 rounded-xl border border-line bg-surface p-4">
-              <AlertIcon className="mt-0.5 h-4 w-4 text-ink-subtle" />
-              <p className="text-sm leading-6 text-ink-muted">
-                No active portal users are available as sales designers yet. The job can
-                still be created and the designer assigned later.
-              </p>
-            </div>
-          ) : null}
-          <Panel
-            id="job-create"
-            title="Job details"
-            description="Financials start at zero and are entered by accounting on the job's Financials section."
-          >
-            <JobOverviewForm categories={categories} designers={designers} />
-          </Panel>
-        </>
+        <Panel
+          id="job-entry"
+          title="Job details"
+          description="Revenue and cost entered here are stored on the job, and the derived totals are written by the shared calculation. No demo or placeholder jobs are created."
+        >
+          <NewJobForm categories={categories} options={options} />
+        </Panel>
       )}
     </div>
   );

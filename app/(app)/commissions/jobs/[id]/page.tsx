@@ -8,7 +8,7 @@ import { JobFinancialsForm } from "@/components/commission/job-financials-form";
 import { JobOverviewForm } from "@/components/commission/job-forms";
 import { JobCompensationPlanForm } from "@/components/commission/job-plan-form";
 import { EmptyState } from "@/components/empty-state/empty-state";
-import { ActivityIcon } from "@/components/icons";
+import { ActivityIcon, AlertIcon } from "@/components/icons";
 import { PageHeader } from "@/components/page-header/page-header";
 import { StatusBadge } from "@/components/ui/badge";
 import { buttonClassName } from "@/components/ui/button";
@@ -28,6 +28,7 @@ import {
   getJobDetail,
 } from "@/lib/commission/queries";
 import { getJobCommissionContext } from "@/lib/commission/event-queries";
+import { toNumber } from "@/lib/commission/financials";
 import {
   ADJUSTMENT_TYPE_LABELS,
   isAdjustmentType,
@@ -45,9 +46,9 @@ export const metadata = {
 const SECTIONS = [
   { href: "#overview", label: "Overview" },
   { href: "#financials", label: "Financials" },
-  { href: "#commission-setup", label: "Commission setup" },
   { href: "#commission", label: "Commission" },
-  { href: "#audit", label: "Audit / adjustments" },
+  { href: "#commission-setup", label: "Commission setup" },
+  { href: "#audit", label: "Events / history" },
 ];
 
 export default async function JobDetailPage(props: PageProps<"/commissions/jobs/[id]">) {
@@ -74,6 +75,15 @@ export default async function JobDetailPage(props: PageProps<"/commissions/jobs/
 
   const commissionContext = await getJobCommissionContext(id);
 
+  // Anything already approved or paid keeps the figures it was calculated with.
+  const recognizedEvents = (commissionContext?.events ?? []).filter(
+    (event) => event.status === "approved" || event.status === "paid",
+  );
+  const recognizedNetPayable = recognizedEvents.reduce(
+    (total, event) => total + toNumber(event.net_payable),
+    0,
+  );
+
   const [categories, designers, planOptions] = await Promise.all([
     canManageJobs ? listProjectCategories() : Promise.resolve([]),
     canManageJobs ? listSalesDesignerOptions() : Promise.resolve([]),
@@ -97,18 +107,20 @@ export default async function JobDetailPage(props: PageProps<"/commissions/jobs/
           planVersionTiers.map<TierWindow>((tier) => ({
             sortOrder: tier.sort_order,
             label: tier.label,
-            rate: tier.rate,
+            // numeric columns can arrive as strings; the band comparison must be
+            // numeric, especially for project_minimum thresholds.
+            rate: toNumber(tier.rate),
             lower: {
               thresholdType: tier.lower_threshold_type as ThresholdType,
-              value: tier.lower_gp_percent,
+              value: tier.lower_gp_percent === null ? null : toNumber(tier.lower_gp_percent),
             },
             upper: {
               thresholdType: tier.upper_threshold_type as ThresholdType,
-              value: tier.upper_gp_percent,
+              value: tier.upper_gp_percent === null ? null : toNumber(tier.upper_gp_percent),
             },
           })),
-          job.job_gp_percent,
-          category.minimum_gp_standard,
+          toNumber(job.commissionable_gp_percent),
+          toNumber(category.minimum_gp_standard),
         )
       : null;
 
@@ -200,6 +212,30 @@ export default async function JobDetailPage(props: PageProps<"/commissions/jobs/
         title="Financials"
         description="Revenue and cost inputs. Total job revenue, total job cost, job gross profit and the commissionable figures are derived from these by the single shared calculation."
       >
+        {recognizedEvents.length > 0 ? (
+          <div
+            role="status"
+            className="mb-5 flex items-start gap-3 rounded-lg border border-line bg-accent-soft px-3 py-3"
+          >
+            <AlertIcon className="mt-0.5 h-4 w-4 shrink-0 text-accent-strong" />
+            <div className="space-y-1">
+              <p className="text-sm font-medium text-accent-strong">
+                These inputs do not rewrite what has already been recognized
+              </p>
+              <p className="text-sm leading-6 text-accent-strong">
+                {recognizedEvents.length} approved or paid commission event
+                {recognizedEvents.length === 1 ? "" : "s"} already exist for this job —
+                {" "}
+                {formatMoney(recognizedNetPayable)} net payable. They keep the figures,
+                rates and plan version they were calculated with, so editing the inputs
+                below changes the job&apos;s current financials only. Final reconciliation
+                happens through the existing final true-up workflow, which recognizes the
+                difference rather than amending history.
+              </p>
+            </div>
+          </div>
+        ) : null}
+
         {canEditFinancials ? (
           <JobFinancialsForm job={job} adjustments={adjustmentInputs} />
         ) : (
@@ -258,9 +294,11 @@ export default async function JobDetailPage(props: PageProps<"/commissions/jobs/
             ) : null}
 
             <p className="text-xs leading-5 text-ink-subtle">
-              Bands are shown for context only. This phase stores the rules and the
-              job&apos;s financials; it does not calculate commission dollars or any
-              sales manager bonus.
+              The band above matches this job&apos;s commissionable GP against the attached
+              plan version. Commission is calculated from the Commission section below,
+              which snapshots these rates and figures onto the event. Sales manager
+              compensation is not implemented: a manager bonus is attributed to qualifying
+              jobs separately, never as a share of this designer&apos;s commission.
             </p>
           </div>
         ) : (
@@ -286,8 +324,8 @@ export default async function JobDetailPage(props: PageProps<"/commissions/jobs/
       {canViewConfig ? (
         <Panel
           id="audit"
-          title="Audit / adjustments"
-          description="Adjustments are append-only. Correcting a job means recording another adjustment, so the reason behind every change stays on the record."
+          title="Events and history"
+          description="Financial adjustments and the job's audit trail. Adjustments are append-only: correcting a job means recording another adjustment, so the reason behind every change stays on the record. Commission events themselves are listed in the Commission section above."
         >
           <div className="space-y-6">
             {canAdjust ? <JobAdjustmentForm jobId={job.id} /> : null}

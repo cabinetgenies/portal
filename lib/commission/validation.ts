@@ -102,6 +102,31 @@ export const jobFinancialsSchema = z.object({
 
 export type JobFinancialsInput = z.infer<typeof jobFinancialsSchema>;
 
+/**
+ * The complete job entry payload used by the New job form: identity, milestone
+ * dates, the compensation plan version and the revenue/cost inputs, so a job is
+ * created in one pass instead of being saved empty and filled in later.
+ *
+ * The plan fields are optional on purpose: a job may be created before its sales
+ * designer has a plan assignment, and the version can be attached afterwards.
+ */
+export const jobEntrySchema = jobOverviewSchema.omit({ jobId: true }).extend({
+  compensationPlanId: optionalUuid,
+  compensationPlanVersionId: optionalUuid,
+  contractRevenue: moneyField("Contract revenue"),
+  changeOrderRevenue: moneyField("Change order revenue"),
+  creditAmount: moneyField("Credits"),
+  otherRevenue: moneyField("Other revenue"),
+  materialCost: moneyField("Material cost"),
+  laborCost: moneyField("Labor cost"),
+  subcontractorCost: moneyField("Subcontractor cost"),
+  otherDirectCost: moneyField("Other direct cost"),
+  burdenCost: moneyField("Burden"),
+  warrantyServiceContingency: moneyField("Warranty / service contingency"),
+});
+
+export type JobEntryInput = z.infer<typeof jobEntrySchema>;
+
 export const jobAdjustmentSchema = z.object({
   jobId: uuidField("Job"),
   adjustmentType: z.enum(ADJUSTMENT_TYPES, { error: "Choose an adjustment type." }),
