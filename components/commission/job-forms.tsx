@@ -192,7 +192,7 @@ export function JobOverviewForm({ designers, job }: JobFormProps) {
         <FormAlert state={state} className="flex-1" />
         {job ? (
           <Link
-            href="/commissions/jobs"
+            href="/sales/commissions/jobs"
             className="text-sm font-medium text-ink-muted hover:text-ink"
           >
             Back to jobs

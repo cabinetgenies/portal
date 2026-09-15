@@ -64,7 +64,7 @@ export default async function CommissionEmployeesPage() {
                 <div className="min-w-0 space-y-1">
                   <div className="flex flex-wrap items-center gap-2">
                     <Link
-                      href={`/commissions/employees/${designer.profile.id}`}
+                      href={`/sales/commissions/employees/${designer.profile.id}`}
                       className="font-medium text-ink underline-offset-4 hover:underline"
                     >
                       {designerProfileName(designer.profile)}
@@ -88,7 +88,7 @@ export default async function CommissionEmployeesPage() {
                 </div>
 
                 <Link
-                  href={`/commissions/employees/${designer.profile.id}`}
+                  href={`/sales/commissions/employees/${designer.profile.id}`}
                   className={buttonClassName({ size: "sm" })}
                 >
                   View dashboard

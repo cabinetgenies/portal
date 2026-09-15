@@ -42,9 +42,9 @@ import {
  */
 
 function revalidateJob(jobId: string) {
-  revalidatePath(`/commissions/jobs/${jobId}`);
-  revalidatePath("/commissions/jobs");
-  revalidatePath("/commissions");
+  revalidatePath(`/sales/commissions/jobs/${jobId}`);
+  revalidatePath("/sales/commissions/jobs");
+  revalidatePath("/sales/commissions");
 }
 
 type JobLivePicture = {

@@ -169,7 +169,7 @@ export default async function CommissionsPage() {
         description="Commission events calculated and waiting on an approver."
         actions={
           <Link
-            href="/commissions/payments"
+            href="/sales/commissions/payments"
             className="text-sm font-medium text-ink-muted hover:text-ink"
           >
             Open payment workflow
@@ -200,7 +200,7 @@ export default async function CommissionsPage() {
                   <tr key={entry.event.id}>
                     <Td>
                       <Link
-                        href={`/commissions/jobs/${entry.event.job_id}`}
+                        href={`/sales/commissions/jobs/${entry.event.job_id}`}
                         className="font-medium text-ink underline-offset-4 hover:underline"
                       >
                         {entry.jobName ?? "Job"}
@@ -270,7 +270,7 @@ function QueuePanel({
                 <tr key={job.id}>
                   <Td>
                     <Link
-                      href={`/commissions/jobs/${job.id}`}
+                      href={`/sales/commissions/jobs/${job.id}`}
                       className="font-medium text-ink underline-offset-4 hover:underline"
                     >
                       {job.name}

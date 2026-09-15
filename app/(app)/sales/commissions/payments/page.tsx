@@ -168,7 +168,7 @@ function EventQueue({
                 <tr key={entry.event.id}>
                   <Td>
                     <Link
-                      href={`/commissions/jobs/${entry.event.job_id}`}
+                      href={`/sales/commissions/jobs/${entry.event.job_id}`}
                       className="font-medium text-ink underline-offset-4 hover:underline"
                     >
                       {entry.jobName ?? "Job"}

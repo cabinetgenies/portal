@@ -687,7 +687,7 @@ export const getCommissionDashboard = cache(async function getCommissionDashboar
 });
 
 // ---------------------------------------------------------------------------
-// Employee summaries (the /commissions/employees table and its detail panels)
+// Employee summaries (the designer directory and the dashboard detail pages)
 // ---------------------------------------------------------------------------
 
 export type EmployeeCommissionSummary = {

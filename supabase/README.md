@@ -257,7 +257,7 @@ the workflow uses — four revenue columns, six cost columns including burden, t
 milestone dates, and the compensation plan/version reference — and the Phase 2–3
 guard-rail triggers already cover them.
 
-`/commissions/jobs/new` writes identity, the plan version, the revenue/cost
+`/sales/commissions/jobs/new` writes identity, the plan version, the revenue/cost
 structure and the milestone dates in one submit, and recomputes the derived
 columns through `lib/commission/financials.ts`. The form's live preview calls the
 same functions, so the figures on screen are the figures that get stored.
@@ -377,7 +377,7 @@ rewritten. `project_categories` keeps its RLS policies and its single historical
 
 ## Designer dashboards (Phase 4.2)
 
-`/commissions/employees` and `/commissions/employees/[id]` are a read-only composition
+`/sales/commissions/employees` and `/sales/commissions/employees/[id]` are a read-only composition
 layer: no schema change, no new calculation. A designer's dashboard is assembled from
 the commission workspace (jobs, events, ledgers, plans, tiers — already loaded in
 batch by the other commission screens) plus a single `commission_audits` query for

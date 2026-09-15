@@ -61,7 +61,7 @@ const SECTIONS = [
  * comes back empty rather than being hidden by the layout.
  */
 export default async function DesignerDashboardPage(
-  props: PageProps<"/commissions/employees/[id]">,
+  props: PageProps<"/sales/commissions/employees/[id]">,
 ) {
   const { id } = await props.params;
   const searchParams = await props.searchParams;
@@ -114,7 +114,7 @@ export default async function DesignerDashboardPage(
         description={`${planLabel ?? "No compensation plan assigned"} · ${roleLabel(summary.profile.role)}`}
         actions={
           <Link
-            href="/commissions/employees"
+            href="/sales/commissions/employees"
             className={buttonClassName({ variant: "secondary", size: "sm" })}
           >
             Back to designers
@@ -430,8 +430,8 @@ export default async function DesignerDashboardPage(
               const active = option.id === filter;
               const href =
                 option.id === "all"
-                  ? `/commissions/employees/${id}#history`
-                  : `/commissions/employees/${id}?filter=${option.id}#history`;
+                  ? `/sales/commissions/employees/${id}#history`
+                  : `/sales/commissions/employees/${id}?filter=${option.id}#history`;
 
               return (
                 <Link
@@ -475,7 +475,7 @@ export default async function DesignerDashboardPage(
                       <Td className="text-ink-muted">{formatDateTime(event.created_at)}</Td>
                       <Td>
                         <Link
-                          href={`/commissions/jobs/${event.job_id}`}
+                          href={`/sales/commissions/jobs/${event.job_id}`}
                           className="text-ink underline-offset-4 hover:underline"
                         >
                           {jobNameFor(pipeline, event.job_id)}
@@ -686,7 +686,7 @@ function ActiveJobsTable({
             <tr key={row.job.id}>
               <Td>
                 <Link
-                  href={`/commissions/jobs/${row.job.id}`}
+                  href={`/sales/commissions/jobs/${row.job.id}`}
                   className="text-ink underline-offset-4 hover:underline"
                 >
                   {row.job.job_name}
@@ -756,7 +756,7 @@ function PipelineGroup({
                   <Td className="text-ink-muted">{formatDateTime(item.date)}</Td>
                   <Td>
                     <Link
-                      href={`/commissions/jobs/${item.jobId}`}
+                      href={`/sales/commissions/jobs/${item.jobId}`}
                       className="text-ink underline-offset-4 hover:underline"
                     >
                       {item.jobName}
@@ -790,14 +790,14 @@ function CompactEventList({ items }: { items: PipelineItem[] }) {
           <span className="min-w-0 text-sm text-ink">
             {item.jobName ? (
               <Link
-                href={`/commissions/jobs/${item.jobId}`}
+                href={`/sales/commissions/jobs/${item.jobId}`}
                 className="underline-offset-4 hover:underline"
               >
                 {item.jobName}
               </Link>
             ) : (
               <Link
-                href={`/commissions/jobs/${item.jobId}`}
+                href={`/sales/commissions/jobs/${item.jobId}`}
                 className="underline-offset-4 hover:underline"
               >
                 View job
@@ -847,7 +847,7 @@ function LedgerTable({
               <Td className="text-ink-muted">
                 {row.jobId ? (
                   <Link
-                    href={`/commissions/jobs/${row.jobId}`}
+                    href={`/sales/commissions/jobs/${row.jobId}`}
                     className="underline-offset-4 hover:underline"
                   >
                     {row.jobName ?? "View job"}

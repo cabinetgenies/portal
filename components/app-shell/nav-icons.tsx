@@ -1,6 +1,7 @@
 import type { ComponentType } from "react";
 
 import {
+  ActivityIcon,
   AdminIcon,
   CommissionsIcon,
   DashboardIcon,
@@ -8,6 +9,7 @@ import {
   ProjectsIcon,
   ReportsIcon,
   SalesIcon,
+  UsersIcon,
   type IconProps,
 } from "@/components/icons";
 import type { NavIconKey } from "@/lib/permissions/navigation";
@@ -20,4 +22,7 @@ export const NAV_ICONS: Record<NavIconKey, ComponentType<IconProps>> = {
   commissions: CommissionsIcon,
   reports: ReportsIcon,
   admin: AdminIcon,
+  people: UsersIcon,
+  requests: ActivityIcon,
+  company: ProjectsIcon,
 };

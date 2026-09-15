@@ -29,9 +29,9 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
  */
 
 function revalidateDraw() {
-  revalidatePath("/commissions/employees");
-  revalidatePath("/commissions");
-  revalidatePath("/commissions/payments");
+  revalidatePath("/sales/commissions/employees");
+  revalidatePath("/sales/commissions");
+  revalidatePath("/sales/commissions/payments");
 }
 
 export async function placeEmployeeOnDraw(

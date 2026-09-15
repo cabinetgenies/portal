@@ -5,11 +5,8 @@ import { usePathname } from "next/navigation";
 
 import { NAV_ICONS } from "@/components/app-shell/nav-icons";
 import { cn } from "@/lib/utils/cn";
+import { isActivePath } from "@/lib/routes";
 import type { NavSection } from "@/lib/permissions/navigation";
-
-function isActivePath(pathname: string, href: string) {
-  return pathname === href || pathname.startsWith(`${href}/`);
-}
 
 export function NavList({
   sections,

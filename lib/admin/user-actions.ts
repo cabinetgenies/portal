@@ -39,7 +39,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 function revalidateUserDirectory() {
   revalidatePath("/admin/users");
-  revalidatePath("/commissions/employees");
+  revalidatePath("/sales/commissions/employees");
 }
 
 type DirectoryFields = {

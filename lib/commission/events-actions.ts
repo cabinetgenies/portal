@@ -44,12 +44,12 @@ import type {
 type Supabase = Awaited<ReturnType<typeof createSupabaseServerClient>>;
 
 function revalidateCommission(jobId?: string) {
-  revalidatePath("/commissions");
-  revalidatePath("/commissions/payments");
-  revalidatePath("/commissions/employees");
-  revalidatePath("/commissions/jobs");
+  revalidatePath("/sales/commissions");
+  revalidatePath("/sales/commissions/payments");
+  revalidatePath("/sales/commissions/employees");
+  revalidatePath("/sales/commissions/jobs");
   if (jobId) {
-    revalidatePath(`/commissions/jobs/${jobId}`);
+    revalidatePath(`/sales/commissions/jobs/${jobId}`);
   }
 }
 

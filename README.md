@@ -60,6 +60,12 @@ Internal operations portal for Cabinet Genies.
   draw and rollover balances) linking into `/commissions/employees/[id]`, a personal
   dashboard with a commission pipeline, active jobs, the draw schedule and ledger,
   rollover, filtered event history and a plan/eligibility section. No schema change.
+- **Phase 4.3 (done):** commissions moved under Sales. The top-level navigation is now
+  Home, People, Requests, Company, Sales and Admin; the commission sub-app lives at
+  `/sales/commissions/*` with its own Overview, Employees, Commission Jobs, Payments,
+  Plans & Rules and Reports tabs, and every legacy `/commissions/*` path redirects
+  permanently to its new home. Routing and navigation only — no business logic,
+  permissions or schema changed.
 
 Sales manager bonus calculation and payout, support designer bonuses, split
 commissions, production performance bonuses, payroll batching, Buildertrend
@@ -119,14 +125,18 @@ first administrator, are in [`supabase/README.md`](supabase/README.md).
 | --- | --- | --- |
 | `/login` | public | Email and password sign-in |
 | `/home` | authenticated | Dashboard shell, workspace cards, activity empty state |
-| `/commissions` | authenticated | Commission dashboard: projected, pending, approved, paid, draw and rollover cards plus action queues (employees see their own commission instead) |
-| `/commissions/payments` | accounting+ | Approval and payment workflow, void-with-reason, immutable paid history |
-| `/commissions/jobs` | scoped by role | Live job list: revenue, GP, GP %, commissionable GP |
-| `/commissions/jobs/new` | admin / CEO | Create a job |
-| `/commissions/jobs/[id]` | scoped by role | Overview, Financials, Commission setup, Commission (projected/final breakdown, events, workflow), Audit / adjustments |
-| `/commissions/employees` | accounting+ | Designer directory: plan, draw status, projected/pending/ready/paid figures and balances |
-| `/commissions/employees/[id]` | accounting+ (or the designer themselves) | Personal commission dashboard: pipeline, active jobs, draw schedule and ledger, rollover, event history, plan & eligibility |
-| `/commissions/rules` | accounting+ | Read-only plan tiers plus the current rule inputs |
+| `/sales/commissions` | authenticated | Commission dashboard: projected, pending, approved, paid, draw and rollover cards plus action queues (employees see their own commission instead) |
+| `/sales` | authenticated | Sales landing: the entry point into the commission center. No sales pipeline is built, and nothing is simulated |
+| `/people` | authenticated | Placeholder route for the wider people view (roles and reporting lines live under Admin → Users today) |
+| `/requests` | authenticated | Placeholder route for a general request queue |
+| `/company` | authenticated | Placeholder route for company-wide reference data |
+| `/sales/commissions/payments` | accounting+ | Approval and payment workflow, void-with-reason, immutable paid history |
+| `/sales/commissions/jobs` | scoped by role | Live job list: revenue, GP, GP %, commissionable GP |
+| `/sales/commissions/jobs/new` | admin / CEO | Create a job |
+| `/sales/commissions/jobs/[id]` | scoped by role | Overview, Financials, Commission setup, Commission (projected/final breakdown, events, workflow), Audit / adjustments |
+| `/sales/commissions/employees` | accounting+ | Designer directory: plan, draw status, projected/pending/ready/paid figures and balances |
+| `/sales/commissions/employees/[id]` | accounting+ (or the designer themselves) | Personal commission dashboard: pipeline, active jobs, draw schedule and ledger, rollover, event history, plan & eligibility |
+| `/sales/commissions/rules` | accounting+ | Read-only plan tiers plus the current rule inputs |
 | `/sales`, `/projects`, `/production`, `/reports` | authenticated | Placeholder module screens |
 | `/admin`, `/admin/users` | admin / CEO | Administration shell, current profile, role model |
 | `/admin/compensation-plans` | admin / CEO | Manage compensation plans, versions and tiers (sales designer plans today; manager plans reserved) |

@@ -66,7 +66,7 @@ const SECTIONS = [
   { href: "#audit", label: "Events / history" },
 ];
 
-export default async function JobDetailPage(props: PageProps<"/commissions/jobs/[id]">) {
+export default async function JobDetailPage(props: PageProps<"/sales/commissions/jobs/[id]">) {
   const { id } = await props.params;
   const session = await requireSession();
   const detail = await getJobDetail(id);
@@ -176,7 +176,7 @@ export default async function JobDetailPage(props: PageProps<"/commissions/jobs/
         }
         actions={
           <Link
-            href="/commissions/jobs"
+            href="/sales/commissions/jobs"
             className={buttonClassName({ variant: "secondary", size: "sm" })}
           >
             Back to jobs

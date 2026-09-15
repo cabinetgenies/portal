@@ -7,9 +7,9 @@ export default function CommissionsLayout({ children }: { children: ReactNode })
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Finance"
+        eyebrow="Sales"
         title="Commissions"
-        description="Commission jobs, employees, payments, rules and reporting."
+        description="The commission center: jobs, designers, payments, plans and rules, and reporting."
       />
       <CommissionsNav />
       {children}

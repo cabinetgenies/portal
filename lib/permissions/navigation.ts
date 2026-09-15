@@ -7,7 +7,10 @@ export type NavIconKey =
   | "production"
   | "commissions"
   | "reports"
-  | "admin";
+  | "admin"
+  | "people"
+  | "requests"
+  | "company";
 
 export type NavItem = {
   label: string;
@@ -29,59 +32,38 @@ export type NavSection = {
  */
 export const PORTAL_NAVIGATION: NavSection[] = [
   {
-    label: "Home",
+    label: "Portal",
     items: [
       {
-        label: "Dashboard",
+        label: "Home",
         href: "/home",
         icon: "dashboard",
         description: "Portal overview and personal workspace.",
       },
-    ],
-  },
-  {
-    label: "Operations",
-    items: [
+      {
+        label: "People",
+        href: "/people",
+        icon: "people",
+        description: "The team, their roles and their reporting lines.",
+      },
+      {
+        label: "Requests",
+        href: "/requests",
+        icon: "requests",
+        description: "Internal requests and approvals.",
+      },
+      {
+        label: "Company",
+        href: "/company",
+        icon: "company",
+        description: "Company-wide reference data and settings.",
+      },
       {
         label: "Sales",
         href: "/sales",
         icon: "sales",
-        description: "Pipeline, estimates and closed business.",
+        description: "Sales overview, and the commission sub-app.",
       },
-      {
-        label: "Projects",
-        href: "/projects",
-        icon: "projects",
-        description: "Active jobs, milestones and schedules.",
-      },
-      {
-        label: "Production",
-        href: "/production",
-        icon: "production",
-        description: "Shop floor workload and job status.",
-      },
-    ],
-  },
-  {
-    label: "Finance",
-    items: [
-      {
-        label: "Commissions",
-        href: "/commissions",
-        icon: "commissions",
-        description: "Jobs, employees, payments and rules.",
-      },
-      {
-        label: "Reports",
-        href: "/reports",
-        icon: "reports",
-        description: "Company reporting and exports.",
-      },
-    ],
-  },
-  {
-    label: "Administration",
-    items: [
       {
         label: "Admin",
         href: "/admin",

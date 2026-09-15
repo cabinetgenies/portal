@@ -56,7 +56,7 @@ export default async function NewJobPage() {
         description="One record per job, sized for commission and financial audit: identity, the plan version that governs it, the revenue and cost structure, and the milestone dates that make a commission eligible."
         actions={
           <Link
-            href="/commissions/jobs"
+            href="/sales/commissions/jobs"
             className={buttonClassName({ variant: "secondary", size: "sm" })}
           >
             Back to jobs

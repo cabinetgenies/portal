@@ -32,9 +32,9 @@ import { toDecimalPercent } from "@/lib/utils/percent";
 
 function revalidateCompensation() {
   revalidatePath("/admin/compensation-plans");
-  revalidatePath("/commissions/rules");
-  revalidatePath("/commissions/employees");
-  revalidatePath("/commissions/jobs");
+  revalidatePath("/sales/commissions/rules");
+  revalidatePath("/sales/commissions/employees");
+  revalidatePath("/sales/commissions/jobs");
 }
 
 // ---------------------------------------------------------------------------
@@ -78,10 +78,10 @@ export async function saveCommissionSettings(
 
   if (error) return mutationErrorState(error, "settings");
 
-  revalidatePath("/commissions/rules");
+  revalidatePath("/sales/commissions/rules");
   revalidatePath("/admin/commission-settings");
-  revalidatePath("/commissions");
-  revalidatePath("/commissions/jobs");
+  revalidatePath("/sales/commissions");
+  revalidatePath("/sales/commissions/jobs");
 
   return successState(
     "Commission settings saved. These values apply to calculations made from the effective date onward. Jobs already saved keep the burden and warranty rates they were stored with, and existing commission events keep their snapshot.",

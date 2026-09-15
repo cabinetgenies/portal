@@ -61,7 +61,7 @@ export default async function CommissionJobsPage() {
         description="Every job with the financial structure commission is calculated from. Rows are limited to the jobs your role can see."
         actions={
           canManageJobs ? (
-            <Link href="/commissions/jobs/new" className={buttonClassName({ size: "sm" })}>
+            <Link href="/sales/commissions/jobs/new" className={buttonClassName({ size: "sm" })}>
               New job
             </Link>
           ) : null
@@ -79,7 +79,7 @@ export default async function CommissionJobsPage() {
           }
           action={
             canManageJobs ? (
-              <Link href="/commissions/jobs/new" className={buttonClassName({ size: "sm" })}>
+              <Link href="/sales/commissions/jobs/new" className={buttonClassName({ size: "sm" })}>
                 Create a job
               </Link>
             ) : null
@@ -108,7 +108,7 @@ export default async function CommissionJobsPage() {
                   <div className="min-w-0 space-y-1">
                     <div className="flex flex-wrap items-center gap-2">
                       <Link
-                        href={`/commissions/jobs/${job.id}`}
+                        href={`/sales/commissions/jobs/${job.id}`}
                         className="font-medium text-ink underline-offset-4 hover:underline"
                       >
                         {job.job_name}
@@ -129,14 +129,14 @@ export default async function CommissionJobsPage() {
 
                   <div className="flex shrink-0 items-center gap-2">
                     <Link
-                      href={`/commissions/jobs/${job.id}`}
+                      href={`/sales/commissions/jobs/${job.id}`}
                       className={buttonClassName({ variant: "secondary", size: "sm" })}
                     >
                       View job
                     </Link>
                     {canManageJobs || canEditFinancials ? (
                       <Link
-                        href={`/commissions/jobs/${job.id}#overview`}
+                        href={`/sales/commissions/jobs/${job.id}#overview`}
                         className={buttonClassName({ variant: "ghost", size: "sm" })}
                       >
                         Edit job

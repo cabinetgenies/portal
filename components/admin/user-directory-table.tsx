@@ -99,7 +99,7 @@ export function UserDirectoryTable({
                     <UpdatePortalUserForm user={user} managers={managers} />
                     <div className="flex flex-wrap items-center gap-2 border-t border-line pt-3">
                       <Link
-                        href="/commissions/employees"
+                        href="/sales/commissions/employees"
                         className={buttonClassName({ size: "sm", variant: "secondary" })}
                       >
                         Compensation &amp; draw setup
