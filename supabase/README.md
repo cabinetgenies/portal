@@ -41,6 +41,15 @@ never overwrites an administrator's role experience: the `role_modules`,
 `role_dashboard_widgets` and `role_quick_actions` inserts are
 `on conflict do nothing`, so re-running the migration cannot undo configured work.
 
+**Phase 5.1** (canonical projects) needed no schema change: the work was routing,
+link targets and the seed's quick-action hrefs. Re-running
+`20260915230200_seed_business_architecture.sql` is what reconciles an already
+seeded deployment — it moves `new_project` to `/projects/new` and
+`update_financials` to `/projects`. That idempotent re-run is safe: catalog rows
+are updated, role experience rows are left alone, and every change lands in
+`audit_events`. Phase 5.1 also assigned the CEO's business role explicitly, which
+is profile data rather than schema.
+
 The commission engine is documented in
 [docs/commission-engine.md](../docs/commission-engine.md).
 

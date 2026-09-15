@@ -1,4 +1,5 @@
 import { displayNameFor } from "@/lib/auth/identity";
+import { FALLBACK_ROLE_KEY_BY_AUTH_ROLE } from "@/lib/business/catalog";
 import { normalizeRole, roleLabel, type Role } from "@/lib/permissions/roles";
 import type {
   CompensationPlanRow,
@@ -32,6 +33,9 @@ export type UserDirectoryRow = {
   businessRoleId: string | null;
   businessRoleName: string | null;
   businessRoleKey: string | null;
+  /** How this person's experience resolves today. */
+  assignmentStatus: AssignmentStatus;
+  assignmentStatusLabel: string;
   /** Primary department: the registry assignment, falling back to the legacy text. */
   departmentId: string | null;
   departmentName: string | null;
@@ -64,6 +68,48 @@ export type UserDirectorySources = {
 
 export function accountStatusLabel(active: boolean) {
   return active ? "Active" : "Deactivated";
+}
+
+/**
+ * How a profile resolves its role experience.
+ *
+ *   assigned             a business role is set — the intended end state
+ *   auth_role_fallback   no business role, so the security role stands in
+ *   unassigned           neither, so the baseline experience applies
+ *
+ * The fallback keeps an un-configured account usable; this status is what lets an
+ * administrator see who is still relying on it, which is exactly what the
+ * assignment work needs to finish.
+ */
+export const ASSIGNMENT_STATUSES = ["assigned", "auth_role_fallback", "unassigned"] as const;
+
+export type AssignmentStatus = (typeof ASSIGNMENT_STATUSES)[number];
+
+export const ASSIGNMENT_STATUS_LABELS: Record<AssignmentStatus, string> = {
+  assigned: "Assigned",
+  auth_role_fallback: "Fallback",
+  unassigned: "Unassigned",
+};
+
+export const ASSIGNMENT_STATUS_HINTS: Record<AssignmentStatus, string> = {
+  assigned: "This profile has a business role, so its experience comes from that role's configuration.",
+  auth_role_fallback:
+    "No business role is assigned, so the security role is standing in. Assign a business role to make the experience explicit.",
+  unassigned:
+    "No business role and no useful security mapping: this profile is on the baseline experience.",
+};
+
+export function assignmentStatusFor(profile: {
+  business_role_id: string | null;
+  role: string | null;
+}): AssignmentStatus {
+  if (profile.business_role_id) return "assigned";
+
+  return FALLBACK_ROLE_KEY_BY_AUTH_ROLE[normalizeRole(profile.role)] ? "auth_role_fallback" : "unassigned";
+}
+
+export function isAssignmentStatus(value: unknown): value is AssignmentStatus {
+  return typeof value === "string" && (ASSIGNMENT_STATUSES as readonly string[]).includes(value);
 }
 
 export function drawStatusLabel(
@@ -153,6 +199,8 @@ export function buildUserDirectoryRows({
       businessRoleId: profile.business_role_id,
       businessRoleName: businessRole?.name ?? null,
       businessRoleKey: businessRole?.key ?? null,
+      assignmentStatus: assignmentStatusFor(profile),
+      assignmentStatusLabel: ASSIGNMENT_STATUS_LABELS[assignmentStatusFor(profile)],
       // The registry name wins when a department is assigned; the free-text column
       // is what a profile configured before the registry still carries.
       departmentId: profile.department_id,

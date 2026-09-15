@@ -475,7 +475,7 @@ export default async function DesignerDashboardPage(
                       <Td className="text-ink-muted">{formatDateTime(event.created_at)}</Td>
                       <Td>
                         <Link
-                          href={`/sales/commissions/jobs/${event.job_id}`}
+                          href={`/projects/${event.job_id}`}
                           className="text-ink underline-offset-4 hover:underline"
                         >
                           {jobNameFor(pipeline, event.job_id)}
@@ -686,7 +686,7 @@ function ActiveJobsTable({
             <tr key={row.job.id}>
               <Td>
                 <Link
-                  href={`/sales/commissions/jobs/${row.job.id}`}
+                  href={`/projects/${row.job.id}`}
                   className="text-ink underline-offset-4 hover:underline"
                 >
                   {row.job.job_name}
@@ -756,7 +756,7 @@ function PipelineGroup({
                   <Td className="text-ink-muted">{formatDateTime(item.date)}</Td>
                   <Td>
                     <Link
-                      href={`/sales/commissions/jobs/${item.jobId}`}
+                      href={`/projects/${item.jobId}`}
                       className="text-ink underline-offset-4 hover:underline"
                     >
                       {item.jobName}
@@ -790,14 +790,14 @@ function CompactEventList({ items }: { items: PipelineItem[] }) {
           <span className="min-w-0 text-sm text-ink">
             {item.jobName ? (
               <Link
-                href={`/sales/commissions/jobs/${item.jobId}`}
+                href={`/projects/${item.jobId}`}
                 className="underline-offset-4 hover:underline"
               >
                 {item.jobName}
               </Link>
             ) : (
               <Link
-                href={`/sales/commissions/jobs/${item.jobId}`}
+                href={`/projects/${item.jobId}`}
                 className="underline-offset-4 hover:underline"
               >
                 View job
@@ -847,7 +847,7 @@ function LedgerTable({
               <Td className="text-ink-muted">
                 {row.jobId ? (
                   <Link
-                    href={`/sales/commissions/jobs/${row.jobId}`}
+                    href={`/projects/${row.jobId}`}
                     className="underline-offset-4 hover:underline"
                   >
                     {row.jobName ?? "View job"}

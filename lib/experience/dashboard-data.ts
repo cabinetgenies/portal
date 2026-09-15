@@ -149,9 +149,21 @@ async function loadProjects(
   { session, profile }: { session: SessionContext; profile: ProfileRow | null },
 ): Promise<WidgetData> {
   const canViewAllJobs = session.capabilities.includes("view:jobs-all");
+
+  // "My projects" needs to know whose they are; an unloadable profile is a real
+  // failure, not an empty list.
+  if (!profile) {
+    return {
+      status: "unavailable",
+      reason: "Your profile could not be loaded, so your projects cannot be listed.",
+    };
+  }
+
   const { items, failed } = await listVisibleProjects({
-    profileId: profile?.id ?? null,
-    canViewAllJobs,
+    profileId: profile.id,
+    // The dashboard's card is "my projects". A role with wider job visibility
+    // sees the whole picture, which is what the widget then says it is showing.
+    scope: canViewAllJobs ? "visible" : "own",
     limit: 5,
   });
 

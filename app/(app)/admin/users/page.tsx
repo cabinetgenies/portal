@@ -2,12 +2,14 @@ import {
   CreatePortalUserForm,
   LinkExistingPortalUserForm,
 } from "@/components/admin/user-forms";
+import Link from "next/link";
 import { UserDirectoryTable } from "@/components/admin/user-directory-table";
 import { EmptyState } from "@/components/empty-state/empty-state";
 import { InfoIcon, UsersIcon } from "@/components/icons";
 import { MetricCard } from "@/components/metric-card/metric-card";
 import { Panel } from "@/components/ui/panel";
 import { listRecentUserAuditEvents, listUserDirectory } from "@/lib/admin/user-queries";
+import { isAssignmentStatus, type AssignmentStatus } from "@/lib/admin/user-directory";
 import { requireCapability } from "@/lib/auth/dal";
 import { getServiceRoleKey } from "@/lib/env";
 import { loadExperienceCatalog } from "@/lib/experience/queries";
@@ -17,7 +19,11 @@ export const metadata = {
   title: "Users",
 };
 
-export default async function AdminUsersPage() {
+export default async function AdminUsersPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ assignment?: string }>;
+}) {
   // Re-checked here as well as in the admin layout: authorization belongs as
   // close to the data as possible, not only in a wrapping layout.
   const session = await requireCapability("administer:portal");
@@ -32,6 +38,7 @@ export default async function AdminUsersPage() {
     listUserDirectory(),
     listRecentUserAuditEvents(12),
   ]);
+  const { assignment } = await searchParams;
   const catalog = await loadExperienceCatalog();
 
   // Assignment options come from the registry, and only when the registry is the
@@ -60,12 +67,42 @@ export default async function AdminUsersPage() {
   const eligibleCount = directory.filter((user) => user.compensationEligible).length;
   const plannedCount = directory.filter((user) => user.planName !== null).length;
   const onDrawCount = directory.filter((user) => user.onDraw).length;
+  const needsAssignmentCount = directory.filter(
+    (user) => user.assignmentStatus !== "assigned",
+  ).length;
+
+  // The role assignment status filter. Server-rendered from the query string, so
+  // an administrator can see exactly who still needs a business role and can
+  // bookmark that answer.
+  const assignmentFilter = isAssignmentStatus(assignment) ? assignment : null;
+  const visibleDirectory = assignmentFilter
+    ? directory.filter((user) => user.assignmentStatus === assignmentFilter)
+    : directory;
+
+  const assignmentFilters: { label: string; value: AssignmentStatus | null; count: number }[] = [
+    { label: "All", value: null, count: directory.length },
+    {
+      label: "Assigned",
+      value: "assigned",
+      count: directory.filter((user) => user.assignmentStatus === "assigned").length,
+    },
+    {
+      label: "Fallback",
+      value: "auth_role_fallback",
+      count: directory.filter((user) => user.assignmentStatus === "auth_role_fallback").length,
+    },
+    {
+      label: "Unassigned",
+      value: "unassigned",
+      count: directory.filter((user) => user.assignmentStatus === "unassigned").length,
+    },
+  ];
 
   return (
     <div className="space-y-6">
       <section
         aria-label="Directory summary"
-        className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"
+        className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5"
       >
         <MetricCard
           label="Portal users"
@@ -89,6 +126,12 @@ export default async function AdminUsersPage() {
           label="On draw"
           value={`${onDrawCount}`}
           hint="Enrolled in draw against commission"
+          placeholder={false}
+        />
+        <MetricCard
+          label="Need a business role"
+          value={`${needsAssignmentCount}`}
+          hint="Resolving through fallback or unassigned"
           placeholder={false}
         />
       </section>
@@ -121,17 +164,56 @@ export default async function AdminUsersPage() {
       <Panel
         id="user-directory"
         title="User directory"
-        description="Every portal profile with its role, reporting line, status and commission setup. People who signed in with Google before being approved appear here as not active — set their role, then switch their status to Active to grant access. Changes are recorded in the audit trail below."
+        description="Every portal profile with its security role, business role, reporting line, status and commission setup. The security role decides what a person may do; the business role decides what their app looks like. People who signed in with Google before being approved appear here as not active — set their role, then switch their status to Active to grant access. Changes are recorded in the audit trail below."
       >
+        <div className="flex flex-wrap items-center gap-2 pb-4">
+          <span className="text-xs font-medium tracking-[0.08em] text-ink-subtle uppercase">
+            Role assignment
+          </span>
+          <ul className="flex flex-wrap gap-2">
+            {assignmentFilters.map((filter) => {
+              const active = assignmentFilter === filter.value;
+              const href = filter.value ? `/admin/users?assignment=${filter.value}` : "/admin/users";
+
+              return (
+                <li key={filter.label}>
+                  <Link
+                    href={href}
+                    aria-current={active ? "true" : undefined}
+                    className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${
+                      active
+                        ? "border-line-strong bg-surface-muted text-ink"
+                        : "border-line bg-surface text-ink-muted hover:border-line-strong hover:text-ink"
+                    }`}
+                  >
+                    {filter.label}
+                    <span className="font-mono text-[0.68rem] text-ink-subtle">{filter.count}</span>
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+          <p className="max-w-2xl text-xs leading-5 text-ink-subtle">
+            Assigned means the profile has a business role. Fallback means it has none and the
+            security role is standing in; unassigned means it is on the baseline experience.
+          </p>
+        </div>
+
         {directory.length === 0 ? (
           <EmptyState
             icon={<UsersIcon className="h-5 w-5" />}
             title="No portal users yet."
             description="Invite someone above, or create the account in Supabase → Authentication → Users and it will appear here."
           />
+        ) : visibleDirectory.length === 0 ? (
+          <EmptyState
+            icon={<UsersIcon className="h-5 w-5" />}
+            title="No users with that assignment status."
+            description="Nothing in the directory matches this filter right now."
+          />
         ) : (
           <UserDirectoryTable
-            users={directory}
+            users={visibleDirectory}
             managers={managers}
             departments={departments}
             businessRoles={businessRoles}

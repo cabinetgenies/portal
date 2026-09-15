@@ -74,7 +74,38 @@ degraded and explicit, never silently empty.
 | `/admin/roles` | The role catalog with people, module, widget and action counts |
 | `/admin/roles/[id]` | One role in full: overview, module experience, dashboard widgets, quick actions, knowledge scope, assigned people, with show/hide and reorder |
 | `/admin/role-experiences` | Read-only preview of any role: modules, dashboard, quick actions, knowledge scope and permission summary |
-| `/admin/users` | Assigns each person a security role, a primary department and a business role |
+| `/admin/users` | Assigns each person a security role, a primary department and a business role, and shows whether they resolve as Assigned, Fallback or Unassigned (`?assignment=fallback` filters to the people who still need one) |
+
+## Projects are the shared entity (Phase 5.1)
+
+A project is the shared parent record. Sales and commissions are views and
+workflows over the same one, so the canonical routes are:
+
+| Route | What it is |
+| --- | --- |
+| `/projects` | The shared project list: identity, sales financial position, commission projection, final audit state |
+| `/projects/new` | The one project-creation form. Sales and commissions link here rather than each growing their own |
+| `/projects/[id]` | The one project detail page: overview, sales financials, change orders, commission, commission setup, final audit, events/history |
+
+The old paths redirect, so nothing is duplicated and no bookmark breaks:
+`/sales/projects` → `/projects`, `/sales/projects/[id]` → `/projects/[id]`,
+`/sales/commissions/jobs` → `/projects`, `/sales/commissions/jobs/new` →
+`/projects/new`, `/sales/commissions/jobs/[id]` → `/projects/[id]`, and the
+original `/commissions/*` paths → the same canonical routes.
+
+Nothing was reimplemented to do this. The project detail page renders the same
+financial form, live calculation, commission panel and final-audit panel the
+commission route rendered, and the project list reads the stored job figures plus
+the commission engine's own view model (`projectedCommissionForJob`) and
+`deriveFinalAuditState`. A test asserts that `lib/projects/queries.ts` never
+imports the engine's calculation functions, so the project layer cannot grow a
+second opinion about money.
+
+Route moves are not permission changes. `/projects/[id]` gates on the session
+exactly as the job route did, and what a viewer can read is still decided by Row
+Level Security: a project manager sees the projects their security role allows and
+a 404 for anything else, and the commission columns degrade to "not available"
+rather than showing a figure their role cannot read.
 
 The preview is **not** impersonation. It does not switch sessions, does not touch
 the auth client, and does not bypass a policy; it renders configuration through the

@@ -8,7 +8,8 @@ import { capabilitiesFor, type Role } from "@/lib/permissions/roles";
 import {
   COMMISSION_ROUTES,
   LEGACY_COMMISSION_REDIRECTS,
-  SALES_PROJECT_REDIRECTS,
+  PROJECT_ROUTE_REDIRECTS,
+  PROJECT_ROUTES,
   SALES_ROUTES,
   isActivePath,
 } from "@/lib/routes";
@@ -29,14 +30,11 @@ function experienceFor(roleKey: string, role: Role) {
   });
 }
 
-test("every commission route lives under /sales/commissions", () => {
+test("every remaining commission route lives under /sales/commissions", () => {
   const paths = [
     COMMISSION_ROUTES.overview,
     COMMISSION_ROUTES.employees,
     COMMISSION_ROUTES.employee("profile-1"),
-    COMMISSION_ROUTES.jobs,
-    COMMISSION_ROUTES.newJob,
-    COMMISSION_ROUTES.job("job-1"),
     COMMISSION_ROUTES.payments,
     COMMISSION_ROUTES.rules,
     COMMISSION_ROUTES.reports,
@@ -46,9 +44,6 @@ test("every commission route lives under /sales/commissions", () => {
     "/sales/commissions",
     "/sales/commissions/employees",
     "/sales/commissions/employees/profile-1",
-    "/sales/commissions/jobs",
-    "/sales/commissions/jobs/new",
-    "/sales/commissions/jobs/job-1",
     "/sales/commissions/payments",
     "/sales/commissions/rules",
     "/sales/commissions/reports",
@@ -70,24 +65,41 @@ test("every legacy commission route redirects to its new home", () => {
     redirects.get("/commissions/employees/:profileId"),
     "/sales/commissions/employees/:profileId",
   );
-  assert.equal(redirects.get("/commissions/jobs"), "/sales/commissions/jobs");
-  assert.equal(redirects.get("/commissions/jobs/new"), "/sales/commissions/jobs/new");
-  assert.equal(redirects.get("/commissions/jobs/:jobId"), "/sales/commissions/jobs/:jobId");
+  // Jobs are projects now, and the project route is canonical, so even the oldest
+  // bookmark lands on /projects rather than on an intermediate.
+  assert.equal(redirects.get("/commissions/jobs"), "/projects");
+  assert.equal(redirects.get("/commissions/jobs/new"), "/projects/new");
+  assert.equal(redirects.get("/commissions/jobs/:projectId"), "/projects/:projectId");
   assert.equal(redirects.get("/commissions/payments"), "/sales/commissions/payments");
   assert.equal(redirects.get("/commissions/rules"), "/sales/commissions/rules");
   assert.equal(redirects.get("/commissions/reports"), "/sales/commissions/reports");
 });
 
-test("the preferred /sales/projects paths resolve to the canonical existing routes", () => {
-  // Phase 5 names /sales/projects and /sales/projects/[id] as preferred paths. The
-  // portal already has canonical project and job routes, so the preferred paths
-  // redirect rather than duplicating a second project list.
+test("the canonical project routes are the shared ones", () => {
+  assert.equal(PROJECT_ROUTES.overview, "/projects");
+  assert.equal(PROJECT_ROUTES.new, "/projects/new");
+  assert.equal(PROJECT_ROUTES.project("project-1"), "/projects/project-1");
+});
+
+test("old sales and commission project paths redirect to the canonical routes", () => {
   const redirects = new Map(
-    SALES_PROJECT_REDIRECTS.map((redirect) => [redirect.source, redirect.destination]),
+    PROJECT_ROUTE_REDIRECTS.map((redirect) => [redirect.source, redirect.destination]),
   );
 
   assert.equal(redirects.get("/sales/projects"), "/projects");
-  assert.equal(redirects.get("/sales/projects/:jobId"), "/sales/commissions/jobs/:jobId");
+  assert.equal(redirects.get("/sales/projects/:projectId"), "/projects/:projectId");
+  assert.equal(redirects.get("/sales/commissions/jobs"), "/projects");
+  assert.equal(redirects.get("/sales/commissions/jobs/new"), "/projects/new");
+  assert.equal(redirects.get("/sales/commissions/jobs/:projectId"), "/projects/:projectId");
+
+  // Order matters: a static segment must be listed before the dynamic one that
+  // would otherwise swallow it.
+  const sources = PROJECT_ROUTE_REDIRECTS.map((redirect) => redirect.source);
+  assert.ok(
+    sources.indexOf("/sales/commissions/jobs/new") <
+      sources.indexOf("/sales/commissions/jobs/:projectId"),
+    "the new-project redirect must be declared before the project-detail redirect",
+  );
 });
 
 test("being inside commissions keeps Sales highlighted in the sidebar", () => {
@@ -97,12 +109,15 @@ test("being inside commissions keeps Sales highlighted in the sidebar", () => {
     isActivePath("/sales/commissions/employees/profile-1", SALES_ROUTES.overview),
     true,
   );
-  assert.equal(isActivePath("/sales/commissions/jobs", SALES_ROUTES.overview), true);
+  assert.equal(isActivePath("/sales/commissions/payments", SALES_ROUTES.overview), true);
 
   // …and nothing else lights up.
   assert.equal(isActivePath("/salesx", SALES_ROUTES.overview), false);
   assert.equal(isActivePath("/home", SALES_ROUTES.overview), false);
   assert.equal(isActivePath("/admin/users", SALES_ROUTES.overview), false);
+  // Projects is its own module now, so a project no longer highlights Sales.
+  assert.equal(isActivePath("/projects", SALES_ROUTES.overview), false);
+  assert.equal(isActivePath("/projects/project-1", SALES_ROUTES.overview), false);
 });
 
 test("the registry describes every module the navigation can show", () => {

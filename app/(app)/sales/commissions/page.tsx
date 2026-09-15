@@ -13,6 +13,7 @@ import {
   listEmployeeCommissionSummaries,
 } from "@/lib/commission/event-queries";
 import { toNumber } from "@/lib/commission/financials";
+import { PROJECT_ROUTES } from "@/lib/routes";
 import {
   commissionEventStatusLabel,
   commissionEventStatusTone,
@@ -200,7 +201,7 @@ export default async function CommissionsPage() {
                   <tr key={entry.event.id}>
                     <Td>
                       <Link
-                        href={`/sales/commissions/jobs/${entry.event.job_id}`}
+                        href={PROJECT_ROUTES.project(entry.event.job_id)}
                         className="font-medium text-ink underline-offset-4 hover:underline"
                       >
                         {entry.jobName ?? "Job"}
@@ -270,7 +271,7 @@ function QueuePanel({
                 <tr key={job.id}>
                   <Td>
                     <Link
-                      href={`/sales/commissions/jobs/${job.id}`}
+                      href={PROJECT_ROUTES.project(job.id)}
                       className="font-medium text-ink underline-offset-4 hover:underline"
                     >
                       {job.name}

@@ -9,6 +9,7 @@ import { StatusBadge } from "@/components/ui/badge";
 import { buttonClassName } from "@/components/ui/button";
 import { Table, TableWrap, Td, Th } from "@/components/ui/table";
 import { drawStatusLabel, type UserDirectoryRow } from "@/lib/admin/user-directory";
+import { ASSIGNMENT_STATUS_HINTS } from "@/lib/admin/user-directory";
 import { formatDate, formatText } from "@/lib/utils/format";
 
 /**
@@ -64,11 +65,26 @@ export function UserDirectoryTable({
               <Td className="text-ink-muted">{formatText(user.email)}</Td>
               <Td className="text-ink-muted">{user.roleLabel}</Td>
               <Td className="text-ink-muted">
-                {user.businessRoleName ?? (
-                  <span className="text-ink-subtle">
-                    Not assigned — using the security role&apos;s fallback
-                  </span>
-                )}
+                <span className="block">
+                  {user.businessRoleName ?? (
+                    <span className="text-ink-subtle">No business role assigned</span>
+                  )}
+                </span>
+                <span
+                  title={ASSIGNMENT_STATUS_HINTS[user.assignmentStatus]}
+                  className="mt-1 inline-flex"
+                >
+                  <StatusBadge
+                    label={user.assignmentStatusLabel}
+                    tone={
+                      user.assignmentStatus === "assigned"
+                        ? "positive"
+                        : user.assignmentStatus === "auth_role_fallback"
+                          ? "warning"
+                          : "critical"
+                    }
+                  />
+                </span>
               </Td>
               <Td className="text-ink-muted">{formatText(user.departmentName)}</Td>
               <Td className="text-ink-muted">{formatText(user.managerName)}</Td>

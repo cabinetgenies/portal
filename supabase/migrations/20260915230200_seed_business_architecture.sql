@@ -150,11 +150,11 @@ on conflict (key) do update
 
 insert into public.quick_actions (key, label, description, href, action_key, icon_key, is_active, display_order)
 values
-  ('new_project', 'New Project', 'Create a new project record.', '/sales/commissions/jobs/new', null, 'projects', true, 10),
+  ('new_project', 'New Project', 'Create a new project record.', '/projects/new', null, 'projects', true, 10),
   ('view_projects', 'View Projects', 'Open the project list.', '/projects', null, 'projects', true, 20),
   ('view_commissions', 'View Commissions', 'Open commissions.', '/sales/commissions', null, 'commissions', true, 30),
   ('review_approvals', 'Review Approvals', 'Open the approval and payment queue.', '/sales/commissions/payments', null, 'commissions', true, 40),
-  ('update_financials', 'Update Financials', 'Enter or correct a job''s financial inputs.', '/sales/commissions/jobs', null, 'commissions', true, 50),
+  ('update_financials', 'Update Financials', 'Enter or correct a project''s financial inputs.', '/projects', null, 'commissions', true, 50),
   ('submit_request', 'Submit Request', 'Raise a request for someone to action.', '/requests', null, 'requests', true, 60),
   ('view_people', 'View People', 'Open the people directory.', '/people', null, 'people', true, 70),
   ('open_inventory', 'Open Inventory', 'Open the inventory module.', '/inventory', null, 'inventory', true, 80),

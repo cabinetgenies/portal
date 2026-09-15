@@ -10,6 +10,7 @@ import { Table, TableWrap, Td, TdNumeric, Th } from "@/components/ui/table";
 import { requireSession } from "@/lib/auth/dal";
 import { loadCommissionWorkspace } from "@/lib/commission/event-queries";
 import { toNumber } from "@/lib/commission/financials";
+import { PROJECT_ROUTES } from "@/lib/routes";
 import {
   commissionEventStatusLabel,
   commissionEventStatusTone,
@@ -168,7 +169,7 @@ function EventQueue({
                 <tr key={entry.event.id}>
                   <Td>
                     <Link
-                      href={`/sales/commissions/jobs/${entry.event.job_id}`}
+                      href={PROJECT_ROUTES.project(entry.event.job_id)}
                       className="font-medium text-ink underline-offset-4 hover:underline"
                     >
                       {entry.jobName ?? "Job"}

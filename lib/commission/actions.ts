@@ -56,9 +56,9 @@ import type {
  */
 
 function revalidateJobs(jobId?: string) {
-  revalidatePath("/sales/commissions/jobs");
+  revalidatePath("/projects");
   if (jobId) {
-    revalidatePath(`/sales/commissions/jobs/${jobId}`);
+    revalidatePath(`/projects/${jobId}`);
   }
 }
 
@@ -328,7 +328,7 @@ export async function createJob(
   }
 
   revalidateJobs(inserted?.id);
-  redirect(`/sales/commissions/jobs/${inserted?.id}`);
+  redirect(`/projects/${inserted?.id}`);
 }
 
 export async function updateJobOverview(

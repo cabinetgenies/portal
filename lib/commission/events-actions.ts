@@ -47,9 +47,9 @@ function revalidateCommission(jobId?: string) {
   revalidatePath("/sales/commissions");
   revalidatePath("/sales/commissions/payments");
   revalidatePath("/sales/commissions/employees");
-  revalidatePath("/sales/commissions/jobs");
+  revalidatePath("/projects");
   if (jobId) {
-    revalidatePath(`/sales/commissions/jobs/${jobId}`);
+    revalidatePath(`/projects/${jobId}`);
   }
 }
 

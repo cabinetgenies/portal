@@ -34,7 +34,7 @@ function revalidateCompensation() {
   revalidatePath("/admin/compensation-plans");
   revalidatePath("/sales/commissions/rules");
   revalidatePath("/sales/commissions/employees");
-  revalidatePath("/sales/commissions/jobs");
+  revalidatePath("/projects");
 }
 
 // ---------------------------------------------------------------------------
@@ -81,7 +81,7 @@ export async function saveCommissionSettings(
   revalidatePath("/sales/commissions/rules");
   revalidatePath("/admin/commission-settings");
   revalidatePath("/sales/commissions");
-  revalidatePath("/sales/commissions/jobs");
+  revalidatePath("/projects");
 
   return successState(
     "Commission settings saved. These values apply to calculations made from the effective date onward. Jobs already saved keep the burden and warranty rates they were stored with, and existing commission events keep their snapshot.",

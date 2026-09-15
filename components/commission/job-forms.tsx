@@ -13,6 +13,7 @@ import {
   fieldError,
 } from "@/components/ui/form";
 import { createJob, updateJobOverview } from "@/lib/commission/actions";
+import { PROJECT_ROUTES } from "@/lib/routes";
 import type { SalesDesignerOption } from "@/lib/compensation/queries";
 import {
   JOB_STATUSES,
@@ -192,10 +193,10 @@ export function JobOverviewForm({ designers, job }: JobFormProps) {
         <FormAlert state={state} className="flex-1" />
         {job ? (
           <Link
-            href="/sales/commissions/jobs"
+            href={PROJECT_ROUTES.overview}
             className="text-sm font-medium text-ink-muted hover:text-ink"
           >
-            Back to jobs
+            Back to projects
           </Link>
         ) : null}
       </div>

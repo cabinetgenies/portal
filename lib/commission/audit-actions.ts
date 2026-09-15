@@ -42,8 +42,8 @@ import {
  */
 
 function revalidateJob(jobId: string) {
-  revalidatePath(`/sales/commissions/jobs/${jobId}`);
-  revalidatePath("/sales/commissions/jobs");
+  revalidatePath(`/projects/${jobId}`);
+  revalidatePath("/projects");
   revalidatePath("/sales/commissions");
 }
 

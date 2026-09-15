@@ -11,17 +11,52 @@ export const SALES_ROUTES = {
   commissions: "/sales/commissions",
 } as const;
 
+/**
+ * Canonical project routes.
+ *
+ * A project is the shared parent entity: sales and commissions are views and
+ * workflows over the same record, so the project's identity lives here and
+ * nowhere else. Everything that links to a project — the project list, the
+ * commission pipeline, the designer dashboard, the quick actions — points at
+ * these paths.
+ */
+export const PROJECT_ROUTES = {
+  overview: "/projects",
+  new: "/projects/new",
+  project: (projectId: string) => `/projects/${projectId}`,
+} as const;
+
 export const COMMISSION_ROUTES = {
   overview: "/sales/commissions",
   employees: "/sales/commissions/employees",
   employee: (profileId: string) => `/sales/commissions/employees/${profileId}`,
-  jobs: "/sales/commissions/jobs",
-  newJob: "/sales/commissions/jobs/new",
-  job: (jobId: string) => `/sales/commissions/jobs/${jobId}`,
   payments: "/sales/commissions/payments",
   rules: "/sales/commissions/rules",
   reports: "/sales/commissions/reports",
 } as const;
+
+/**
+ * Where project routes used to live.
+ *
+ * Commissions must not own the canonical project detail route, so the job paths
+ * redirect to the project paths rather than being kept as a second
+ * implementation. Redirects run before routing, so these win over any page that
+ * might still exist at the old path.
+ */
+export const PROJECT_ROUTE_REDIRECTS = [
+  { source: "/sales/projects", destination: PROJECT_ROUTES.overview },
+  {
+    source: "/sales/projects/:projectId",
+    destination: `${PROJECT_ROUTES.overview}/:projectId`,
+  },
+  // `/jobs/new` must be listed before the dynamic job route, or it is swallowed.
+  { source: "/sales/commissions/jobs", destination: PROJECT_ROUTES.overview },
+  { source: "/sales/commissions/jobs/new", destination: PROJECT_ROUTES.new },
+  {
+    source: "/sales/commissions/jobs/:projectId",
+    destination: `${PROJECT_ROUTES.overview}/:projectId`,
+  },
+] as const;
 
 /**
  * Where the commission routes lived before they moved under Sales.
@@ -33,26 +68,12 @@ export const LEGACY_COMMISSION_REDIRECTS = [
   { source: "/commissions", destination: COMMISSION_ROUTES.overview },
   { source: "/commissions/employees", destination: COMMISSION_ROUTES.employees },
   { source: "/commissions/employees/:profileId", destination: `${COMMISSION_ROUTES.employees}/:profileId` },
-  { source: "/commissions/jobs", destination: COMMISSION_ROUTES.jobs },
-  { source: "/commissions/jobs/new", destination: COMMISSION_ROUTES.newJob },
-  { source: "/commissions/jobs/:jobId", destination: `${COMMISSION_ROUTES.jobs}/:jobId` },
+  { source: "/commissions/jobs", destination: PROJECT_ROUTES.overview },
+  { source: "/commissions/jobs/new", destination: PROJECT_ROUTES.new },
+  { source: "/commissions/jobs/:projectId", destination: `${PROJECT_ROUTES.overview}/:projectId` },
   { source: "/commissions/payments", destination: COMMISSION_ROUTES.payments },
   { source: "/commissions/rules", destination: COMMISSION_ROUTES.rules },
   { source: "/commissions/reports", destination: COMMISSION_ROUTES.reports },
-] as const;
-
-/**
- * Where the Phase 5 "preferred" project paths resolve.
- *
- * The phase document names /sales/projects and /sales/projects/[id]. The portal
- * already has canonical routes for both projects and jobs, so rather than standing
- * up a second project list that would drift from the first, the preferred paths
- * redirect to them: `/projects` is the module's own route, and a project's detail
- * is the job record under commissions, where its commission context lives.
- */
-export const SALES_PROJECT_REDIRECTS = [
-  { source: "/sales/projects", destination: "/projects" },
-  { source: "/sales/projects/:jobId", destination: "/sales/commissions/jobs/:jobId" },
 ] as const;
 
 /**

@@ -49,9 +49,9 @@ function RoleSelect({
 }) {
   return (
     <Field
-      label="Role"
+      label="Security role"
       htmlFor={id}
-      hint="Roles decide what the portal lets someone do. Compensation comes from the plan assignment, not the role."
+      hint="What this person is allowed to do, enforced by Row Level Security. This is a different thing from their business role, which only shapes their experience. Compensation comes from the plan assignment, not either role."
       error={error}
     >
       <Select id={id} name="role" defaultValue={defaultValue ?? "employee"} required>

@@ -50,15 +50,16 @@ import {
   jobStatusLabel,
   jobStatusTone,
 } from "@/lib/commission/types";
+import { PROJECT_ROUTES } from "@/lib/routes";
 import { formatDate, formatDateTime, formatMoney, formatPercent, formatText } from "@/lib/utils/format";
 
 export const metadata = {
-  title: "Job",
+  title: "Project",
 };
 
 const SECTIONS = [
   { href: "#overview", label: "Overview" },
-  { href: "#financials", label: "Financials" },
+  { href: "#financials", label: "Sales financials" },
   { href: "#change-orders", label: "Change orders" },
   { href: "#commission", label: "Commission" },
   { href: "#commission-setup", label: "Commission setup" },
@@ -66,8 +67,25 @@ const SECTIONS = [
   { href: "#audit", label: "Events / history" },
 ];
 
-export default async function JobDetailPage(props: PageProps<"/sales/commissions/jobs/[id]">) {
-  const { id } = await props.params;
+/**
+ * The canonical project detail page.
+ *
+ * A project is the shared parent entity: sales and commissions read the same
+ * record, so this is the one page that shows it. The sections follow that split —
+ * shared identity, then the sales financials, then commission, then the final
+ * audit that freezes the commission picture.
+ *
+ * Every figure here comes from the existing commission engine, the existing
+ * financial calculation and the existing audit workflow. Nothing is recalculated
+ * locally, and the page does not gate on a commission capability it did not gate
+ * on before: what a viewer can see is what Row Level Security gives them.
+ */
+export default async function ProjectDetailPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const { id } = await params;
   const session = await requireSession();
   const detail = await getJobDetail(id);
 
@@ -104,13 +122,16 @@ export default async function JobDetailPage(props: PageProps<"/sales/commissions
   const removedChangeOrders = changeOrders.filter((changeOrder) => !changeOrder.active);
   const changeOrderRollUp = changeOrderTotalsFromRows(activeChangeOrders);
   const tierWindows = tierWindowsFromRows(planVersionTiers);
+  // The stored original inputs, read once and used by the read-only summary and
+  // the live calculation so the two cannot disagree.
+  const jobInputs = financialInputsFromJob(job, costRateDefaults);
 
   // The live picture: stored original inputs plus the change order roll-up, run
   // through the same engine the new-job form uses. This is the estimate a deposit
   // is based on; the final true-up uses the finalized audit snapshot.
   const liveCalculation = buildLiveCalculation({
     inputs: {
-      ...financialInputsFromJob(job, costRateDefaults),
+      ...jobInputs,
       changeOrderRevenue: changeOrderRollUp.revenue,
       changeOrderCost: changeOrderRollUp.cost,
     },
@@ -167,7 +188,7 @@ export default async function JobDetailPage(props: PageProps<"/sales/commissions
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow={job.job_number ? `Job ${job.job_number}` : "Job"}
+        eyebrow={job.job_number ? `Project ${job.job_number}` : "Project"}
         title={job.job_name}
         description={
           planVersion
@@ -176,10 +197,10 @@ export default async function JobDetailPage(props: PageProps<"/sales/commissions
         }
         actions={
           <Link
-            href="/sales/commissions/jobs"
+            href={PROJECT_ROUTES.overview}
             className={buttonClassName({ variant: "secondary", size: "sm" })}
           >
-            Back to jobs
+            Back to projects
           </Link>
         }
       />
@@ -192,7 +213,7 @@ export default async function JobDetailPage(props: PageProps<"/sales/commissions
         <span className="text-xs text-ink-muted">Sold: {formatDate(job.sold_date)}</span>
       </div>
 
-      <nav aria-label="Job sections" className="flex flex-wrap gap-2">
+      <nav aria-label="Project sections" className="flex flex-wrap gap-2">
         {SECTIONS.filter(
           (section) => section.href !== "#audit" || canViewConfig,
         ).map((section) => (
@@ -224,32 +245,43 @@ export default async function JobDetailPage(props: PageProps<"/sales/commissions
       <Panel
         id="overview"
         title="Overview"
-        description="Job identity, workflow status, milestone dates and the sales designer. Changes here are recorded in the audit trail."
+        description="Shared project identity: the record sales and commissions both read. Execution detail — schedule, selections, site work — stays in Buildertrend. Changes made here are recorded in the audit trail."
       >
+        <dl className="grid gap-x-8 gap-y-4 sm:grid-cols-2 lg:grid-cols-4">
+          <ReadOnly label="Project name" value={job.job_name} />
+          <ReadOnly label="Project number" value={formatText(job.job_number)} />
+          <ReadOnly label="Customer" value={formatText(job.customer_name)} />
+          <ReadOnly label="Status" value={jobStatusLabel(job.status)} />
+          <ReadOnly
+            label="Sales designer"
+            value={formatText(designer ? designerDisplayName(designer) : null)}
+          />
+          <ReadOnly label="Sold date" value={formatDate(job.sold_date)} />
+          <ReadOnly label="Created" value={formatDate(job.created_at)} />
+          <ReadOnly
+            label="Buildertrend"
+            value={
+              <span className="text-ink-muted">
+                Not linked — Buildertrend remains the execution system of record.
+              </span>
+            }
+          />
+        </dl>
+
         {canManageJobs ? (
-          <JobOverviewForm designers={designers} job={job} />
-        ) : (
-          <dl className="grid gap-x-8 gap-y-4 sm:grid-cols-2 lg:grid-cols-4">
-            <ReadOnly label="Job name" value={job.job_name} />
-            <ReadOnly label="Job number" value={formatText(job.job_number)} />
-            <ReadOnly label="Customer" value={formatText(job.customer_name)} />
-            <ReadOnly label="Status" value={jobStatusLabel(job.status)} />
-            <ReadOnly
-              label="Sales designer"
-              value={formatText(designer ? designerDisplayName(designer) : null)}
-            />
-            <ReadOnly label="Sold" value={formatDate(job.sold_date)} />
-            <ReadOnly label="Deposit received" value={formatDate(job.deposit_received_date)} />
-            <ReadOnly label="Completed" value={formatDate(job.completion_date)} />
-            <ReadOnly label="GP audit completed" value={formatDate(job.gp_audit_completed_date)} />
-          </dl>
-        )}
+          <div className="border-t border-line pt-5">
+            <h3 className="pb-4 text-xs font-semibold tracking-[0.12em] text-ink-subtle uppercase">
+              Edit project identity
+            </h3>
+            <JobOverviewForm designers={designers} job={job} />
+          </div>
+        ) : null}
       </Panel>
 
       <Panel
         id="financials"
-        title="Financials"
-        description="Revenue and cost inputs. Total job revenue, total job cost, job gross profit and the commissionable figures are derived from these by the single shared calculation."
+        title="Sales financials"
+        description="The sales-side financial picture for this project. Revenue and cost inputs, then the totals the single shared calculation derives from them — the same numbers commission is calculated against."
       >
         {recognizedEvents.length > 0 ? (
           <div
@@ -277,11 +309,32 @@ export default async function JobDetailPage(props: PageProps<"/sales/commissions
 
         <div className="grid gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
           <div>
+            <dl className="mb-6 grid gap-x-8 gap-y-4 sm:grid-cols-2 lg:grid-cols-3">
+              <ReadOnly
+                label="Original contract price"
+                value={formatMoney(jobInputs.contractRevenue)}
+              />
+              <ReadOnly label="Original costs" value={formatMoney(jobInputs.originalCost)} />
+              <ReadOnly
+                label="Change orders"
+                value={`${formatMoney(changeOrderRollUp.revenue)} revenue · ${formatMoney(changeOrderRollUp.cost)} cost`}
+              />
+              <ReadOnly label="Burden %" value={formatPercent(jobInputs.burdenPercent)} />
+              <ReadOnly
+                label="Warranty %"
+                value={formatPercent(jobInputs.warrantyContingencyPercent)}
+              />
+              <ReadOnly label="Total revenue" value={formatMoney(job.actual_total_revenue)} />
+              <ReadOnly label="Total cost" value={formatMoney(job.actual_total_cost)} />
+              <ReadOnly label="Gross profit" value={formatMoney(job.job_gross_profit)} />
+              <ReadOnly label="GP %" value={formatPercent(job.job_gp_percent)} />
+            </dl>
+
             {canEditFinancials ? (
               <JobFinancialsForm job={job} costRates={costRateDefaults} />
             ) : (
               <p className="text-sm leading-6 text-ink-muted">
-                Your role can see this job&apos;s figures but not change them. Direct cost,
+                Your role can see this project&apos;s figures but not change them. Direct cost,
                 burden, warranty contingency, total cost, gross profit and the commission
                 estimate are all in the Live Calculation panel.
               </p>

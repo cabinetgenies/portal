@@ -3,6 +3,7 @@ import test from "node:test";
 
 import {
   accountStatusLabel,
+  assignmentStatusFor,
   assignmentInForceAt,
   buildUserDirectoryRows,
   describeAuditEntry,
@@ -255,6 +256,53 @@ test("a legacy free-text department still displays when no registry department i
 
   assert.equal(rows[0].departmentId, null);
   assert.equal(rows[0].departmentName, "Sales");
+});
+
+test("assignment status says whether somebody is on an explicit business role", () => {
+  const rows = buildUserDirectoryRows(
+    sources({
+      profiles: [
+        profile({ id: "assigned", business_role_id: "role-sales-designer", role: "employee" }),
+        profile({ id: "fallback-ceo", role: "ceo" }),
+        profile({ id: "fallback-accounting", role: "accounting" }),
+        profile({ id: "unassigned", role: "employee" }),
+      ],
+    }),
+  );
+
+  const status = (id: string) =>
+    rows.find((row) => row.profileId === id)?.assignmentStatusLabel;
+
+  assert.equal(status("assigned"), "Assigned");
+  assert.equal(status("fallback-ceo"), "Fallback");
+  assert.equal(status("fallback-accounting"), "Fallback");
+  assert.equal(status("unassigned"), "Unassigned");
+});
+
+test("assignment status is computed from the row, not from the registry", () => {
+  // An assigned profile whose business role row is unreadable is still assigned:
+  // the column is what decides, so a hidden registry row cannot make somebody look
+  // unconfigured.
+  assert.equal(
+    assignmentStatusFor({ business_role_id: "role-with-no-row", role: "employee" }),
+    "assigned",
+  );
+  assert.equal(assignmentStatusFor({ business_role_id: null, role: "admin" }), "auth_role_fallback");
+  assert.equal(assignmentStatusFor({ business_role_id: null, role: "supervisor" }), "auth_role_fallback");
+  assert.equal(assignmentStatusFor({ business_role_id: null, role: "employee" }), "unassigned");
+  assert.equal(assignmentStatusFor({ business_role_id: null, role: null }), "unassigned");
+});
+
+test("a fallback profile still has a safe, explicit experience", () => {
+  // The fallback exists so nobody loses their portal while assignment is rolled
+  // out: the status is reported, and the label says what is happening.
+  const rows = buildUserDirectoryRows(
+    sources({ profiles: [profile({ id: "ceo", role: "ceo", first_name: "Casey" })] }),
+  );
+
+  assert.equal(rows[0].assignmentStatus, "auth_role_fallback");
+  assert.equal(rows[0].businessRoleName, null);
+  assert.ok(rows[0].assignmentStatusLabel.length > 0);
 });
 
 test("status and draw labels read as sentences", () => {

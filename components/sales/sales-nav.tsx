@@ -1,8 +1,9 @@
 import { ModuleTabs } from "@/components/ui/module-tabs";
-import { SALES_ROUTES } from "@/lib/routes";
+import { PROJECT_ROUTES, SALES_ROUTES } from "@/lib/routes";
 
 const TABS = [
   { label: "Overview", href: SALES_ROUTES.overview },
+  { label: "Projects", href: PROJECT_ROUTES.overview },
   { label: "Commissions", href: SALES_ROUTES.commissions },
 ];
 

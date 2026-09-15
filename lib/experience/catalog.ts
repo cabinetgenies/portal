@@ -284,7 +284,7 @@ export const QUICK_ACTIONS: readonly QuickActionDefinition[] = [
     key: "new_project",
     label: "New Project",
     description: "Create a new project record.",
-    href: "/sales/commissions/jobs/new",
+    href: "/projects/new",
     actionKey: null,
     iconKey: "projects",
     isActive: true,
@@ -323,8 +323,10 @@ export const QUICK_ACTIONS: readonly QuickActionDefinition[] = [
   {
     key: "update_financials",
     label: "Update Financials",
-    description: "Enter or correct a job's financial inputs.",
-    href: "/sales/commissions/jobs",
+    description: "Enter or correct a project's financial inputs.",
+    // Financial inputs live on the project record, so the action opens the shared
+    // project list rather than a commission-owned copy of it.
+    href: "/projects",
     actionKey: null,
     iconKey: "commissions",
     isActive: true,
