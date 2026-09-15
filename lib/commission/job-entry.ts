@@ -271,6 +271,16 @@ function tierWindowFromRow(row: CompensationPlanTierRow): TierWindow {
   };
 }
 
+/** Plan tiers as the engine's pure windows, with numeric columns coerced. */
+export function tierWindowsFromRows(
+  rows: readonly CompensationPlanTierRow[],
+): TierWindow[] {
+  return rows
+    .slice()
+    .sort((a, b) => a.sort_order - b.sort_order)
+    .map(tierWindowFromRow);
+}
+
 export function isOnDrawOn(
   periods: readonly EmployeeDrawPeriodRow[],
   profileId: string,

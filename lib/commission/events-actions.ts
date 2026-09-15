@@ -89,6 +89,9 @@ async function createEventForJob({
   }
 
   const { job, plan, planVersion, designer } = context.detail;
+  // Set once a finalized audit is found: a final true-up is based on that snapshot,
+  // never on the live figures, and never on a GP audit date alone.
+  let finalizedAudit: { id: string; revision: number } | null = null;
 
   if (!designer || !job.sales_designer_id) {
     return failureState("Assign a sales designer to this job before calculating commission.");
@@ -122,6 +125,27 @@ async function createEventForJob({
   }
 
   if (eventType === "final_true_up") {
+    const auditClient = await createSupabaseServerClient();
+    const { data: auditRows, error: auditError } = await auditClient
+      .from("commission_audits")
+      .select("id, revision")
+      .eq("job_id", job.id)
+      .eq("status", "finalized")
+      .order("revision", { ascending: false })
+      .limit(1);
+
+    if (auditError) return mutationErrorState(auditError, "audit");
+
+    const audit = auditRows?.[0] ?? null;
+
+    if (!audit) {
+      return failureState(
+        "The final true-up uses the finalized commission audit. Open the Final audit section on this job, review the figures and finalize the audit first — a GP audit date on its own is not enough.",
+      );
+    }
+
+    finalizedAudit = { id: audit.id, revision: audit.revision };
+
     if (!context.finalEligible) {
       return failureState(
         "Record the GP audit completion date (or move the job to GP audited) before calculating the final true-up.",
@@ -188,6 +212,9 @@ async function createEventForJob({
             }
           : null,
         warnings: calculation.warnings,
+        audit: finalizedAudit
+          ? { id: finalizedAudit.id, revision: finalizedAudit.revision }
+          : null,
       },
       created_by: createdBy,
     })

@@ -19,6 +19,7 @@ generalise the shared structures for future Sales Manager compensation (see
 | 10 | `migrations/20260915160000_user_directory_audit.sql` | profile audit trail (`user_created`, `role_changed`, `manager_changed`, `active_status_changed`, …) and the admin policy that links a profile to an existing auth user |
 | 11 | `migrations/20260915170000_percentage_based_job_costs.sql` | percentage-based burden and warranty / service contingency: company defaults on `commission_settings`, per-job snapshots on `jobs`, derived dollars kept, and range constraints |
 | 12 | `migrations/20260915180000_change_orders_and_original_cost.sql` | simplified job financials: `jobs.original_cost` and `jobs.change_order_cost`, the `job_change_orders` table with RLS and audit, and an audit trigger for the financial inputs |
+| 13 | `migrations/20260915190000_final_commission_audit.sql` | the final commission audit: `commission_audits` snapshot table with revisions, RLS, audit trigger, one open audit per job, and finalized-requires-actor constraints |
 
 Every script is idempotent, so re-running one is safe.
 
@@ -323,3 +324,27 @@ access. Writes are audited through the `job_change_orders_audit` trigger
 flipping to false), and changes to the original contract price, original cost and the
 two roll-ups are audited by `jobs_financial_inputs_audit` as
 `job_financial_inputs_changed`.
+
+## Final commission audit (Phase 3.9)
+
+Live financials are an estimate. `commission_audits` is the authoritative record, and
+it is reached through an explicit workflow: **open → review → finalize → create the
+final true-up**. It stores a snapshot, not a reference: the audited inputs, the plan
+version, the tier label, the standard/draw/effective rates, the burden and warranty
+percentages and dollars, the final gross commission, what had already been
+recognized, and the resulting true-up.
+
+| Guarantee | How it is enforced |
+| --- | --- |
+| Only one audit open at a time | partial unique index on `(job_id)` where `status = 'in_review'` |
+| Finalized audits record who and when | `finalized_by`/`finalized_at` check constraint |
+| Revisions are never renumbered or overwritten | `unique (job_id, revision)`; re-opening supersedes the old revision and inserts the next one |
+| Audits are never deleted | no DELETE policy and no DELETE grant; cancelling marks a revision `superseded` |
+| `anon` has no access | privileges revoked, no policy targets it |
+| Finance/administrators only | insert/update policies require accounting, admin or CEO, and an insert must set `started_by = auth.uid()` |
+
+Finalizing also writes `jobs.gp_audit_completed_date`, so the GP audit date is a
+consequence of the audit rather than a field typed in beside normal job entry. The
+final true-up action refuses to run without a finalized audit and records the audit
+id and revision in the event's `calculation_metadata`, so the payout can always be
+traced back to the snapshot it was based on.

@@ -381,6 +381,55 @@ export type JobChangeOrderInsert = {
 
 export type JobChangeOrderUpdate = Partial<JobChangeOrderInsert>;
 
+/** A finalized (or in-review) final commission audit snapshot. */
+export type CommissionAuditRow = {
+  id: string;
+  job_id: string;
+  revision: number;
+  status: string;
+  original_contract_price: number;
+  change_order_revenue: number;
+  other_revenue: number;
+  credit_amount: number;
+  original_cost: number;
+  change_order_cost: number;
+  direct_job_cost: number;
+  burden_percent: number;
+  burden_cost: number;
+  warranty_contingency_percent: number;
+  warranty_service_contingency: number;
+  final_total_revenue: number;
+  final_total_cost: number;
+  final_gross_profit: number;
+  final_gp_percent: number;
+  commissionable_revenue: number;
+  commissionable_cost: number;
+  commissionable_gross_profit: number;
+  commissionable_gp_percent: number;
+  compensation_plan_id: string | null;
+  compensation_plan_version_id: string | null;
+  tier_label: string | null;
+  standard_commission_rate: number;
+  draw_rate_reduction: number;
+  effective_commission_rate: number;
+  final_gross_commission: number;
+  previously_recognized: number;
+  final_true_up: number;
+  notes: string | null;
+  started_by: string | null;
+  started_at: string;
+  finalized_by: string | null;
+  finalized_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type CommissionAuditInsert = Partial<
+  Omit<CommissionAuditRow, "job_id">
+> & { job_id: string };
+
+export type CommissionAuditUpdate = Partial<CommissionAuditInsert>;
+
 export type AuditEventRow = {
   id: string;
   entity_type: string;
@@ -777,6 +826,34 @@ export type Database = {
           {
             foreignKeyName: "job_change_orders_created_by_fkey";
             columns: ["created_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      commission_audits: {
+        Row: CommissionAuditRow;
+        Insert: CommissionAuditInsert;
+        Update: CommissionAuditUpdate;
+        Relationships: [
+          {
+            foreignKeyName: "commission_audits_job_id_fkey";
+            columns: ["job_id"];
+            isOneToOne: false;
+            referencedRelation: "jobs";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "commission_audits_started_by_fkey";
+            columns: ["started_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "commission_audits_finalized_by_fkey";
+            columns: ["finalized_by"];
             isOneToOne: false;
             referencedRelation: "profiles";
             referencedColumns: ["id"];

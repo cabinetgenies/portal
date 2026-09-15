@@ -39,6 +39,12 @@ Internal operations portal for Cabinet Genies.
   a number/name, revenue and cost, rolled up by the canonical calculation. The four
   old cost buckets are folded into `original_cost` and no longer surface in the UI;
   add, edit and remove all recalculate the live summary.
+- **Phase 3.9 (done):** the final commission audit as its own workflow — opened
+  deliberately on the job page, reviewed against the complete live financial picture,
+  then finalized into an append-only snapshot of the inputs, plan version, tier,
+  rates, burden and warranty percentages and the resulting true-up. The final true-up
+  is created separately from that snapshot, and a GP audit date on its own no longer
+  unlocks it.
 
 Sales manager bonus calculation and payout, support designer bonuses, split
 commissions, production performance bonuses, payroll batching, Buildertrend

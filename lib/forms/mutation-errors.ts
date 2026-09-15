@@ -11,6 +11,7 @@ export type MutationContext =
   | "job"
   | "adjustment"
   | "change_order"
+  | "audit"
   | "commission_event"
   | "draw"
   | "rollover"
@@ -37,6 +38,8 @@ export function mutationErrorState(
                 ? "Another tier in this version already uses that evaluation order."
                 : context === "user"
                   ? "A portal profile with those details already exists. Check the email address, or configure the existing account in the directory."
+                  : context === "audit"
+                    ? "A final audit already exists for this job at that revision. Reload the page and try again."
                   : "A record with those details already exists.",
       );
     case "23P01":

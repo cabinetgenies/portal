@@ -8,6 +8,7 @@ import {
   ChangeOrderCreateForm,
 } from "@/components/commission/job-change-orders";
 import { JobCommissionPanel } from "@/components/commission/job-commission-panel";
+import { FinalAuditPanel } from "@/components/commission/final-audit-panel";
 import { JobFinancialsForm } from "@/components/commission/job-financials-form";
 import { JobOverviewForm } from "@/components/commission/job-forms";
 import { JobCompensationPlanForm } from "@/components/commission/job-plan-form";
@@ -20,9 +21,6 @@ import { buttonClassName } from "@/components/ui/button";
 import { Panel } from "@/components/ui/panel";
 import { Table, TableWrap, Td, TdNumeric, Th } from "@/components/ui/table";
 import { requireSession } from "@/lib/auth/dal";
-import {
-  type TierWindow,
-} from "@/lib/compensation/plan-resolution";
 import {
   listCompensationPlanOptions,
   listProjectCategories,
@@ -39,15 +37,20 @@ import {
   settingsSnapshot,
 } from "@/lib/commission/event-queries";
 import { toNumber } from "@/lib/commission/financials";
+import {
+  auditReadiness,
+  deriveFinalAuditState,
+} from "@/lib/commission/audit";
+import { listJobAudits } from "@/lib/commission/audit-queries";
 import { changeOrderLabel, changeOrderTotalsFromRows } from "@/lib/commission/change-orders";
 import { buildLiveCalculation } from "@/lib/commission/live-calculation";
+import { tierWindowsFromRows } from "@/lib/commission/job-entry";
 import {
   ADJUSTMENT_TYPE_LABELS,
   isAdjustmentType,
   jobStatusLabel,
   jobStatusTone,
 } from "@/lib/commission/types";
-import type { ThresholdType } from "@/lib/compensation/types";
 import { formatDate, formatDateTime, formatMoney, formatPercent, formatText } from "@/lib/utils/format";
 
 export const metadata = {
@@ -60,6 +63,7 @@ const SECTIONS = [
   { href: "#change-orders", label: "Change orders" },
   { href: "#commission", label: "Commission" },
   { href: "#commission-setup", label: "Commission setup" },
+  { href: "#final-audit", label: "Final audit" },
   { href: "#audit", label: "Events / history" },
 ];
 
@@ -101,20 +105,7 @@ export default async function JobDetailPage(props: PageProps<"/commissions/jobs/
   const activeChangeOrders = changeOrders.filter((changeOrder) => changeOrder.active);
   const removedChangeOrders = changeOrders.filter((changeOrder) => !changeOrder.active);
   const changeOrderRollUp = changeOrderTotalsFromRows(activeChangeOrders);
-  const tierWindows = planVersionTiers.map<TierWindow>((tier) => ({
-    sortOrder: tier.sort_order,
-    label: tier.label,
-    // numeric columns can arrive as strings; the band comparison must be numeric.
-    rate: toNumber(tier.rate),
-    lower: {
-      thresholdType: tier.lower_threshold_type as ThresholdType,
-      value: tier.lower_gp_percent === null ? null : toNumber(tier.lower_gp_percent),
-    },
-    upper: {
-      thresholdType: tier.upper_threshold_type as ThresholdType,
-      value: tier.upper_gp_percent === null ? null : toNumber(tier.upper_gp_percent),
-    },
-  }));
+  const tierWindows = tierWindowsFromRows(planVersionTiers);
 
   // The live picture: stored original inputs plus the change order roll-up, run
   // through the same engine the new-job form uses. This is the estimate a deposit
@@ -130,6 +121,24 @@ export default async function JobDetailPage(props: PageProps<"/commissions/jobs/
     settings: settingsSnapshot(commissionSettings),
     onDraw: commissionContext?.onDraw ?? false,
     previouslyRecognized: commissionContext?.previouslyRecognized ?? 0,
+  });
+
+  // The final audit: state, the open revision under review, the latest finalized
+  // revision, and what would block finalization.
+  const audits = await listJobAudits(id);
+  const finalTrueUpEvent = (commissionContext?.events ?? []).find(
+    (event) => event.event_type === "final_true_up",
+  );
+  const auditState = deriveFinalAuditState({
+    audits,
+    finalEventStatus: finalTrueUpEvent?.status ?? null,
+  });
+  const openAudit = audits.find((audit) => audit.status === "in_review") ?? null;
+  // `audits` arrives newest revision first, so this is the highest finalized revision.
+  const latestFinalized = audits.find((audit) => audit.status === "finalized") ?? null;
+  const auditBlockers = auditReadiness({
+    calculation: liveCalculation,
+    hasPlanVersion: planVersion !== null,
   });
 
   // Anything already approved or paid keeps the figures it was calculated with.
@@ -412,8 +421,35 @@ export default async function JobDetailPage(props: PageProps<"/commissions/jobs/
           canApprove={canApprove}
           canPay={canPay}
           canVoid={canVoid}
+          hasFinalizedAudit={latestFinalized !== null}
         />
       ) : null}
+
+      <Panel
+        id="final-audit"
+        title="Final audit"
+        description="The authoritative record for this job's commission. Open it deliberately, review the complete picture, then finalize: the financial inputs, plan version, tier, rates and true-up are snapshotted and stop moving with the job."
+      >
+        <FinalAuditPanel
+          jobId={job.id}
+          state={auditState}
+          audits={audits}
+          openAudit={openAudit}
+          latestFinalized={latestFinalized}
+          calculation={liveCalculation}
+          changeOrders={changeOrders}
+          blockers={auditBlockers}
+          canManageAudit={canCalculate}
+          trueUp={
+            finalTrueUpEvent
+              ? {
+                  status: finalTrueUpEvent.status,
+                  netPayable: toNumber(finalTrueUpEvent.net_payable),
+                }
+              : null
+          }
+        />
+      </Panel>
 
       {canViewConfig ? (
         <Panel

@@ -32,6 +32,7 @@ export function JobCommissionPanel({
   canApprove,
   canPay,
   canVoid,
+  hasFinalizedAudit,
 }: {
   context: JobCommissionContext;
   canCalculate: boolean;
@@ -40,6 +41,8 @@ export function JobCommissionPanel({
   canApprove: boolean;
   canPay: boolean;
   canVoid: boolean;
+  /** A final true-up is measured against a finalized audit, never a GP audit date. */
+  hasFinalizedAudit: boolean;
 }) {
   const { detail, projected, finalCalculation, events } = context;
   const paidToDate = events
@@ -61,8 +64,16 @@ export function JobCommissionPanel({
             />
             <CreateFinalTrueUpButton
               jobId={detail.job.id}
-              disabled={!context.finalEligible || context.hasFinalEvent}
-              label={context.hasFinalEvent ? "Final true-up exists" : "Calculate final true-up"}
+              disabled={
+                !context.finalEligible || context.hasFinalEvent || !hasFinalizedAudit
+              }
+              label={
+                context.hasFinalEvent
+                  ? "Final true-up exists"
+                  : hasFinalizedAudit
+                    ? "Calculate final true-up"
+                    : "Finalize the audit first"
+              }
             />
           </>
         ) : null

@@ -60,6 +60,28 @@ Changing the company defaults therefore cannot rewrite an existing job's cost
 structure or any approved or paid commission event. Only a job that has never been
 saved with a rate falls back to the default in force.
 
+## The final commission audit
+
+Two figures exist for every job, and they are deliberately different things:
+
+| | What it is | What it feeds |
+| --- | --- | --- |
+| Projected commission | The live estimate from the job's current financials | The **deposit** payout |
+| Final audited commission | The snapshot taken when the audit is finalized | The **final true-up** |
+
+The audit is a workflow, not a field: `Begin Final Commission Audit` opens a revision
+in review, the review screen shows the complete picture (original contract price,
+original costs, every change order, burden and warranty percentages and dollars,
+final totals, GP and GP %, the tier and rates, the final gross commission, what has
+already been recognized, and the resulting true-up), and finalizing locks those
+figures with `finalized_by` and `finalized_at`.
+
+Two rules come out of that separation. A final true-up is never created because
+someone recorded a GP audit date — the date is written *by* finalization, and the
+true-up action refuses to run unless a finalized audit exists. And an audit is never
+edited in place: re-opening supersedes the old revision and starts the next one, so a
+measurement that has already been paid against stays on the record.
+
 ## 1. Rate resolution
 
 Commission is based on **commissionable gross profit**, and the gross-profit
