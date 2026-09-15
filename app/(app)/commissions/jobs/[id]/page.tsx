@@ -3,10 +3,15 @@ import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
 
 import { JobAdjustmentForm } from "@/components/commission/job-adjustment-form";
+import {
+  ChangeOrderCard,
+  ChangeOrderCreateForm,
+} from "@/components/commission/job-change-orders";
 import { JobCommissionPanel } from "@/components/commission/job-commission-panel";
 import { JobFinancialsForm } from "@/components/commission/job-financials-form";
 import { JobOverviewForm } from "@/components/commission/job-forms";
 import { JobCompensationPlanForm } from "@/components/commission/job-plan-form";
+import { LiveCalculationPanel } from "@/components/commission/live-calculation-panel";
 import { EmptyState } from "@/components/empty-state/empty-state";
 import { ActivityIcon, AlertIcon } from "@/components/icons";
 import { PageHeader } from "@/components/page-header/page-header";
@@ -16,7 +21,6 @@ import { Panel } from "@/components/ui/panel";
 import { Table, TableWrap, Td, TdNumeric, Th } from "@/components/ui/table";
 import { requireSession } from "@/lib/auth/dal";
 import {
-  resolveTierForGpPercent,
   type TierWindow,
 } from "@/lib/compensation/plan-resolution";
 import {
@@ -25,21 +29,23 @@ import {
   listSalesDesignerOptions,
 } from "@/lib/compensation/queries";
 import {
+  financialInputsFromJob,
   getJobDetail,
 } from "@/lib/commission/queries";
 import {
   getCommissionSettings,
   getJobCommissionContext,
   jobCostRateDefaults,
+  settingsSnapshot,
 } from "@/lib/commission/event-queries";
-import { directJobCost, jobCostRatesFromRow, toNumber } from "@/lib/commission/financials";
-import { financialInputsFromJob } from "@/lib/commission/queries";
+import { toNumber } from "@/lib/commission/financials";
+import { changeOrderLabel, changeOrderTotalsFromRows } from "@/lib/commission/change-orders";
+import { buildLiveCalculation } from "@/lib/commission/live-calculation";
 import {
   ADJUSTMENT_TYPE_LABELS,
   isAdjustmentType,
   jobStatusLabel,
   jobStatusTone,
-  type JobAdjustmentInput,
 } from "@/lib/commission/types";
 import type { ThresholdType } from "@/lib/compensation/types";
 import { formatDate, formatDateTime, formatMoney, formatPercent, formatText } from "@/lib/utils/format";
@@ -51,6 +57,7 @@ export const metadata = {
 const SECTIONS = [
   { href: "#overview", label: "Overview" },
   { href: "#financials", label: "Financials" },
+  { href: "#change-orders", label: "Change orders" },
   { href: "#commission", label: "Commission" },
   { href: "#commission-setup", label: "Commission setup" },
   { href: "#audit", label: "Events / history" },
@@ -65,8 +72,17 @@ export default async function JobDetailPage(props: PageProps<"/commissions/jobs/
     notFound();
   }
 
-  const { job, category, designer, adjustments, auditEvents, plan, planVersion, planVersionTiers } =
-    detail;
+  const {
+    job,
+    category,
+    designer,
+    adjustments,
+    changeOrders,
+    auditEvents,
+    plan,
+    planVersion,
+    planVersionTiers,
+  } = detail;
 
   const canManageJobs = session.capabilities.includes("manage:jobs");
   const canEditFinancials = session.capabilities.includes("edit:job-financials");
@@ -81,10 +97,40 @@ export default async function JobDetailPage(props: PageProps<"/commissions/jobs/
   const commissionContext = await getJobCommissionContext(id);
   const commissionSettings = await getCommissionSettings();
   const costRateDefaults = jobCostRateDefaults(commissionSettings);
-  // The job's own snapshot wins; the company default only fills a job that has
-  // never been saved with a rate.
-  const costRates = jobCostRatesFromRow(job, costRateDefaults);
-  const directCostValue = directJobCost(financialInputsFromJob(job, costRateDefaults));
+
+  const activeChangeOrders = changeOrders.filter((changeOrder) => changeOrder.active);
+  const removedChangeOrders = changeOrders.filter((changeOrder) => !changeOrder.active);
+  const changeOrderRollUp = changeOrderTotalsFromRows(activeChangeOrders);
+  const tierWindows = planVersionTiers.map<TierWindow>((tier) => ({
+    sortOrder: tier.sort_order,
+    label: tier.label,
+    // numeric columns can arrive as strings; the band comparison must be numeric.
+    rate: toNumber(tier.rate),
+    lower: {
+      thresholdType: tier.lower_threshold_type as ThresholdType,
+      value: tier.lower_gp_percent === null ? null : toNumber(tier.lower_gp_percent),
+    },
+    upper: {
+      thresholdType: tier.upper_threshold_type as ThresholdType,
+      value: tier.upper_gp_percent === null ? null : toNumber(tier.upper_gp_percent),
+    },
+  }));
+
+  // The live picture: stored original inputs plus the change order roll-up, run
+  // through the same engine the new-job form uses. This is the estimate a deposit
+  // is based on; the final true-up uses the finalized audit snapshot.
+  const liveCalculation = buildLiveCalculation({
+    inputs: {
+      ...financialInputsFromJob(job, costRateDefaults),
+      changeOrderRevenue: changeOrderRollUp.revenue,
+      changeOrderCost: changeOrderRollUp.cost,
+    },
+    tiers: tierWindows,
+    minimumGpStandard: toNumber(category?.minimum_gp_standard),
+    settings: settingsSnapshot(commissionSettings),
+    onDraw: commissionContext?.onDraw ?? false,
+    previouslyRecognized: commissionContext?.previouslyRecognized ?? 0,
+  });
 
   // Anything already approved or paid keeps the figures it was calculated with.
   const recognizedEvents = (commissionContext?.events ?? []).filter(
@@ -101,38 +147,14 @@ export default async function JobDetailPage(props: PageProps<"/commissions/jobs/
     canViewConfig && canManageJobs ? listCompensationPlanOptions() : Promise.resolve([]),
   ]);
 
-  const adjustmentInputs: JobAdjustmentInput[] = adjustments.flatMap((adjustment) =>
-    isAdjustmentType(adjustment.adjustment_type)
-      ? [
-          {
-            adjustmentType: adjustment.adjustment_type,
-            amount: Number(adjustment.amount),
-          },
-        ]
-      : [],
-  );
-
+  // The affected band comes from the same calculation the Commission section uses,
+  // so the detail page cannot disagree with the engine about which tier applies.
   const indicativeBand =
-    canViewConfig && planVersion && category && planVersionTiers.length > 0
-      ? resolveTierForGpPercent(
-          planVersionTiers.map<TierWindow>((tier) => ({
-            sortOrder: tier.sort_order,
-            label: tier.label,
-            // numeric columns can arrive as strings; the band comparison must be
-            // numeric, especially for project_minimum thresholds.
-            rate: toNumber(tier.rate),
-            lower: {
-              thresholdType: tier.lower_threshold_type as ThresholdType,
-              value: tier.lower_gp_percent === null ? null : toNumber(tier.lower_gp_percent),
-            },
-            upper: {
-              thresholdType: tier.upper_threshold_type as ThresholdType,
-              value: tier.upper_gp_percent === null ? null : toNumber(tier.upper_gp_percent),
-            },
-          })),
-          toNumber(job.commissionable_gp_percent),
-          toNumber(category.minimum_gp_standard),
-        )
+    canViewConfig && planVersion
+      ? {
+          label: liveCalculation.commission.tierLabel,
+          rate: liveCalculation.commission.standardRate,
+        }
       : null;
 
   return (
@@ -247,51 +269,85 @@ export default async function JobDetailPage(props: PageProps<"/commissions/jobs/
           </div>
         ) : null}
 
-        {canEditFinancials ? (
-          <JobFinancialsForm
-            job={job}
-            adjustments={adjustmentInputs}
-            costRates={costRateDefaults}
-          />
-        ) : (
-          <dl className="grid gap-x-8 gap-y-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+          <div>
+            {canEditFinancials ? (
+              <JobFinancialsForm job={job} costRates={costRateDefaults} />
+            ) : (
+              <p className="text-sm leading-6 text-ink-muted">
+                Your role can see this job&apos;s figures but not change them. Direct cost,
+                burden, warranty contingency, total cost, gross profit and the commission
+                estimate are all in the Live Calculation panel.
+              </p>
+            )}
+          </div>
+          <LiveCalculationPanel calculation={liveCalculation} />
+        </div>
+      </Panel>
+
+      <Panel
+        id="change-orders"
+        title="Change orders"
+        description="Each change order is its own record — number, name, revenue and cost. The job's change order totals are the roll-up of these rows, and change order cost sits inside direct cost before burden and warranty contingency are applied."
+      >
+        <div className="space-y-5">
+          <dl className="grid gap-x-8 gap-y-4 sm:grid-cols-3">
             <ReadOnly
-              label="Total job revenue"
-              value={formatMoney(toNumber(job.actual_total_revenue))}
-            />
-            <ReadOnly label="Direct job cost" value={formatMoney(directCostValue)} />
-            <ReadOnly
-              label="Burden"
-              value={`${formatPercent(costRates.burdenPercent, 2)} · ${formatMoney(
-                toNumber(job.burden_cost),
-              )}`}
-            />
-            <ReadOnly
-              label="Warranty / service contingency"
-              value={`${formatPercent(
-                costRates.warrantyContingencyPercent,
-                2,
-              )} · ${formatMoney(toNumber(job.warranty_service_contingency))}`}
-            />
-            <ReadOnly
-              label="Total job cost"
-              value={formatMoney(toNumber(job.actual_total_cost))}
+              label="Total change order revenue"
+              value={formatMoney(changeOrderRollUp.revenue)}
             />
             <ReadOnly
-              label="Job gross profit"
-              value={formatMoney(toNumber(job.job_gross_profit))}
-            />
-            <ReadOnly label="Job GP %" value={formatPercent(toNumber(job.job_gp_percent))} />
-            <ReadOnly
-              label="Commissionable GP"
-              value={formatMoney(toNumber(job.commissionable_gross_profit))}
+              label="Total change order costs"
+              value={formatMoney(changeOrderRollUp.cost)}
             />
             <ReadOnly
-              label="Commissionable GP %"
-              value={formatPercent(toNumber(job.commissionable_gp_percent))}
+              label="Gross profit impact"
+              value={formatMoney(changeOrderRollUp.grossProfit)}
             />
           </dl>
-        )}
+
+          {activeChangeOrders.length === 0 ? (
+            <p className="rounded-lg border border-dashed border-line-strong px-4 py-6 text-center text-sm text-ink-muted">
+              No active change orders. Revenue and cost come from the original job only.
+            </p>
+          ) : (
+            <ul className="space-y-3">
+              {activeChangeOrders.map((changeOrder) => (
+                <ChangeOrderCard
+                  key={changeOrder.id}
+                  jobId={job.id}
+                  changeOrder={changeOrder}
+                />
+              ))}
+            </ul>
+          )}
+
+          {canEditFinancials ? <ChangeOrderCreateForm jobId={job.id} /> : null}
+
+          {removedChangeOrders.length > 0 ? (
+            <section className="space-y-2 border-t border-line pt-4">
+              <h3 className="text-xs font-semibold tracking-[0.12em] text-ink-subtle uppercase">
+                Removed change orders
+              </h3>
+              <ul className="space-y-1 text-xs text-ink-muted">
+                {removedChangeOrders.map((changeOrder) => (
+                  <li key={changeOrder.id}>
+                    {changeOrderLabel(changeOrder)} · revenue{" "}
+                    {formatMoney(changeOrder.revenue)} · cost{" "}
+                    {formatMoney(changeOrder.cost)} · kept for history, excluded from the
+                    totals above
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ) : null}
+
+          <p className="text-xs leading-5 text-ink-subtle">
+            Adding, editing or removing a change order updates the job&apos;s current
+            financials only. A commission event already approved or paid keeps the figures it
+            was calculated with; reconciliation happens through the final true-up.
+          </p>
+        </div>
       </Panel>
 
       <Panel

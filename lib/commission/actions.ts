@@ -9,7 +9,15 @@ import {
   resolveSalePlanSnapshot,
   type PlanVersionWindow,
 } from "@/lib/compensation/plan-resolution";
-import { computeJobFinancials, type JobCostRateDefaults } from "@/lib/commission/financials";
+import {
+  changeOrderTotals,
+  changeOrderTotalsFromRows,
+} from "@/lib/commission/change-orders";
+import {
+  computeJobFinancials,
+  toNumber,
+  type JobCostRateDefaults,
+} from "@/lib/commission/financials";
 import { getCommissionSettings, jobCostRateDefaults } from "@/lib/commission/event-queries";
 import { adjustmentInputsFromRows, financialInputsFromJob } from "@/lib/commission/queries";
 import {
@@ -22,6 +30,8 @@ import {
 import { mutationErrorState } from "@/lib/forms/mutation-errors";
 import {
   jobAdjustmentSchema,
+  jobChangeOrderActiveSchema,
+  jobChangeOrderSchema,
   jobCompensationPlanSchema,
   jobEntrySchema,
   jobFinancialsSchema,
@@ -31,6 +41,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { toDecimalPercent } from "@/lib/utils/percent";
 import type {
   CompensationPlanVersionRow,
+  JobChangeOrderRow,
   JobFinancialAdjustmentRow,
   JobRow,
 } from "@/lib/supabase/database.types";
@@ -141,12 +152,24 @@ async function validateJobPlanPairing(
   return null;
 }
 
-/** Recomputes and persists the derived columns from the stored inputs. */
-async function refreshJobTotals(jobId: string) {
+/**
+ * Recomputes and persists every derived column of a job.
+ *
+ * This is the only writer of `change_order_revenue` and `change_order_cost`: both
+ * are derived from the active change order rows, so the aggregate can never drift
+ * from the line items. Original contract price and original cost are inputs and are
+ * left alone here.
+ */
+async function recalculateJobTotals(jobId: string) {
   const supabase = await createSupabaseServerClient();
-  const [jobResult, adjustmentsResult, settings] = await Promise.all([
+  const [jobResult, adjustmentsResult, changeOrdersResult, settings] = await Promise.all([
     supabase.from("jobs").select("*").eq("id", jobId).maybeSingle(),
     supabase.from("job_financial_adjustments").select("*").eq("job_id", jobId),
+    supabase
+      .from("job_change_orders")
+      .select("*")
+      .eq("job_id", jobId)
+      .eq("active", true),
     getCommissionSettings(),
   ]);
 
@@ -155,14 +178,24 @@ async function refreshJobTotals(jobId: string) {
   }
 
   const job = jobResult.data as JobRow;
+  const changeOrderRollUp = changeOrderTotalsFromRows(
+    (changeOrdersResult.data ?? []) as JobChangeOrderRow[],
+  );
   const financials = computeJobFinancials(
-    financialInputsFromJob(job, jobCostRateDefaults(settings)),
+    {
+      ...financialInputsFromJob(job, jobCostRateDefaults(settings)),
+      // The roll-up comes from the rows, never from the stored columns.
+      changeOrderRevenue: changeOrderRollUp.revenue,
+      changeOrderCost: changeOrderRollUp.cost,
+    },
     adjustmentInputsFromRows((adjustmentsResult.data ?? []) as JobFinancialAdjustmentRow[]),
   );
 
   await supabase
     .from("jobs")
     .update({
+      change_order_revenue: changeOrderRollUp.revenue,
+      change_order_cost: changeOrderRollUp.cost,
       burden_percent: financials.burdenPercent,
       warranty_contingency_percent: financials.warrantyContingencyPercent,
       burden_cost: financials.burdenCost,
@@ -216,17 +249,19 @@ export async function createJob(
         : toDecimalPercent(data.warrantyContingencyPercent),
   });
 
+  // Change orders travel as line items. The job row only ever holds their roll-up,
+  // so there is no second place to keep an aggregate in step.
+  const changeOrderRollUp = changeOrderTotals(data.changeOrders);
+
   // Derived figures are written through the canonical calculation even when the
   // job starts at zero, so a new row can never disagree with the domain rules.
   const financials = computeJobFinancials({
     contractRevenue: data.contractRevenue,
-    changeOrderRevenue: data.changeOrderRevenue,
-    creditAmount: data.creditAmount,
-    otherRevenue: data.otherRevenue,
-    materialCost: data.materialCost,
-    laborCost: data.laborCost,
-    subcontractorCost: data.subcontractorCost,
-    otherDirectCost: data.otherDirectCost,
+    changeOrderRevenue: changeOrderRollUp.revenue,
+    creditAmount: 0,
+    otherRevenue: 0,
+    originalCost: data.originalCost,
+    changeOrderCost: changeOrderRollUp.cost,
     burdenPercent: rates.burdenPercent,
     warrantyContingencyPercent: rates.warrantyContingencyPercent,
   });
@@ -246,13 +281,11 @@ export async function createJob(
       completion_date: data.completionDate,
       gp_audit_completed_date: data.gpAuditCompletedDate,
       contract_revenue: data.contractRevenue,
-      change_order_revenue: data.changeOrderRevenue,
-      credit_amount: data.creditAmount,
-      other_revenue: data.otherRevenue,
-      material_cost: data.materialCost,
-      labor_cost: data.laborCost,
-      subcontractor_cost: data.subcontractorCost,
-      other_direct_cost: data.otherDirectCost,
+      change_order_revenue: changeOrderRollUp.revenue,
+      change_order_cost: changeOrderRollUp.cost,
+      credit_amount: 0,
+      other_revenue: 0,
+      original_cost: data.originalCost,
       burden_percent: rates.burdenPercent,
       warranty_contingency_percent: rates.warrantyContingencyPercent,
       burden_cost: financials.burdenCost,
@@ -273,6 +306,27 @@ export async function createJob(
     .single();
 
   if (error) return mutationErrorState(error, "job");
+
+  if (data.changeOrders.length > 0 && inserted?.id) {
+    const { error: changeOrderError } = await supabase
+      .from("job_change_orders")
+      .insert(
+        data.changeOrders.map((changeOrder) => ({
+          job_id: inserted.id,
+          change_order_number: changeOrder.changeOrderNumber,
+          name: changeOrder.name,
+          revenue: changeOrder.revenue,
+          cost: changeOrder.cost,
+          created_by: auth.userId,
+        })),
+      );
+
+    if (changeOrderError) {
+      // The job exists and is correct; the change orders are missing. Say so
+      // rather than redirecting as if everything saved.
+      return mutationErrorState(changeOrderError, "change_order");
+    }
+  }
 
   revalidateJobs(inserted?.id);
   redirect(`/commissions/jobs/${inserted?.id}`);
@@ -339,12 +393,25 @@ export async function updateJobFinancials(
   const { jobId, ...money } = parsed.data;
   const supabase = await createSupabaseServerClient();
 
-  const { data: adjustments, error: adjustmentError } = await supabase
-    .from("job_financial_adjustments")
-    .select("*")
-    .eq("job_id", jobId);
+  const [jobResult, adjustmentsResult, changeOrdersResult] = await Promise.all([
+    supabase.from("jobs").select("*").eq("id", jobId).maybeSingle(),
+    supabase.from("job_financial_adjustments").select("*").eq("job_id", jobId),
+    supabase.from("job_change_orders").select("*").eq("job_id", jobId).eq("active", true),
+  ]);
 
-  if (adjustmentError) return mutationErrorState(adjustmentError, "adjustment");
+  if (jobResult.error) return mutationErrorState(jobResult.error, "job");
+  if (!jobResult.data) return failureState("That job is not available to you.");
+  if (adjustmentsResult.error) {
+    return mutationErrorState(adjustmentsResult.error, "adjustment");
+  }
+  if (changeOrdersResult.error) {
+    return mutationErrorState(changeOrdersResult.error, "change_order");
+  }
+
+  const job = jobResult.data as JobRow;
+  const changeOrderRollUp = changeOrderTotalsFromRows(
+    (changeOrdersResult.data ?? []) as JobChangeOrderRow[],
+  );
 
   const rates = await resolveJobCostRates({
     burdenPercent:
@@ -358,30 +425,28 @@ export async function updateJobFinancials(
   const financials = computeJobFinancials(
     {
       contractRevenue: money.contractRevenue,
-      changeOrderRevenue: money.changeOrderRevenue,
-      creditAmount: money.creditAmount,
-      otherRevenue: money.otherRevenue,
-      materialCost: money.materialCost,
-      laborCost: money.laborCost,
-      subcontractorCost: money.subcontractorCost,
-      otherDirectCost: money.otherDirectCost,
+      changeOrderRevenue: changeOrderRollUp.revenue,
+      // Other revenue and credits are carried through from the stored row: they are
+      // no longer inputs in the simplified form, but they still count if set.
+      creditAmount: toNumber(job.credit_amount),
+      otherRevenue: toNumber(job.other_revenue),
+      originalCost: money.originalCost,
+      changeOrderCost: changeOrderRollUp.cost,
       burdenPercent: rates.burdenPercent,
       warrantyContingencyPercent: rates.warrantyContingencyPercent,
     },
-    adjustmentInputsFromRows((adjustments ?? []) as JobFinancialAdjustmentRow[]),
+    adjustmentInputsFromRows(
+      (adjustmentsResult.data ?? []) as JobFinancialAdjustmentRow[],
+    ),
   );
 
   const { error } = await supabase
     .from("jobs")
     .update({
       contract_revenue: money.contractRevenue,
-      change_order_revenue: money.changeOrderRevenue,
-      credit_amount: money.creditAmount,
-      other_revenue: money.otherRevenue,
-      material_cost: money.materialCost,
-      labor_cost: money.laborCost,
-      subcontractor_cost: money.subcontractorCost,
-      other_direct_cost: money.otherDirectCost,
+      original_cost: money.originalCost,
+      change_order_revenue: changeOrderRollUp.revenue,
+      change_order_cost: changeOrderRollUp.cost,
       burden_percent: rates.burdenPercent,
       warranty_contingency_percent: rates.warrantyContingencyPercent,
       burden_cost: financials.burdenCost,
@@ -426,10 +491,122 @@ export async function createJobFinancialAdjustment(
 
   if (error) return mutationErrorState(error, "adjustment");
 
-  await refreshJobTotals(jobId);
+  await recalculateJobTotals(jobId);
   revalidateJobs(jobId);
 
   return successState("Adjustment recorded and job totals recalculated.");
+}
+
+// ---------------------------------------------------------------------------
+// Change orders
+//
+// Line items, never aggregates: every write here ends by recalculating the job's
+// roll-ups and derived figures through the canonical calculation. Removing a change
+// order deactivates it instead of deleting the row, so history survives once
+// commission has been paid against it.
+// ---------------------------------------------------------------------------
+
+export async function createJobChangeOrder(
+  _previousState: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const auth = await authorizeCapability("edit:job-financials");
+  if ("denied" in auth) return auth.denied;
+
+  const parsed = jobChangeOrderSchema.safeParse(formDataToObject(formData));
+  if (!parsed.success) return validationErrorState(parsed.error);
+
+  const { jobId, changeOrderNumber, name, revenue, cost } = parsed.data;
+  const supabase = await createSupabaseServerClient();
+  const { error } = await supabase.from("job_change_orders").insert({
+    job_id: jobId,
+    change_order_number: changeOrderNumber,
+    name,
+    revenue,
+    cost,
+    created_by: auth.userId,
+  });
+
+  if (error) return mutationErrorState(error, "change_order");
+
+  await recalculateJobTotals(jobId);
+  revalidateJobs(jobId);
+
+  return successState(
+    "Change order added. Job revenue, direct cost and the commission projection are recalculated; any commission event already approved or paid keeps its own figures.",
+  );
+}
+
+export async function updateJobChangeOrder(
+  _previousState: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const auth = await authorizeCapability("edit:job-financials");
+  if ("denied" in auth) return auth.denied;
+
+  const parsed = jobChangeOrderSchema.safeParse(formDataToObject(formData));
+  if (!parsed.success) return validationErrorState(parsed.error);
+
+  const { jobId, changeOrderId, changeOrderNumber, name, revenue, cost } = parsed.data;
+
+  if (!changeOrderId) return failureState("A change order is required.");
+
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase
+    .from("job_change_orders")
+    .update({
+      change_order_number: changeOrderNumber,
+      name,
+      revenue,
+      cost,
+    })
+    .eq("id", changeOrderId)
+    .eq("job_id", jobId)
+    .select("id");
+
+  if (error) return mutationErrorState(error, "change_order");
+  if ((data ?? []).length === 0) {
+    return failureState("That change order no longer exists. Refresh the page.");
+  }
+
+  await recalculateJobTotals(jobId);
+  revalidateJobs(jobId);
+
+  return successState("Change order updated and job totals recalculated.");
+}
+
+export async function setJobChangeOrderActive(
+  _previousState: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const auth = await authorizeCapability("edit:job-financials");
+  if ("denied" in auth) return auth.denied;
+
+  const parsed = jobChangeOrderActiveSchema.safeParse(formDataToObject(formData));
+  if (!parsed.success) return validationErrorState(parsed.error);
+
+  const { jobId, changeOrderId, active } = parsed.data;
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase
+    .from("job_change_orders")
+    .update({ active })
+    .eq("id", changeOrderId)
+    .eq("job_id", jobId)
+    .select("id");
+
+  if (error) return mutationErrorState(error, "change_order");
+  if ((data ?? []).length === 0) {
+    return failureState("That change order no longer exists. Refresh the page.");
+  }
+
+  await recalculateJobTotals(jobId);
+  revalidateJobs(jobId);
+
+  return successState(
+    active
+      ? "Change order restored and job totals recalculated."
+      : "Change order removed from the active totals. The record is kept, and the audit trail shows it was voided rather than deleted.",
+  );
 }
 
 /**

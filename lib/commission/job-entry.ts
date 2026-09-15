@@ -1,20 +1,21 @@
 import { displayNameFor } from "@/lib/auth/identity";
-import { resolveTierForGpPercent, type TierWindow } from "@/lib/compensation/plan-resolution";
+import type { TierWindow } from "@/lib/compensation/plan-resolution";
 import {
-  applyDrawRateReduction,
-  calculateDepositCommission,
-  calculateGrossCommission,
-  type CommissionSettingsSnapshot,
-} from "@/lib/commission/engine";
+  changeOrderTotals,
+  type ChangeOrderTotalsInput,
+} from "@/lib/commission/change-orders";
+import type { CommissionSettingsSnapshot } from "@/lib/commission/engine";
 import {
-  computeJobFinancials,
   jobCostRatesFromRow,
   toNumber,
   ZERO_JOB_COST_RATES,
   type JobCostRateDefaults,
 } from "@/lib/commission/financials";
-import type { JobFinancialInputs, JobFinancialResults } from "@/lib/commission/types";
-import { fromDecimalPercent, toDecimalPercent } from "@/lib/utils/percent";
+import {
+  buildLiveCalculation,
+  type LiveCalculation,
+} from "@/lib/commission/live-calculation";
+import type { JobFinancialInputs } from "@/lib/commission/types";
 import type {
   CompensationPlanRow,
   CompensationPlanTierRow,
@@ -25,82 +26,59 @@ import type {
   JobRow,
   ProfileRow,
 } from "@/lib/supabase/database.types";
+import { fromDecimalPercent, toDecimalPercent } from "@/lib/utils/percent";
 
 /**
- * Job entry: the money fields, the live commission preview and the option lists
- * the job form needs.
+ * Commission job entry: the original job inputs, the burden and warranty rates,
+ * the live calculation, and the option lists the job form needs.
  *
- * Every figure here comes from the canonical domain functions
- * (`computeJobFinancials`, and the engine's tier/rate/deposit functions). Nothing
- * in this module — or in the form that consumes it — re-implements a formula, so
- * the preview, the stored job row and a commission event can never disagree.
+ * The financial model is deliberately small — original contract price, original
+ * costs, and change orders — and every derived figure comes from the canonical
+ * functions (`computeJobFinancials` via `buildLiveCalculation`, and the commission
+ * engine). Nothing in this module or the forms that use it re-implements a formula.
  */
 
 // ---------------------------------------------------------------------------
-// Revenue and cost fields (the columns that actually exist on public.jobs)
+// Original job inputs
 // ---------------------------------------------------------------------------
 
-export const JOB_REVENUE_FIELDS = [
+export const JOB_ORIGINAL_FIELDS = [
   {
     name: "contractRevenue",
     column: "contract_revenue",
-    label: "Contract revenue",
-    hint: "Signed contract value.",
+    label: "Original contract price",
+    hint: "The signed contract, before change orders.",
   },
   {
-    name: "changeOrderRevenue",
-    column: "change_order_revenue",
-    label: "Change order revenue",
-    hint: "Approved additions to the contract.",
-  },
-  {
-    name: "otherRevenue",
-    column: "other_revenue",
-    label: "Other revenue",
-    hint: "Any other billable revenue.",
-  },
-  {
-    name: "creditAmount",
-    column: "credit_amount",
-    label: "Credits",
-    hint: "Discounts and write-offs. Reduces revenue.",
+    name: "originalCost",
+    column: "original_cost",
+    label: "Original costs",
+    hint: "Total original job cost, before change orders, burden and warranty contingency.",
   },
 ] as const;
 
-export const JOB_COST_FIELDS = [
-  {
-    name: "materialCost",
-    column: "material_cost",
-    label: "Cabinet / material cost",
-    hint: "",
-  },
-  {
-    name: "laborCost",
-    column: "labor_cost",
-    label: "Labor / installation cost",
-    hint: "",
-  },
-  {
-    name: "subcontractorCost",
-    column: "subcontractor_cost",
-    label: "Subcontractor cost",
-    hint: "",
-  },
-  {
-    name: "otherDirectCost",
-    column: "other_direct_cost",
-    label: "Other direct costs",
-    hint: "Freight, permits and similar. The schema has no separate freight column.",
-  },
-] as const;
+export const JOB_MONEY_FIELDS = JOB_ORIGINAL_FIELDS;
 
-export const JOB_MONEY_FIELDS = [...JOB_REVENUE_FIELDS, ...JOB_COST_FIELDS] as const;
+export type JobMoneyFieldName = (typeof JOB_ORIGINAL_FIELDS)[number]["name"];
 
-/**
- * Burden and warranty / service contingency are rates, not amounts. They default
- * from company settings and can be overridden per job; the dollar amounts are
- * derived by the canonical calculation.
- */
+/** Form values are kept as strings so a half-typed number never becomes NaN. */
+export type JobMoneyValues = Record<JobMoneyFieldName, string>;
+
+export function emptyJobMoneyValues(): JobMoneyValues {
+  return { contractRevenue: "", originalCost: "" };
+}
+
+export function jobMoneyValuesFromJob(job: JobRow): JobMoneyValues {
+  return {
+    contractRevenue: String(toNumber(job.contract_revenue)),
+    originalCost: String(toNumber(job.original_cost)),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Burden and warranty rates
+// ---------------------------------------------------------------------------
+
 export const JOB_COST_RATE_FIELDS = [
   {
     name: "burdenPercent",
@@ -119,46 +97,6 @@ export type JobCostRateValues = Record<JobCostRateFieldName, string>;
 
 export function emptyJobCostRateValues(): JobCostRateValues {
   return { burdenPercent: "0", warrantyContingencyPercent: "0" };
-}
-
-export type JobRevenueFieldName = (typeof JOB_REVENUE_FIELDS)[number]["name"];
-export type JobCostFieldName = (typeof JOB_COST_FIELDS)[number]["name"];
-export type JobMoneyFieldName = JobRevenueFieldName | JobCostFieldName;
-
-/** Form values are kept as strings so a half-typed number never becomes NaN. */
-export type JobMoneyValues = Record<JobMoneyFieldName, string>;
-
-export function emptyJobMoneyValues(): JobMoneyValues {
-  return Object.fromEntries(
-    JOB_MONEY_FIELDS.map((field) => [field.name, ""]),
-  ) as JobMoneyValues;
-}
-
-export function jobMoneyValuesFromJob(job: JobRow): JobMoneyValues {
-  return Object.fromEntries(
-    JOB_MONEY_FIELDS.map((field) => [
-      field.name,
-      String(toNumber(job[field.column as keyof JobRow] as unknown)),
-    ]),
-  ) as JobMoneyValues;
-}
-
-export function jobFinancialInputsFromValues(
-  values: JobMoneyValues,
-  rates: JobCostRateDefaults,
-): JobFinancialInputs {
-  return {
-    contractRevenue: toNumber(values.contractRevenue),
-    changeOrderRevenue: toNumber(values.changeOrderRevenue),
-    creditAmount: toNumber(values.creditAmount),
-    otherRevenue: toNumber(values.otherRevenue),
-    materialCost: toNumber(values.materialCost),
-    laborCost: toNumber(values.laborCost),
-    subcontractorCost: toNumber(values.subcontractorCost),
-    otherDirectCost: toNumber(values.otherDirectCost),
-    burdenPercent: rates.burdenPercent,
-    warrantyContingencyPercent: rates.warrantyContingencyPercent,
-  };
 }
 
 /** Percent points as typed in the form ("10") to decimal shares (0.1). */
@@ -192,98 +130,76 @@ export function jobCostRateValuesFromJob(
 }
 
 // ---------------------------------------------------------------------------
-// Live preview
+// Inputs and the live calculation
 // ---------------------------------------------------------------------------
 
-export type JobEntryPreview = {
-  financials: JobFinancialResults;
-  /** False when the selected plan version has no tiers, so no rate can apply. */
-  hasTiers: boolean;
-  tierLabel: string | null;
-  standardRate: number;
-  drawReductionApplied: number;
-  effectiveRate: number;
-  /** Full commission on commissionable gross profit at the effective rate. */
-  projectedGrossCommission: number;
-  /** The share payable when the deposit is recorded. */
-  depositTarget: number;
-  depositPayoutPercent: number;
-  warnings: readonly string[];
-};
-
 /**
- * The read-only summary the job form shows while it is being filled in.
+ * The canonical inputs for a job being edited in a form.
  *
- * Balances (outstanding draw and rollover) are deliberately not applied here: the
- * entry preview answers "what does this job's structure produce?", while the
- * offsets that decide actual cash are applied when a commission event is created
- * and are shown on the job's Commission section.
+ * Change order revenue and cost are the *roll-up of the change order rows*; the
+ * job's stored totals are never passed in, so the aggregate can only be produced
+ * in one place. `otherRevenue` and `creditAmount` are carried through from the
+ * stored job row because they are no longer editable inputs.
  */
-export function buildJobEntryPreview({
+export function jobFinancialInputsFromValues(
+  values: JobMoneyValues,
+  rates: JobCostRateDefaults,
+  extras: {
+    changeOrders?: readonly ChangeOrderTotalsInput[];
+    otherRevenue?: number;
+    creditAmount?: number;
+  } = {},
+): JobFinancialInputs {
+  const totals = changeOrderTotals(extras.changeOrders ?? []);
+
+  return {
+    contractRevenue: toNumber(values.contractRevenue),
+    changeOrderRevenue: totals.revenue,
+    creditAmount: toNumber(extras.creditAmount),
+    otherRevenue: toNumber(extras.otherRevenue),
+    originalCost: toNumber(values.originalCost),
+    changeOrderCost: totals.cost,
+    burdenPercent: rates.burdenPercent,
+    warrantyContingencyPercent: rates.warrantyContingencyPercent,
+  };
+}
+
+/** The live calculation for job-entry form state. */
+export function buildJobEntryLiveCalculation({
   values,
   rateValues,
+  changeOrders,
   tiers,
   minimumGpStandard,
   settings,
   onDraw,
+  previouslyRecognized = 0,
+  otherRevenue = 0,
+  creditAmount = 0,
 }: {
   values: JobMoneyValues;
   rateValues: JobCostRateValues;
+  changeOrders: readonly ChangeOrderTotalsInput[];
   tiers: readonly TierWindow[];
   minimumGpStandard: number;
   settings: CommissionSettingsSnapshot;
   onDraw: boolean;
-}): JobEntryPreview {
-  // Burden and warranty / service contingency are derived from the rates here by
-  // the same canonical function the Server Action persists with.
-  const financials = computeJobFinancials(
-    jobFinancialInputsFromValues(values, costRateValuesToDecimals(rateValues)),
-  );
-  const warnings: string[] = [];
-  const tier =
-    tiers.length > 0
-      ? resolveTierForGpPercent(
-          tiers,
-          financials.commissionableGpPercent,
-          minimumGpStandard,
-        )
-      : null;
-
-  if (tiers.length === 0) {
-    warnings.push(
-      "Attach a compensation plan version with tiers to see the commission for this job.",
-    );
-  } else if (!tier) {
-    warnings.push(
-      "No commission tier matches this commissionable GP percentage, so the standard rate is 0%.",
-    );
-  }
-
-  const standardRate = tier?.rate ?? 0;
-  const drawReductionApplied =
-    onDraw && settings.drawEnabled ? Math.max(0, settings.drawRateReduction) : 0;
-  const effectiveRate = applyDrawRateReduction(standardRate, drawReductionApplied);
-  const projectedGrossCommission = calculateGrossCommission(
-    financials.commissionableGrossProfit,
-    effectiveRate,
-  );
-  const depositTarget = calculateDepositCommission(
-    projectedGrossCommission,
-    settings.depositPayoutPercent,
-  );
-
-  return {
-    financials,
-    hasTiers: tiers.length > 0,
-    tierLabel: tier?.label ?? null,
-    standardRate,
-    drawReductionApplied,
-    effectiveRate,
-    projectedGrossCommission,
-    depositTarget,
-    depositPayoutPercent: settings.depositPayoutPercent,
-    warnings,
-  };
+  previouslyRecognized?: number;
+  otherRevenue?: number;
+  creditAmount?: number;
+}): LiveCalculation {
+  return buildLiveCalculation({
+    inputs: jobFinancialInputsFromValues(
+      values,
+      costRateValuesToDecimals(rateValues),
+      { changeOrders, otherRevenue, creditAmount },
+    ),
+    tiers,
+    minimumGpStandard,
+    settings,
+    onDraw,
+    previouslyRecognized,
+  });
 }
 
 // ---------------------------------------------------------------------------

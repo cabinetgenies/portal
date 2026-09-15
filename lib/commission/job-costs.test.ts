@@ -70,10 +70,7 @@ function job(
   return {
     ...EMPTY_JOB_FINANCIAL_INPUTS,
     contractRevenue: 100_000,
-    materialCost: 30_000,
-    laborCost: 12_000,
-    subcontractorCost: 5_000,
-    otherDirectCost: 3_000,
+    originalCost: 50_000,
     ...overrides,
   };
 }
@@ -99,6 +96,8 @@ function jobRow(overrides: Partial<JobRow> = {}): JobRow {
     labor_cost: 12_000,
     subcontractor_cost: 5_000,
     other_direct_cost: 3_000,
+    original_cost: 50_000,
+    change_order_cost: 0,
     burden_cost: 0,
     warranty_service_contingency: 0,
     actual_total_revenue: 100_000,

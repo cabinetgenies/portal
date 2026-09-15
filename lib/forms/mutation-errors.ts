@@ -10,6 +10,7 @@ export type MutationContext =
   | "reporting"
   | "job"
   | "adjustment"
+  | "change_order"
   | "commission_event"
   | "draw"
   | "rollover"
@@ -51,7 +52,9 @@ export function mutationErrorState(
     case "23514":
     case "23503":
       return failureState(
-        context === "user"
+        context === "change_order"
+          ? "That change order is not valid. A change order needs a name, and revenue and cost cannot be negative."
+          : context === "user"
           ? "No Supabase Auth user matches that id. Create the user in Supabase → Authentication → Users first, then paste their id here."
           : "Those values are not valid for this record. Check the fields and try again.",
       );

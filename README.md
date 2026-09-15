@@ -34,6 +34,11 @@ Internal operations portal for Cabinet Genies.
   their dollar amounts from direct job cost through the one canonical calculation,
   and are included in total job cost before the commission tier is selected. The
   company defaults are 0% until Cabinet Genies sets its real percentages.
+- **Phase 3.8 (done):** simplified job financials plus change orders — original
+  contract price, one original cost figure, and change orders as child records with
+  a number/name, revenue and cost, rolled up by the canonical calculation. The four
+  old cost buckets are folded into `original_cost` and no longer surface in the UI;
+  add, edit and remove all recalculate the live summary.
 
 Sales manager bonus calculation and payout, support designer bonuses, split
 commissions, production performance bonuses, payroll batching, Buildertrend

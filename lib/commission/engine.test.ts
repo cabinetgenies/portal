@@ -377,15 +377,13 @@ test("change-order revenue increases commissionable revenue and therefore commis
   const base = computeJobFinancials({
     ...EMPTY_JOB_FINANCIAL_INPUTS,
     contractRevenue: 100_000,
-    materialCost: 30_000,
-    laborCost: 20_000,
+    originalCost: 50_000,
   });
   const withChangeOrder = computeJobFinancials({
     ...EMPTY_JOB_FINANCIAL_INPUTS,
     contractRevenue: 100_000,
     changeOrderRevenue: 10_000,
-    materialCost: 30_000,
-    laborCost: 20_000,
+    originalCost: 50_000,
   });
 
   assert.equal(base.commissionableGrossProfit, 50_000);
@@ -411,14 +409,12 @@ test("burden lowers GP before tier selection, so it can change the tier", () => 
   const withoutBurden = computeJobFinancials({
     ...EMPTY_JOB_FINANCIAL_INPUTS,
     contractRevenue: 100_000,
-    materialCost: 45_000,
-    laborCost: 5_000,
+    originalCost: 50_000,
   });
   const withBurden = computeJobFinancials({
     ...EMPTY_JOB_FINANCIAL_INPUTS,
     contractRevenue: 100_000,
-    materialCost: 45_000,
-    laborCost: 5_000,
+    originalCost: 50_000,
     // 12% of the 50,000 direct cost — the same 6,000 the old dollar input carried.
     burdenPercent: 0.12,
   });

@@ -54,10 +54,7 @@ test("credits reduce total job revenue", () => {
 
 test("total job cost is direct cost plus the derived burden and warranty contingency", () => {
   const job = inputs({
-    materialCost: 12_000,
-    laborCost: 8_000,
-    subcontractorCost: 3_000,
-    otherDirectCost: 750,
+    originalCost: 23_750,
     burdenPercent: 0.1,
     warrantyContingencyPercent: 0.05,
   });
@@ -71,8 +68,7 @@ test("total job cost is direct cost plus the derived burden and warranty conting
 test("job gross profit is revenue minus cost and is independent of commission rules", () => {
   const job = inputs({
     contractRevenue: 30_000,
-    materialCost: 10_000,
-    laborCost: 8_000,
+    originalCost: 18_000,
   });
 
   assert.equal(jobGrossProfit(job), 12_000);
@@ -81,8 +77,7 @@ test("job gross profit is revenue minus cost and is independent of commission ru
 test("job gross profit percentage is gross profit over revenue", () => {
   const job = inputs({
     contractRevenue: 30_000,
-    materialCost: 10_000,
-    laborCost: 8_000,
+    originalCost: 18_000,
   });
 
   assert.equal(jobGrossProfitPercent(totalJobRevenue(job), jobGrossProfit(job)), 0.4);
@@ -99,7 +94,7 @@ test("zero revenue reports a 0% gross profit percentage instead of NaN or Infini
 });
 
 test("a negative gross profit produces a negative percentage, not a clamped one", () => {
-  const job = inputs({ contractRevenue: 10_000, materialCost: 12_000 });
+  const job = inputs({ contractRevenue: 10_000, originalCost: 12_000 });
   const revenue = totalJobRevenue(job);
   const grossProfit = jobGrossProfit(job);
 
@@ -111,7 +106,7 @@ test("money arithmetic keeps cents exact across many components", () => {
   const job = inputs({
     contractRevenue: 0.1,
     changeOrderRevenue: 0.2,
-    materialCost: 0.3,
+    originalCost: 0.3,
   });
 
   assert.equal(totalJobRevenue(job), 0.3);
@@ -121,7 +116,7 @@ test("money arithmetic keeps cents exact across many components", () => {
 });
 
 test("revenue adjustments change the actual total and the gross profit", () => {
-  const job = inputs({ contractRevenue: 20_000, materialCost: 8_000 });
+  const job = inputs({ contractRevenue: 20_000, originalCost: 8_000 });
   const adjustments: JobAdjustmentInput[] = [{ adjustmentType: "revenue", amount: 1_500 }];
 
   assert.equal(actualTotalRevenue(job, adjustments), 21_500);
@@ -129,7 +124,7 @@ test("revenue adjustments change the actual total and the gross profit", () => {
 });
 
 test("cost adjustments change the actual total and the gross profit", () => {
-  const job = inputs({ contractRevenue: 20_000, materialCost: 8_000 });
+  const job = inputs({ contractRevenue: 20_000, originalCost: 8_000 });
   const adjustments: JobAdjustmentInput[] = [{ adjustmentType: "cost", amount: 2_500 }];
 
   assert.equal(actualTotalCost(job, adjustments), 10_500);
@@ -140,8 +135,7 @@ test("commissionable gross profit equals job gross profit when nothing is exclud
   const job = inputs({
     contractRevenue: 50_000,
     changeOrderRevenue: 5_000,
-    materialCost: 20_000,
-    laborCost: 10_000,
+    originalCost: 30_000,
     burdenPercent: 0.1,
     warrantyContingencyPercent: 0.05,
   });
@@ -157,8 +151,7 @@ test("commissionable gross profit equals job gross profit when nothing is exclud
 test("explicit exclusions reduce commissionable gross profit without touching job gross profit", () => {
   const job = inputs({
     contractRevenue: 50_000,
-    materialCost: 20_000,
-    laborCost: 10_000,
+    originalCost: 30_000,
     burdenPercent: 0.1,
   });
 
@@ -182,7 +175,7 @@ test("explicit exclusions reduce commissionable gross profit without touching jo
 });
 
 test("a pure commissionable exclusion lowers commissionable GP below job GP", () => {
-  const job = inputs({ contractRevenue: 10_000, materialCost: 4_000 });
+  const job = inputs({ contractRevenue: 10_000, originalCost: 4_000 });
   const adjustments: JobAdjustmentInput[] = [
     { adjustmentType: "commissionable_revenue", amount: -1_000 },
   ];
@@ -205,10 +198,7 @@ test("computeJobFinancials is the single source of every derived figure", () => 
     changeOrderRevenue: 10_000,
     creditAmount: 5_000,
     otherRevenue: 2_000,
-    materialCost: 30_000,
-    laborCost: 25_000,
-    subcontractorCost: 5_000,
-    otherDirectCost: 1_000,
+    originalCost: 61_000,
     burdenPercent: 0.1,
     warrantyContingencyPercent: 0.05,
   });
@@ -217,6 +207,8 @@ test("computeJobFinancials is the single source of every derived figure", () => 
 
   assert.deepEqual(results, {
     directJobCost: 61_000,
+    originalCost: 61_000,
+    changeOrderCost: 0,
     burdenCost: 6_100,
     warrantyServiceContingency: 3_050,
     burdenPercent: 0.1,

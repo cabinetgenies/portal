@@ -262,6 +262,10 @@ export type JobRow = {
   labor_cost: number;
   subcontractor_cost: number;
   other_direct_cost: number;
+  /** Original Costs — the single original cost input (Phase 3.8). */
+  original_cost: number;
+  /** Derived roll-up of the active change orders' cost. */
+  change_order_cost: number;
   burden_cost: number;
   warranty_service_contingency: number;
   actual_total_revenue: number;
@@ -301,6 +305,8 @@ export type JobInsert = {
   labor_cost?: number;
   subcontractor_cost?: number;
   other_direct_cost?: number;
+  original_cost?: number;
+  change_order_cost?: number;
   burden_cost?: number;
   warranty_service_contingency?: number;
   actual_total_revenue?: number;
@@ -343,6 +349,37 @@ export type JobFinancialAdjustmentInsert = {
 };
 
 export type JobFinancialAdjustmentUpdate = Partial<JobFinancialAdjustmentInsert>;
+
+/** A change order: a real child record, not an aggregate on the job. */
+export type JobChangeOrderRow = {
+  id: string;
+  job_id: string;
+  change_order_number: string | null;
+  name: string;
+  revenue: number;
+  cost: number;
+  active: boolean;
+  notes: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type JobChangeOrderInsert = {
+  id?: string;
+  job_id: string;
+  change_order_number?: string | null;
+  name: string;
+  revenue?: number;
+  cost?: number;
+  active?: boolean;
+  notes?: string | null;
+  created_by?: string | null;
+  created_at?: string;
+  updated_at?: string;
+};
+
+export type JobChangeOrderUpdate = Partial<JobChangeOrderInsert>;
 
 export type AuditEventRow = {
   id: string;
@@ -718,6 +755,27 @@ export type Database = {
           },
           {
             foreignKeyName: "job_financial_adjustments_created_by_fkey";
+            columns: ["created_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      job_change_orders: {
+        Row: JobChangeOrderRow;
+        Insert: JobChangeOrderInsert;
+        Update: JobChangeOrderUpdate;
+        Relationships: [
+          {
+            foreignKeyName: "job_change_orders_job_id_fkey";
+            columns: ["job_id"];
+            isOneToOne: false;
+            referencedRelation: "jobs";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "job_change_orders_created_by_fkey";
             columns: ["created_by"];
             isOneToOne: false;
             referencedRelation: "profiles";

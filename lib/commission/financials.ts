@@ -11,7 +11,7 @@ import type { JobRow } from "@/lib/supabase/database.types";
  *
  * Rules that this module owns:
  *   total job revenue        = contract + change orders + other revenue - credits
- *   direct job cost          = material + labor + subcontractor + other direct
+ *   direct job cost          = original cost + change order cost
  *   burden cost              = direct job cost x burden percent
  *   warranty contingency     = direct job cost x warranty contingency percent
  *   total job cost           = direct job cost + burden + warranty contingency
@@ -102,10 +102,7 @@ export function totalJobRevenue(inputs: JobFinancialInputs) {
  */
 export function directJobCost(inputs: JobFinancialInputs) {
   return fromCents(
-    toCents(inputs.materialCost) +
-      toCents(inputs.laborCost) +
-      toCents(inputs.subcontractorCost) +
-      toCents(inputs.otherDirectCost),
+    toCents(inputs.originalCost) + toCents(inputs.changeOrderCost),
   );
 }
 
@@ -199,10 +196,10 @@ export function jobFinancialInputsFromRow(
     changeOrderRevenue: toNumber(row.change_order_revenue),
     creditAmount: toNumber(row.credit_amount),
     otherRevenue: toNumber(row.other_revenue),
-    materialCost: toNumber(row.material_cost),
-    laborCost: toNumber(row.labor_cost),
-    subcontractorCost: toNumber(row.subcontractor_cost),
-    otherDirectCost: toNumber(row.other_direct_cost),
+    // The four legacy cost buckets are deliberately not read: the migration folded
+    // them into original_cost, and reading both would double-count the same money.
+    originalCost: toNumber(row.original_cost),
+    changeOrderCost: toNumber(row.change_order_cost),
     burdenPercent: rates.burdenPercent,
     warrantyContingencyPercent: rates.warrantyContingencyPercent,
   };
@@ -308,6 +305,8 @@ export function computeJobFinancials(
   const commissionableGp = roundMoney(commissionableRev - commissionableCst);
 
   return {
+    originalCost: roundMoney(toNumber(inputs.originalCost)),
+    changeOrderCost: roundMoney(toNumber(inputs.changeOrderCost)),
     directJobCost: direct,
     burdenCost: calculateBurdenCost(direct, burdenPercent),
     warrantyServiceContingency: calculateWarrantyServiceContingency(

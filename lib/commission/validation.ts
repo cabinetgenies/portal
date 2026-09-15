@@ -84,6 +84,62 @@ const optionalUuid = z.preprocess(
   z.string().trim().min(1).nullable(),
 );
 
+const booleanField = (label: string) =>
+  z.preprocess((value) => {
+    if (typeof value === "boolean") return value;
+    if (value === null || value === undefined || value === "") return false;
+    const normalized = String(value).toLowerCase();
+    return normalized === "on" || normalized === "true" || normalized === "1";
+  }, z.boolean({ error: `${label} must be true or false.` }));
+
+/**
+ * A change order as entered in the job form.
+ *
+ * The line items travel as a JSON array in one form field: the shared
+ * `formDataToObject` helper keeps one value per field name, so repeated names
+ * would collapse to the last row. Parsing here keeps one validating path for
+ * both the create form and the change order editor.
+ */
+export const changeOrderRowSchema = z.object({
+  name: requiredText("Change order name", 120),
+  changeOrderNumber: optionalText(40),
+  revenue: moneyField("Change order revenue"),
+  cost: moneyField("Change order cost"),
+});
+
+const changeOrdersField = z.preprocess(
+  (value) => {
+    if (value === null || value === undefined || value === "") return [];
+    if (Array.isArray(value)) return value;
+    if (typeof value !== "string") return value;
+
+    try {
+      const parsed: unknown = JSON.parse(value);
+      return Array.isArray(parsed) ? parsed : value;
+    } catch {
+      return value;
+    }
+  },
+  z
+    .array(changeOrderRowSchema)
+    .max(50, "That is more change orders than this form supports in one save."),
+);
+
+export const jobChangeOrderSchema = z.object({
+  jobId: uuidField("Job"),
+  changeOrderId: optionalUuid,
+  changeOrderNumber: optionalText(40),
+  name: requiredText("Change order name", 120),
+  revenue: moneyField("Change order revenue"),
+  cost: moneyField("Change order cost"),
+});
+
+export const jobChangeOrderActiveSchema = z.object({
+  jobId: uuidField("Job"),
+  changeOrderId: uuidField("Change order"),
+  active: booleanField("Active"),
+});
+
 export const jobOverviewSchema = z.object({
   jobId: z.preprocess(
     (value) => (value === "" || value === null || value === undefined ? undefined : value),
@@ -105,14 +161,8 @@ export type JobOverviewInput = z.infer<typeof jobOverviewSchema>;
 
 export const jobFinancialsSchema = z.object({
   jobId: uuidField("Job"),
-  contractRevenue: moneyField("Contract revenue"),
-  changeOrderRevenue: moneyField("Change order revenue"),
-  creditAmount: moneyField("Credit amount"),
-  otherRevenue: moneyField("Other revenue"),
-  materialCost: moneyField("Material cost"),
-  laborCost: moneyField("Labor cost"),
-  subcontractorCost: moneyField("Subcontractor cost"),
-  otherDirectCost: moneyField("Other direct cost"),
+  contractRevenue: moneyField("Original contract price"),
+  originalCost: moneyField("Original costs"),
   burdenPercent: optionalPercentPoints("Burden percentage"),
   warrantyContingencyPercent: optionalPercentPoints("Warranty contingency percentage"),
 });
@@ -130,16 +180,11 @@ export type JobFinancialsInput = z.infer<typeof jobFinancialsSchema>;
 export const jobEntrySchema = jobOverviewSchema.omit({ jobId: true }).extend({
   compensationPlanId: optionalUuid,
   compensationPlanVersionId: optionalUuid,
-  contractRevenue: moneyField("Contract revenue"),
-  changeOrderRevenue: moneyField("Change order revenue"),
-  creditAmount: moneyField("Credits"),
-  otherRevenue: moneyField("Other revenue"),
-  materialCost: moneyField("Material cost"),
-  laborCost: moneyField("Labor cost"),
-  subcontractorCost: moneyField("Subcontractor cost"),
-  otherDirectCost: moneyField("Other direct cost"),
+  contractRevenue: moneyField("Original contract price"),
+  originalCost: moneyField("Original costs"),
   burdenPercent: optionalPercentPoints("Burden percentage"),
   warrantyContingencyPercent: optionalPercentPoints("Warranty contingency percentage"),
+  changeOrders: changeOrdersField,
 });
 
 export type JobEntryInput = z.infer<typeof jobEntrySchema>;

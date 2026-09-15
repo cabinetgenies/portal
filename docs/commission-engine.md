@@ -15,13 +15,27 @@ The rule lives once, in `lib/commission/financials.ts`, and is applied before th
 commission tier is selected:
 
 ```
-direct_job_cost              = material + labor + subcontractor + other direct
+original_revenue             = original contract price (jobs.contract_revenue)
+change_order_revenue         = sum(active change orders' revenue)
+total_revenue                = original contract price + change order revenue
+                               (+ other revenue − credits)
+
+original_cost                = jobs.original_cost
+change_order_cost            = sum(active change orders' cost)
+direct_job_cost              = original_cost + change_order_cost
+
 burden_cost                  = round(direct_job_cost × burden_percent)
 warranty_service_contingency = round(direct_job_cost × warranty_contingency_percent)
 total_job_cost               = direct_job_cost + burden_cost + warranty_service_contingency
 ```
 
-**The base is direct job cost** — the four direct cost inputs, before either adder.
+Change orders are child records (`job_change_orders`), not aggregates typed onto the
+job: a number/name, revenue and cost each. `jobs.change_order_revenue` and
+`jobs.change_order_cost` are the derived roll-ups of the *active* rows, written by
+the canonical calculation. Removing a change order deactivates it rather than
+deleting it, so the history survives once commission has been paid against it.
+
+**The base is direct job cost** — original costs plus change order costs, before either adder.
 Neither rate is applied to revenue: both are cost-side reserves, and a share of
 revenue would inflate cost on high-revenue jobs. Until Phase 3.7 the two amounts
 were raw dollar columns with no stated basis anywhere in this document or in the

@@ -4,17 +4,17 @@ import test from "node:test";
 import type { TierWindow } from "@/lib/compensation/plan-resolution";
 import type { CommissionSettingsSnapshot } from "@/lib/commission/engine";
 import {
+  buildJobEntryLiveCalculation,
   buildJobEntryOptions,
-  buildJobEntryPreview,
   emptyJobMoneyValues,
   jobFinancialInputsFromValues,
   jobMoneyValuesFromJob,
   type JobCostRateValues,
   type JobMoneyValues,
 } from "@/lib/commission/job-entry";
+import type { ChangeOrderTotalsInput } from "@/lib/commission/change-orders";
 import type {
   CompensationPlanRow,
-  CompensationPlanTierRow,
   CompensationPlanVersionRow,
   EmployeeCompensationAssignmentRow,
   EmployeeDrawPeriodRow,
@@ -62,6 +62,11 @@ const SETTINGS: CommissionSettingsSnapshot = {
   drawEnabled: true,
 };
 
+const ZERO_RATES: JobCostRateValues = {
+  burdenPercent: "0",
+  warrantyContingencyPercent: "0",
+};
+
 function values(overrides: Partial<JobMoneyValues> = {}): JobMoneyValues {
   return { ...emptyJobMoneyValues(), ...overrides };
 }
@@ -73,155 +78,161 @@ function preview(
     onDraw?: boolean;
     settings?: CommissionSettingsSnapshot;
     rateValues?: JobCostRateValues;
+    changeOrders?: ChangeOrderTotalsInput[];
+    previouslyRecognized?: number;
   } = {},
 ) {
-  return buildJobEntryPreview({
+  return buildJobEntryLiveCalculation({
     values: values(money),
-    rateValues: options.rateValues ?? {
-      burdenPercent: "0",
-      warrantyContingencyPercent: "0",
-    },
+    rateValues: options.rateValues ?? ZERO_RATES,
+    changeOrders: options.changeOrders ?? [],
     tiers: options.tiers ?? PRODUCTION_TIERS,
     minimumGpStandard: 0.35,
     settings: options.settings ?? SETTINGS,
     onDraw: options.onDraw ?? false,
+    previouslyRecognized: options.previouslyRecognized ?? 0,
   });
 }
 
 test("the documented 50 GP test case produces 30% and a $7,500 deposit target", () => {
-  const result = preview({ contractRevenue: "100000", materialCost: "50000" });
+  const result = preview({ contractRevenue: "100000", originalCost: "50000" });
 
-  assert.equal(result.financials.actualTotalRevenue, 100000);
-  assert.equal(result.financials.actualTotalCost, 50000);
-  assert.equal(result.financials.jobGrossProfit, 50000);
-  assert.equal(result.financials.jobGpPercent, 0.5);
-  assert.equal(result.financials.commissionableGrossProfit, 50000);
-  assert.equal(result.financials.commissionableGpPercent, 0.5);
-  assert.equal(result.tierLabel, "50% GP and above");
-  assert.equal(result.standardRate, 0.3);
-  assert.equal(result.drawReductionApplied, 0);
-  assert.equal(result.effectiveRate, 0.3);
-  assert.equal(result.projectedGrossCommission, 15000);
-  assert.equal(result.depositTarget, 7500);
+  assert.equal(result.revenue.originalContractPrice, 100000);
+  assert.equal(result.revenue.changeOrderRevenue, 0);
+  assert.equal(result.revenue.totalRevenue, 100000);
+  assert.equal(result.cost.originalCost, 50000);
+  assert.equal(result.cost.changeOrderCost, 0);
+  assert.equal(result.cost.directJobCost, 50000);
+  assert.equal(result.cost.totalCost, 50000);
+  assert.equal(result.profit.grossProfit, 50000);
+  assert.equal(result.profit.grossProfitPercent, 0.5);
+  assert.equal(result.commission.commissionableGrossProfit, 50000);
+  assert.equal(result.commission.commissionableGpPercent, 0.5);
+  assert.equal(result.commission.tierLabel, "50% GP and above");
+  assert.equal(result.commission.standardRate, 0.3);
+  assert.equal(result.commission.drawReduction, 0);
+  assert.equal(result.commission.effectiveRate, 0.3);
+  assert.equal(result.commission.projectedGrossCommission, 15000);
+  assert.equal(result.commission.depositTarget, 7500);
+  assert.equal(result.commission.estimatedRemaining, 15000);
   assert.deepEqual([...result.warnings], []);
 });
 
-test("burden and warranty contingency are derived from direct cost and included in total cost", () => {
+test("change orders are inside direct cost, before burden and warranty", () => {
   const result = preview(
+    { contractRevenue: "100000", originalCost: "46000" },
     {
-      contractRevenue: "100000",
-      materialCost: "30000",
-      laborCost: "10000",
-      subcontractorCost: "5000",
-      otherDirectCost: "1000",
+      rateValues: { burdenPercent: "10", warrantyContingencyPercent: "5" },
+      changeOrders: [{ revenue: 10000, cost: 4000 }],
     },
-    { rateValues: { burdenPercent: "10", warrantyContingencyPercent: "5" } },
   );
 
-  // direct 46,000 -> burden 4,600, warranty 2,300, total 52,900
-  assert.equal(result.financials.directJobCost, 46000);
-  assert.equal(result.financials.burdenCost, 4600);
-  assert.equal(result.financials.warrantyServiceContingency, 2300);
-  assert.equal(result.financials.actualTotalCost, 52900);
-  assert.equal(result.financials.jobGrossProfit, 47100);
-  assert.equal(result.financials.jobGpPercent, 0.471);
-  // 47.1% GP falls in the 45–50% band, so the derived costs changed the tier.
-  assert.equal(result.tierLabel, "45% to under 50% GP");
-  assert.equal(result.standardRate, 0.2);
-  assert.equal(result.projectedGrossCommission, 9420);
+  assert.equal(result.revenue.changeOrderRevenue, 10000);
+  assert.equal(result.revenue.totalRevenue, 110000);
+  assert.equal(result.cost.originalCost, 46000);
+  assert.equal(result.cost.changeOrderCost, 4000);
+  // direct = 46,000 + 4,000; burden = 10% of 50,000; warranty = 5% of 50,000
+  assert.equal(result.cost.directJobCost, 50000);
+  assert.equal(result.cost.burdenCost, 5000);
+  assert.equal(result.cost.warrantyServiceContingency, 2500);
+  assert.equal(result.cost.totalCost, 57500);
+  assert.equal(result.profit.grossProfit, 52500);
 });
 
 test("band boundaries resolve to the tier the engine would use", () => {
-  // Exactly 50% falls in the top band; just under it drops to 20%.
-  assert.equal(preview({ contractRevenue: "100000", materialCost: "50000" }).standardRate, 0.3);
-  assert.equal(
-    preview({ contractRevenue: "100000", materialCost: "50001" }).standardRate,
-    0.2,
-    "49.999% must not fall into the 50% band",
-  );
+  const rate = (contract: string, cost: string) =>
+    preview({ contractRevenue: contract, originalCost: cost }).commission.standardRate;
 
-  // Exactly 45% falls in the 20% band; just under it drops to 10%.
-  assert.equal(preview({ contractRevenue: "100000", materialCost: "55000" }).standardRate, 0.2);
-  assert.equal(preview({ contractRevenue: "100000", materialCost: "55010" }).standardRate, 0.1);
-
-  // Exactly 35% still earns 10%; below it the rate is 0%.
-  assert.equal(preview({ contractRevenue: "100000", materialCost: "65000" }).standardRate, 0.1);
-  assert.equal(preview({ contractRevenue: "100000", materialCost: "65010" }).standardRate, 0);
-});
-
-test("credits reduce revenue before the tier is resolved", () => {
-  const result = preview({
-    contractRevenue: "100000",
-    creditAmount: "10000",
-    materialCost: "50000",
-  });
-
-  assert.equal(result.financials.actualTotalRevenue, 90000);
-  assert.equal(result.financials.jobGrossProfit, 40000);
-  assert.equal(result.tierLabel, "35% to under 45% GP");
-  assert.equal(result.projectedGrossCommission, 4000);
-  assert.equal(result.depositTarget, 2000);
+  assert.equal(rate("100000", "50000"), 0.3);
+  assert.equal(rate("100000", "50001"), 0.2, "49.999% must not fall into the 50% band");
+  assert.equal(rate("100000", "55000"), 0.2);
+  assert.equal(rate("100000", "55010"), 0.1);
+  assert.equal(rate("100000", "65000"), 0.1);
+  assert.equal(rate("100000", "65010"), 0);
 });
 
 test("draw lowers the rate by points, never by a multiple", () => {
   const onDraw = preview(
-    { contractRevenue: "100000", materialCost: "50000" },
+    { contractRevenue: "100000", originalCost: "50000" },
     { onDraw: true },
   );
 
-  assert.equal(onDraw.standardRate, 0.3);
-  assert.equal(onDraw.drawReductionApplied, 0.05);
-  assert.equal(onDraw.effectiveRate, 0.25);
-  assert.equal(onDraw.projectedGrossCommission, 12500);
-  assert.equal(onDraw.depositTarget, 6250);
+  assert.equal(onDraw.commission.standardRate, 0.3);
+  assert.equal(onDraw.commission.drawReduction, 0.05);
+  assert.equal(onDraw.commission.effectiveRate, 0.25);
+  assert.equal(onDraw.commission.projectedGrossCommission, 12500);
+  assert.equal(onDraw.commission.depositTarget, 6250);
 
   const drawDisabled = preview(
-    { contractRevenue: "100000", materialCost: "50000" },
-    {
-      onDraw: true,
-      settings: { ...SETTINGS, drawEnabled: false },
-    },
+    { contractRevenue: "100000", originalCost: "50000" },
+    { onDraw: true, settings: { ...SETTINGS, drawEnabled: false } },
   );
 
-  assert.equal(drawDisabled.drawReductionApplied, 0);
-  assert.equal(drawDisabled.effectiveRate, 0.3);
+  assert.equal(drawDisabled.commission.drawReduction, 0);
+  assert.equal(drawDisabled.commission.effectiveRate, 0.3);
+});
+
+test("recognized commission reduces the estimate and can warn about a rollover", () => {
+  const partiallyPaid = preview(
+    { contractRevenue: "100000", originalCost: "50000" },
+    { previouslyRecognized: 7500 },
+  );
+
+  assert.equal(partiallyPaid.commission.projectedGrossCommission, 15000);
+  assert.equal(partiallyPaid.commission.previouslyRecognized, 7500);
+  assert.equal(partiallyPaid.commission.estimatedRemaining, 7500);
+  assert.deepEqual([...partiallyPaid.warnings], []);
+
+  const overRecognized = preview(
+    { contractRevenue: "100000", originalCost: "50000" },
+    { previouslyRecognized: 9000 },
+  );
+
+  assert.equal(overRecognized.commission.estimatedRemaining, 6000);
+  const worse = preview(
+    { contractRevenue: "100000", originalCost: "60000" },
+    { previouslyRecognized: 9000 },
+  );
+  assert.equal(worse.commission.estimatedRemaining, -5000);
+  assert.equal(worse.warnings.length, 1);
+  assert.match(String(worse.warnings[0]), /rollover/i);
 });
 
 test("a job without tiers still totals correctly and says why there is no commission", () => {
-  const result = preview({ contractRevenue: "100000", materialCost: "50000" }, { tiers: [] });
+  const result = preview(
+    { contractRevenue: "100000", originalCost: "50000" },
+    { tiers: [] },
+  );
 
-  assert.equal(result.hasTiers, false);
-  assert.equal(result.financials.commissionableGrossProfit, 50000);
-  assert.equal(result.standardRate, 0);
-  assert.equal(result.projectedGrossCommission, 0);
-  assert.equal(result.depositTarget, 0);
+  assert.equal(result.commission.hasTiers, false);
+  assert.equal(result.commission.commissionableGrossProfit, 50000);
+  assert.equal(result.commission.standardRate, 0);
+  assert.equal(result.commission.projectedGrossCommission, 0);
   assert.equal(result.warnings.length, 1);
-  assert.match(String(result.warnings[0]), /compensation plan version/i);
+  assert.match(String(result.warnings[0]), /plan version/i);
 });
 
-test("money values round-trip from a stored job back into the preview inputs", () => {
+test("money values round-trip from a stored job back into the inputs", () => {
   const job = {
     contract_revenue: "100000.00",
-    change_order_revenue: "0.00",
-    credit_amount: "0.00",
+    original_cost: "50000.00",
     other_revenue: "0.00",
-    material_cost: "50000.00",
-    labor_cost: "0.00",
-    subcontractor_cost: "0.00",
-    other_direct_cost: "0.00",
-    burden_cost: "0.00",
-    warranty_service_contingency: "0.00",
+    credit_amount: "0.00",
+    change_order_revenue: "0.00",
+    change_order_cost: "0.00",
+    burden_percent: null,
+    warranty_contingency_percent: null,
   } as unknown as JobRow;
 
   const roundTripped = preview(jobMoneyValuesFromJob(job));
 
-  assert.equal(roundTripped.projectedGrossCommission, 15000);
+  assert.equal(roundTripped.commission.projectedGrossCommission, 15000);
   assert.equal(
     jobFinancialInputsFromValues(jobMoneyValuesFromJob(job), {
       burdenPercent: 0,
       warrantyContingencyPercent: 0,
-    }).contractRevenue,
-    100000,
+    }).originalCost,
+    50000,
   );
 });
 
@@ -277,27 +288,6 @@ function version(
   };
 }
 
-function tier(
-  id: string,
-  versionId: string,
-  rate: number,
-  sortOrder: number,
-): CompensationPlanTierRow {
-  return {
-    id,
-    compensation_plan_version_id: versionId,
-    sort_order: sortOrder,
-    lower_gp_percent: sortOrder === 1 ? 0.5 : null,
-    lower_threshold_type: "fixed",
-    upper_gp_percent: sortOrder === 1 ? null : 0.5,
-    upper_threshold_type: "fixed",
-    rate,
-    label: `band ${sortOrder}`,
-    created_at: "2026-01-01T00:00:00Z",
-    updated_at: "2026-01-01T00:00:00Z",
-  };
-}
-
 function assignment(
   profileId: string,
   planId: string,
@@ -339,7 +329,7 @@ test("the job form defaults a designer's plan from the assignment in force today
     assignments: [assignment("designer", "plan-standard", "2026-01-01")],
     plans: [plan("plan-standard", "sales_designer", "Standard GP")],
     planVersions: [version("v1", "plan-standard")],
-    planTiers: [tier("t1", "v1", 0.3, 1)],
+    planTiers: [],
     drawPeriods: [drawPeriod("designer", "2026-09-01")],
     settings: SETTINGS,
     today: TODAY,
@@ -355,8 +345,6 @@ test("the job form defaults a designer's plan from the assignment in force today
   assert.equal(options.designers[0].defaultPlanName, "Standard GP");
   assert.equal(options.designers[0].onDraw, true);
   assert.equal(options.plans.length, 1);
-  assert.equal(options.plans[0].versions[0].tiers.length, 1);
-  assert.equal(options.plans[0].versions[0].tiers[0].rate, 0.3);
 });
 
 test("manager plans are never offered on a job, and never defaulted onto one", () => {

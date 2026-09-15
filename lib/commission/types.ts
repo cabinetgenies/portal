@@ -78,10 +78,10 @@ export type JobFinancialInputs = {
   changeOrderRevenue: number;
   creditAmount: number;
   otherRevenue: number;
-  materialCost: number;
-  laborCost: number;
-  subcontractorCost: number;
-  otherDirectCost: number;
+  /** Original Costs: one figure, before change orders, burden and warranty. */
+  originalCost: number;
+  /** Derived roll-up of the active change orders' costs. */
+  changeOrderCost: number;
   burdenPercent: number;
   warrantyContingencyPercent: number;
 };
@@ -93,7 +93,9 @@ export type JobAdjustmentInput = {
 
 /** Everything derived from the inputs above, in one shape. */
 export type JobFinancialResults = {
-  /** material + labor + subcontractor + other direct — the base for both rates. */
+  originalCost: number;
+  changeOrderCost: number;
+  /** originalCost + changeOrderCost — the base for both percentage rates. */
   directJobCost: number;
   /** Derived: directJobCost x burdenPercent, rounded to cents. */
   burdenCost: number;
@@ -117,10 +119,8 @@ export const EMPTY_JOB_FINANCIAL_INPUTS: JobFinancialInputs = {
   changeOrderRevenue: 0,
   creditAmount: 0,
   otherRevenue: 0,
-  materialCost: 0,
-  laborCost: 0,
-  subcontractorCost: 0,
-  otherDirectCost: 0,
+  originalCost: 0,
+  changeOrderCost: 0,
   burdenPercent: 0,
   warrantyContingencyPercent: 0,
 };

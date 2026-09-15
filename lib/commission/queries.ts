@@ -14,6 +14,7 @@ import type {
   CompensationPlanRow,
   CompensationPlanTierRow,
   CompensationPlanVersionRow,
+  JobChangeOrderRow,
   JobFinancialAdjustmentRow,
   JobRow,
   ProfileRow,
@@ -104,6 +105,7 @@ export type JobDetail = {
   category: ProjectCategoryRow | null;
   designer: ProfileRow | null;
   adjustments: JobFinancialAdjustmentRow[];
+  changeOrders: JobChangeOrderRow[];
   auditEvents: AuditEventRow[];
   plan: Pick<CompensationPlanRow, "id" | "name" | "participant_kind"> | null;
   planVersion: Pick<
@@ -125,8 +127,16 @@ export const getJobDetail = cache(async function getJobDetail(jobId: string) {
     return null;
   }
 
-  const [category, designer, adjustments, auditEvents, plan, planVersion, planVersionTiers] =
-    await Promise.all([
+  const [
+    category,
+    designer,
+    adjustments,
+    changeOrders,
+    auditEvents,
+    plan,
+    planVersion,
+    planVersionTiers,
+  ] = await Promise.all([
       supabase
         .from("project_categories")
         .select("*")
@@ -140,6 +150,11 @@ export const getJobDetail = cache(async function getJobDetail(jobId: string) {
         .select("*")
         .eq("job_id", job.id)
         .order("created_at", { ascending: false }),
+      supabase
+        .from("job_change_orders")
+        .select("*")
+        .eq("job_id", job.id)
+        .order("created_at", { ascending: true }),
       supabase
         .from("audit_events")
         .select("*")
@@ -175,6 +190,7 @@ export const getJobDetail = cache(async function getJobDetail(jobId: string) {
     category: requireRow<ProjectCategoryRow>(category, "project category"),
     designer: requireRow<ProfileRow>(designer, "sales designer"),
     adjustments: unwrap<JobFinancialAdjustmentRow[]>(adjustments, "job adjustments"),
+    changeOrders: unwrap<JobChangeOrderRow[]>(changeOrders, "change orders"),
     auditEvents: unwrap<AuditEventRow[]>(auditEvents, "job audit trail"),
     plan: requireRow<Pick<CompensationPlanRow, "id" | "name" | "participant_kind">>(
       plan,

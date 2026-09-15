@@ -2,6 +2,8 @@
 
 import { useActionState, useState } from "react";
 
+import { LiveCalculationPanel } from "@/components/commission/live-calculation-panel";
+import { Button } from "@/components/ui/button";
 import {
   Field,
   FormAlert,
@@ -10,15 +12,13 @@ import {
   TextInput,
   fieldError,
 } from "@/components/ui/form";
-import { InfoIcon } from "@/components/icons";
 import { createJob } from "@/lib/commission/actions";
 import { toNumber } from "@/lib/commission/financials";
 import {
-  buildJobEntryPreview,
+  buildJobEntryLiveCalculation,
   emptyJobMoneyValues,
   JOB_COST_RATE_FIELDS,
-  JOB_COST_FIELDS,
-  JOB_REVENUE_FIELDS,
+  JOB_ORIGINAL_FIELDS,
   type JobCostRateValues,
   type JobEntryOptions,
   type JobMoneyFieldName,
@@ -30,20 +30,25 @@ import {
   type JobStatus,
 } from "@/lib/commission/types";
 import type { ProjectCategoryRow } from "@/lib/supabase/database.types";
-import { formatMoney, formatPercent } from "@/lib/utils/format";
 import { fromDecimalPercent } from "@/lib/utils/percent";
+
+type ChangeOrderDraft = {
+  key: string;
+  changeOrderNumber: string;
+  name: string;
+  revenue: string;
+  cost: string;
+};
 
 /**
  * Creating a commission job.
  *
- * Everything a job needs to be commission-sized is captured in one pass —
- * identity, milestone dates, the governing plan version and the revenue and cost
- * structure — and the read-only summary on the right is calculated live from the
- * canonical domain engine, so what the administrator sees is what gets stored.
+ * The financial model is deliberately small: original contract price, original
+ * costs, and change orders as line items. There is no final audit here — a new job
+ * is not audited when it is created; the audit happens on the job itself.
  *
- * The form is a data-entry surface for commission and financial audit only. It is
- * not a project management screen: Buildertrend stays the system of record for
- * schedules, selections and production.
+ * The Live Calculation panel on the right is calculated from the shared engine on
+ * every keystroke, so what the office sees is what gets stored.
  */
 export function NewJobForm({
   categories,
@@ -60,6 +65,7 @@ export function NewJobForm({
       fromDecimalPercent(options.costRates.warrantyContingencyPercent) ?? 0,
     ),
   }));
+  const [changeOrders, setChangeOrders] = useState<ChangeOrderDraft[]>([]);
   const [categoryId, setCategoryId] = useState("");
   const [designerId, setDesignerId] = useState("");
   const [planId, setPlanId] = useState("");
@@ -71,11 +77,14 @@ export function NewJobForm({
   const versions = plan?.versions ?? [];
   const version = versions.find((candidate) => candidate.id === versionId);
 
-  const preview = buildJobEntryPreview({
+  const calculation = buildJobEntryLiveCalculation({
     values,
     rateValues,
+    changeOrders: changeOrders.map((row) => ({
+      revenue: toNumber(row.revenue),
+      cost: toNumber(row.cost),
+    })),
     tiers: version?.tiers ?? [],
-    // Postgres numeric can arrive as a string; the engine expects a number.
     minimumGpStandard: toNumber(category?.minimum_gp_standard),
     settings: options.settings,
     onDraw: designer?.onDraw ?? false,
@@ -86,6 +95,29 @@ export function NewJobForm({
 
   const setRateValue = (name: keyof JobCostRateValues, value: string) =>
     setRateValues((current) => ({ ...current, [name]: value }));
+
+  function addChangeOrder() {
+    setChangeOrders((current) => [
+      ...current,
+      {
+        key: `${Date.now()}-${current.length}`,
+        changeOrderNumber: "",
+        name: "",
+        revenue: "",
+        cost: "",
+      },
+    ]);
+  }
+
+  function updateChangeOrder(key: string, patch: Partial<ChangeOrderDraft>) {
+    setChangeOrders((current) =>
+      current.map((row) => (row.key === key ? { ...row, ...patch } : row)),
+    );
+  }
+
+  function removeChangeOrder(key: string) {
+    setChangeOrders((current) => current.filter((row) => row.key !== key));
+  }
 
   function selectDesigner(nextDesignerId: string) {
     setDesignerId(nextDesignerId);
@@ -115,16 +147,11 @@ export function NewJobForm({
               Basic information
             </legend>
             <div className="grid gap-4 sm:grid-cols-2">
-              <Field
-                label="Job name"
-                htmlFor="job-name"
-                hint="Buildertrend job names can be reused here for finance matching."
-                error={fieldError(state, "jobName")}
-              >
+              <Field label="Job name" htmlFor="job-name" error={fieldError(state, "jobName")}>
                 <TextInput
                   id="job-name"
                   name="jobName"
-                  placeholder="Commission Test 50 GP"
+                  placeholder="Reed kitchen remodel"
                   required
                   invalid={Boolean(fieldError(state, "jobName"))}
                 />
@@ -259,42 +286,36 @@ export function NewJobForm({
             {designer?.defaultPlanId ? (
               <p className="text-xs leading-5 text-ink-subtle">
                 Defaulted from {designer.name}&apos;s plan assignment in force today (
-                {designer.defaultPlanName}). Change the plan above to override it for this job
-                — the job keeps whichever version is attached here.
+                {designer.defaultPlanName}). Change the plan above to override it for this job.
               </p>
             ) : designer ? (
               <p className="text-xs leading-5 text-ink-subtle">
-                {designer.name} has no sales designer plan assignment in force today
-                {designer.compensationEligible
-                  ? ""
-                  : " and is not marked compensation eligible"}
-                , so no plan was defaulted. The job can still be created and the plan attached
-                later.
+                {designer.name} has no sales designer plan assignment in force today, so no
+                plan was defaulted. The job can still be created and the plan attached later.
               </p>
             ) : (
               <p className="text-xs leading-5 text-ink-subtle">
                 Only sales designer plans can be attached to a job. Manager plans are
-                attributed to qualifying jobs separately and are never a share of a
-                designer&apos;s commission.
+                attributed to qualifying jobs separately.
               </p>
             )}
           </fieldset>
 
           <fieldset className="space-y-4 border-t border-line pt-6">
             <legend className="text-xs font-semibold tracking-[0.12em] text-ink-subtle uppercase">
-              Revenue
+              Original job
             </legend>
             <div className="grid gap-4 sm:grid-cols-2">
-              {JOB_REVENUE_FIELDS.map((field) => (
+              {JOB_ORIGINAL_FIELDS.map((field) => (
                 <Field
                   key={field.name}
                   label={field.label}
-                  htmlFor={`revenue-${field.name}`}
-                  hint={field.hint || undefined}
+                  htmlFor={`money-${field.name}`}
+                  hint={field.hint}
                   error={fieldError(state, field.name)}
                 >
                   <TextInput
-                    id={`revenue-${field.name}`}
+                    id={`money-${field.name}`}
                     name={field.name}
                     type="number"
                     step="0.01"
@@ -307,47 +328,7 @@ export function NewJobForm({
                 </Field>
               ))}
             </div>
-          </fieldset>
 
-          <fieldset className="space-y-4 border-t border-line pt-6">
-            <legend className="text-xs font-semibold tracking-[0.12em] text-ink-subtle uppercase">
-              Direct costs
-            </legend>
-            <div className="grid gap-4 sm:grid-cols-2">
-              {JOB_COST_FIELDS.map((field) => (
-                <Field
-                  key={field.name}
-                  label={field.label}
-                  htmlFor={`cost-${field.name}`}
-                  hint={field.hint || undefined}
-                  error={fieldError(state, field.name)}
-                >
-                  <TextInput
-                    id={`cost-${field.name}`}
-                    name={field.name}
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    inputMode="decimal"
-                    placeholder="0.00"
-                    value={values[field.name]}
-                    onChange={(event) => setValue(field.name, event.target.value)}
-                  />
-                </Field>
-              ))}
-            </div>
-          </fieldset>
-
-          <fieldset className="space-y-4 border-t border-line pt-6">
-            <legend className="text-xs font-semibold tracking-[0.12em] text-ink-subtle uppercase">
-              Burden and warranty contingency
-            </legend>
-            <p className="text-xs leading-5 text-ink-subtle">
-              Both rates apply to direct job cost — the four inputs above, before either is
-              added — and are included in total job cost before the commission tier is
-              selected. They default from Admin → Commission settings and can be overridden
-              for this job; the rates used are stored on the job.
-            </p>
             <div className="grid gap-4 sm:grid-cols-2">
               {JOB_COST_RATE_FIELDS.map((field) => (
                 <Field
@@ -371,43 +352,126 @@ export function NewJobForm({
                 </Field>
               ))}
             </div>
-            <dl className="grid gap-x-6 gap-y-3 rounded-lg border border-line bg-surface-muted p-4 sm:grid-cols-2 lg:grid-cols-4">
-              <DerivedFigure
-                label="Direct job cost"
-                value={formatMoney(preview.financials.directJobCost)}
-              />
-              <DerivedFigure
-                label="Calculated burden"
-                value={`${formatMoney(preview.financials.burdenCost)} · ${formatPercent(
-                  preview.financials.burdenPercent,
-                  2,
-                )}`}
-              />
-              <DerivedFigure
-                label="Calculated warranty contingency"
-                value={`${formatMoney(
-                  preview.financials.warrantyServiceContingency,
-                )} · ${formatPercent(preview.financials.warrantyContingencyPercent, 2)}`}
-              />
-              <DerivedFigure
-                label="Total cost"
-                value={formatMoney(preview.financials.actualTotalCost)}
-                emphasis
-              />
-            </dl>
+            <p className="text-xs leading-5 text-ink-subtle">
+              Both rates apply to direct job cost — original costs plus change order costs,
+              before either is added — and are included in total cost before the commission
+              tier is selected.
+            </p>
           </fieldset>
 
           <fieldset className="space-y-4 border-t border-line pt-6">
             <legend className="text-xs font-semibold tracking-[0.12em] text-ink-subtle uppercase">
-              Deposit
+              Change orders
+            </legend>
+            <input
+              type="hidden"
+              name="changeOrders"
+              value={JSON.stringify(
+                changeOrders.map(({ changeOrderNumber, name, revenue, cost }) => ({
+                  changeOrderNumber,
+                  name,
+                  revenue,
+                  cost,
+                })),
+              )}
+            />
+
+            {changeOrders.length === 0 ? (
+              <p className="rounded-lg border border-dashed border-line-strong px-4 py-6 text-center text-sm text-ink-muted">
+                No change orders. Totals come from the original job only.
+              </p>
+            ) : (
+              <ul className="space-y-3">
+                {changeOrders.map((row, index) => (
+                  <li
+                    key={row.key}
+                    className="space-y-3 rounded-lg border border-line bg-surface-muted p-4"
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="text-xs font-semibold tracking-[0.12em] text-ink-subtle uppercase">
+                        Change order {index + 1}
+                      </p>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => removeChangeOrder(row.key)}
+                      >
+                        Remove
+                      </Button>
+                    </div>
+                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                      <Field label="Name" htmlFor={`co-name-${row.key}`}>
+                        <TextInput
+                          id={`co-name-${row.key}`}
+                          value={row.name}
+                          onChange={(event) =>
+                            updateChangeOrder(row.key, { name: event.target.value })
+                          }
+                          placeholder="Additional cabinetry"
+                        />
+                      </Field>
+                      <Field label="Number / #" htmlFor={`co-number-${row.key}`}>
+                        <TextInput
+                          id={`co-number-${row.key}`}
+                          value={row.changeOrderNumber}
+                          onChange={(event) =>
+                            updateChangeOrder(row.key, {
+                              changeOrderNumber: event.target.value,
+                            })
+                          }
+                          placeholder="CO-1"
+                        />
+                      </Field>
+                      <Field label="Revenue" htmlFor={`co-revenue-${row.key}`}>
+                        <TextInput
+                          id={`co-revenue-${row.key}`}
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          inputMode="decimal"
+                          placeholder="0.00"
+                          value={row.revenue}
+                          onChange={(event) =>
+                            updateChangeOrder(row.key, { revenue: event.target.value })
+                          }
+                        />
+                      </Field>
+                      <Field label="Costs" htmlFor={`co-cost-${row.key}`}>
+                        <TextInput
+                          id={`co-cost-${row.key}`}
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          inputMode="decimal"
+                          placeholder="0.00"
+                          value={row.cost}
+                          onChange={(event) =>
+                            updateChangeOrder(row.key, { cost: event.target.value })
+                          }
+                        />
+                      </Field>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+
+            <Button type="button" variant="secondary" size="sm" onClick={addChangeOrder}>
+              + Add change order
+            </Button>
+          </fieldset>
+
+          <fieldset className="space-y-4 border-t border-line pt-6">
+            <legend className="text-xs font-semibold tracking-[0.12em] text-ink-subtle uppercase">
+              Deposit information
             </legend>
             <Field
               label="Deposit received date"
               htmlFor="deposit-date"
-              hint={`Recording this date makes the deposit commission eligible: ${formatPercent(
-                options.settings.depositPayoutPercent,
-                0,
-              )} of projected commission, currently ${formatMoney(preview.depositTarget)} for this job.`}
+              hint={`Recording this date makes the deposit commission eligible: ${formatMoneyShort(
+                calculation.commission.depositTarget,
+              )} at the current projection. It does not create the event — the deposit commission is calculated deliberately from the job's Commission section.`}
               error={fieldError(state, "depositReceivedDate")}
             >
               <TextInput
@@ -418,40 +482,8 @@ export function NewJobForm({
               />
             </Field>
             <p className="text-xs leading-5 text-ink-subtle">
-              A deposit date makes the deposit commission <em>eligible</em> — it does not
-              create the event. The deposit commission is still calculated deliberately from
-              the job&apos;s Commission section. The jobs table has no separate deposit amount
-              column: the deposit target is derived from the plan version and the deposit
-              payout percentage under Admin → Commission settings.
-            </p>
-          </fieldset>
-
-          <fieldset className="space-y-4 border-t border-line pt-6">
-            <legend className="text-xs font-semibold tracking-[0.12em] text-ink-subtle uppercase">
-              Final GP audit
-            </legend>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Field
-                label="GP audit completed date"
-                htmlFor="gp-audit-date"
-                hint="Records that the final gross profit is audited."
-                error={fieldError(state, "gpAuditCompletedDate")}
-              >
-                <TextInput id="gp-audit-date" name="gpAuditCompletedDate" type="date" />
-              </Field>
-              <Field
-                label="Completion date"
-                htmlFor="completion-date"
-                hint="Optional. Used by the final audit queue."
-                error={fieldError(state, "completionDate")}
-              >
-                <TextInput id="completion-date" name="completionDate" type="date" />
-              </Field>
-            </div>
-            <p className="text-xs leading-5 text-ink-subtle">
-              The GP audit date makes the final true-up <em>eligible</em>. Nothing here creates
-              a final commission automatically: an administrator still calculates it from the
-              job&apos;s Commission section, so the workflow stays under human control.
+              The final GP audit is not part of job creation. Once the job exists, its audit
+              is a separate, explicit workflow on the job page.
             </p>
           </fieldset>
 
@@ -461,166 +493,17 @@ export function NewJobForm({
           </div>
         </div>
 
-        <aside className="xl:sticky xl:top-6 xl:self-start">
-          <div className="space-y-4 rounded-xl border border-line bg-surface p-5">
-            <div className="space-y-1">
-              <h2 className="text-sm font-semibold tracking-tight text-ink">
-                Live calculation
-              </h2>
-              <p className="text-xs leading-5 text-ink-subtle">
-                Read-only. Every figure below comes from the shared commission engine — the
-                same functions that store the job totals and calculate commission events.
-              </p>
-            </div>
-
-            <dl className="space-y-3">
-              <PreviewRow
-                label="Revenue"
-                value={formatMoney(preview.financials.actualTotalRevenue)}
-              />
-              <PreviewRow
-                label="Direct job cost"
-                value={formatMoney(preview.financials.directJobCost)}
-              />
-              <PreviewRow
-                label={`Burden (${formatPercent(preview.financials.burdenPercent, 2)})`}
-                value={formatMoney(preview.financials.burdenCost)}
-              />
-              <PreviewRow
-                label={`Warranty contingency (${formatPercent(
-                  preview.financials.warrantyContingencyPercent,
-                  2,
-                )})`}
-                value={formatMoney(preview.financials.warrantyServiceContingency)}
-              />
-              <PreviewRow
-                label="Total cost"
-                value={formatMoney(preview.financials.actualTotalCost)}
-              />
-              <PreviewRow
-                label="Commissionable GP"
-                value={formatMoney(preview.financials.commissionableGrossProfit)}
-              />
-              <PreviewRow
-                label="Commissionable GP %"
-                value={formatPercent(preview.financials.commissionableGpPercent)}
-              />
-              <PreviewRow
-                label="Job GP"
-                value={`${formatMoney(preview.financials.jobGrossProfit)} · ${formatPercent(
-                  preview.financials.jobGpPercent,
-                )}`}
-              />
-            </dl>
-
-            <dl className="space-y-3 border-t border-line pt-4">
-              <PreviewRow
-                label="Applicable tier"
-                value={
-                  !preview.hasTiers
-                    ? "No plan version attached"
-                    : preview.tierLabel ?? "No matching tier"
-                }
-              />
-              <PreviewRow label="Standard rate" value={formatPercent(preview.standardRate)} />
-              <PreviewRow
-                label="Draw reduction"
-                value={
-                  preview.drawReductionApplied > 0
-                    ? `− ${formatPercent(preview.drawReductionApplied)}`
-                    : "Not on draw"
-                }
-              />
-              <PreviewRow
-                label="Effective commission rate"
-                value={formatPercent(preview.effectiveRate)}
-              />
-              <PreviewRow
-                label="Projected gross commission"
-                value={formatMoney(preview.projectedGrossCommission)}
-                emphasis
-              />
-              <PreviewRow
-                label="Deposit target"
-                value={`${formatMoney(preview.depositTarget)} · ${formatPercent(
-                  preview.depositPayoutPercent,
-                  0,
-                )}`}
-                emphasis
-              />
-            </dl>
-
-            {preview.warnings.length > 0 ? (
-              <ul className="space-y-2 border-t border-line pt-4">
-                {preview.warnings.map((warning) => (
-                  <li key={warning} className="flex items-start gap-2 text-xs leading-5 text-ink-muted">
-                    <InfoIcon className="mt-0.5 h-3.5 w-3.5 shrink-0 text-ink-subtle" />
-                    <span>{warning}</span>
-                  </li>
-                ))}
-              </ul>
-            ) : null}
-
-            <p className="border-t border-line pt-4 text-xs leading-5 text-ink-subtle">
-              Draw and rollover balances are not applied here. They affect actual cash when a
-              commission event is created, and they are shown on the job&apos;s Commission
-              section.
-            </p>
-          </div>
-        </aside>
+        <LiveCalculationPanel calculation={calculation} />
       </div>
     </form>
   );
 }
 
-function PreviewRow({
-  label,
-  value,
-  emphasis = false,
-}: {
-  label: string;
-  value: string;
-  emphasis?: boolean;
-}) {
-  return (
-    <div className="flex items-baseline justify-between gap-4">
-      <dt className="text-xs leading-5 text-ink-muted">{label}</dt>
-      <dd
-        className={
-          emphasis
-            ? "font-mono text-sm font-semibold tabular-nums text-ink"
-            : "font-mono text-sm tabular-nums text-ink"
-        }
-      >
-        {value}
-      </dd>
-    </div>
-  );
-}
-
-function DerivedFigure({
-  label,
-  value,
-  emphasis = false,
-}: {
-  label: string;
-  value: string;
-  emphasis?: boolean;
-}) {
-  return (
-    <div className="min-w-0 space-y-0.5">
-      <dt className="text-xs font-medium tracking-[0.08em] text-ink-subtle uppercase">
-        {label}
-      </dt>
-      <dd
-        className={
-          emphasis
-            ? "font-mono text-sm font-semibold tabular-nums text-ink"
-            : "font-mono text-sm tabular-nums text-ink"
-        }
-      >
-        {value}
-      </dd>
-    </div>
-  );
+function formatMoneyShort(value: number) {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(value);
 }

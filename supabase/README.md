@@ -18,6 +18,7 @@ generalise the shared structures for future Sales Manager compensation (see
 | 9 | `migrations/20260915150200_seed_cabinet_genies_standard_plan.sql` | production plan `Cabinet Genies Standard GP Commission` (50% → 30%, 45% → 20%, 35% → 10%, below → 0%) |
 | 10 | `migrations/20260915160000_user_directory_audit.sql` | profile audit trail (`user_created`, `role_changed`, `manager_changed`, `active_status_changed`, …) and the admin policy that links a profile to an existing auth user |
 | 11 | `migrations/20260915170000_percentage_based_job_costs.sql` | percentage-based burden and warranty / service contingency: company defaults on `commission_settings`, per-job snapshots on `jobs`, derived dollars kept, and range constraints |
+| 12 | `migrations/20260915180000_change_orders_and_original_cost.sql` | simplified job financials: `jobs.original_cost` and `jobs.change_order_cost`, the `job_change_orders` table with RLS and audit, and an audit trigger for the financial inputs |
 
 Every script is idempotent, so re-running one is safe.
 
@@ -288,3 +289,37 @@ Admin → Commission settings. A job that already had dollar amounts when this
 migration ran had the equivalent rate derived from those dollars, so its total cost
 did not change. A job saved under an older default keeps its own rate forever, which
 is what protects approved and paid commission events from later rule changes.
+
+## Simplified job financials and change orders (Phase 3.8)
+
+The commission job financial model is now three inputs plus two rates:
+
+| Input | Column |
+| --- | --- |
+| Original contract price | `jobs.contract_revenue` |
+| Original costs | `jobs.original_cost` |
+| Change orders | `job_change_orders` (one row per change order) |
+| Burden % | `jobs.burden_percent`, defaulted from `commission_settings` |
+| Warranty contingency % | `jobs.warranty_contingency_percent`, defaulted likewise |
+
+`material_cost`, `labor_cost`, `subcontractor_cost` and `other_direct_cost` are
+**superseded**: the migration folded them into `original_cost` once (only where
+`original_cost` was still zero), and nothing reads or writes them afterwards, so
+there is a single source of truth for original cost. They are kept because dropping
+columns that historical rows were sized with is not a layout decision.
+
+Change orders are child records with a number/name, revenue, cost and an `active`
+flag. `jobs.change_order_revenue` and `jobs.change_order_cost` are derived roll-ups
+of the active rows, written by the canonical calculation after every change, so the
+aggregate can never disagree with the line items. Removing a change order sets
+`active = false` — the table has no DELETE policy or grant at all — because a
+deleted change order would silently rewrite the basis of commission that may already
+have been paid.
+
+RLS mirrors `jobs`: accounting, admin and CEO can read and write; the sales designer
+and their manager can read change orders for jobs they can already see; `anon` has no
+access. Writes are audited through the `job_change_orders_audit` trigger
+(`job_change_order_created` / `_updated`, where a removal shows up as `active`
+flipping to false), and changes to the original contract price, original cost and the
+two roll-ups are audited by `jobs_financial_inputs_audit` as
+`job_financial_inputs_changed`.
