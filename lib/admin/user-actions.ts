@@ -48,7 +48,8 @@ type DirectoryFields = {
   lastName: string | null;
   displayName: string | null;
   role: Role;
-  department: string | null;
+  departmentId: string | null;
+  businessRoleId: string | null;
   managerId: string | null;
 };
 
@@ -71,7 +72,11 @@ async function applyDirectoryFields(
     last_name: fields.lastName,
     display_name: fields.displayName,
     role: fields.role,
-    department: fields.department,
+    // The registry assignment is written, not the legacy text column: a database
+    // trigger keeps `department` equal to the assigned department's name, so the
+    // two can never disagree.
+    department_id: fields.departmentId,
+    business_role_id: fields.businessRoleId,
     manager_id: fields.managerId,
   };
 
@@ -118,7 +123,8 @@ export async function createPortalUser(
     lastName,
     displayName,
     role,
-    department,
+    departmentId,
+    businessRoleId,
     managerId,
   } = parsed.data;
 
@@ -140,7 +146,6 @@ export async function createPortalUser(
     first_name: firstName,
     last_name: lastName,
     display_name: displayName,
-    department,
   };
 
   const result =
@@ -172,7 +177,8 @@ export async function createPortalUser(
     lastName,
     displayName,
     role,
-    department,
+    departmentId,
+    businessRoleId,
     managerId,
   });
 
@@ -201,8 +207,17 @@ export async function linkExistingPortalUser(
   const parsed = portalUserLinkSchema.safeParse(formDataToObject(formData));
   if (!parsed.success) return validationErrorState(parsed.error);
 
-  const { authUserId, email, firstName, lastName, displayName, role, department, managerId } =
-    parsed.data;
+  const {
+    authUserId,
+    email,
+    firstName,
+    lastName,
+    displayName,
+    role,
+    departmentId,
+    businessRoleId,
+    managerId,
+  } = parsed.data;
 
   const supabase = await createSupabaseServerClient();
   const existing = await supabase
@@ -228,7 +243,8 @@ export async function linkExistingPortalUser(
     last_name: lastName,
     display_name: displayName,
     role,
-    department,
+    department_id: departmentId,
+    business_role_id: businessRoleId,
     manager_id: managerId,
   });
 
@@ -255,8 +271,17 @@ export async function updatePortalUser(
   const parsed = portalUserUpdateSchema.safeParse(formDataToObject(formData));
   if (!parsed.success) return validationErrorState(parsed.error);
 
-  const { profileId, firstName, lastName, displayName, role, department, managerId, active } =
-    parsed.data;
+  const {
+    profileId,
+    firstName,
+    lastName,
+    displayName,
+    role,
+    departmentId,
+    businessRoleId,
+    managerId,
+    active,
+  } = parsed.data;
 
   // An administrator can lock themselves out of the portal with one save. Both
   // cases need a second administrator, so refuse them here as well as in the UI.
@@ -282,7 +307,8 @@ export async function updatePortalUser(
       last_name: lastName,
       display_name: displayName,
       role,
-      department,
+      department_id: departmentId,
+      business_role_id: businessRoleId,
       manager_id: managerId,
       active,
     })
@@ -298,6 +324,6 @@ export async function updatePortalUser(
   revalidateUserDirectory();
 
   return successState(
-    "Portal user updated. Name, role, manager and status changes are recorded in the audit trail.",
+    "Portal user updated. Name, security role, department, business role, manager and status changes are recorded in the audit trail.",
   );
 }

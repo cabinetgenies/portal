@@ -38,7 +38,13 @@ export type ProfileRow = {
   last_name: string | null;
   display_name: string | null;
   role: ProfileRole;
+  /** Legacy free-text department. Superseded by `department_id`; kept in step by
+   *  the `profiles_sync_department_name` trigger whenever a department is assigned. */
   department: string | null;
+  /** Primary department assignment (registry). Experience, not authorization. */
+  department_id: string | null;
+  /** Primary business role assignment. Decides the role experience only. */
+  business_role_id: string | null;
   manager_id: string | null;
   active: boolean;
   created_at: string;
@@ -53,6 +59,8 @@ export type ProfileInsert = {
   display_name?: string | null;
   role?: ProfileRole;
   department?: string | null;
+  department_id?: string | null;
+  business_role_id?: string | null;
   manager_id?: string | null;
   active?: boolean;
   created_at?: string;
@@ -605,6 +613,306 @@ export type CommissionEventInsert = {
 
 export type CommissionEventUpdate = Partial<CommissionEventInsert>;
 
+// ---------------------------------------------------------------------------
+// Phase 5 — business architecture
+//
+// Departments and business roles are separate concepts: a department is where
+// somebody belongs, a business role is what their app experience looks like.
+// Business roles never widen authorization — profiles.role (the security role)
+// and Row Level Security stay authoritative.
+// ---------------------------------------------------------------------------
+
+export const KNOWLEDGE_ITEM_TYPES = [
+  "training",
+  "sop",
+  "role_expectation",
+  "playbook",
+  "form_reference",
+  "document",
+  "policy",
+  "decision_guide",
+] as const;
+
+export type KnowledgeItemType = (typeof KNOWLEDGE_ITEM_TYPES)[number];
+
+export const KNOWLEDGE_ITEM_STATUSES = ["draft", "published", "archived"] as const;
+
+export type KnowledgeItemStatus = (typeof KNOWLEDGE_ITEM_STATUSES)[number];
+
+export const MODULE_NAV_SECTIONS = ["primary", "support", "admin"] as const;
+
+export type ModuleNavSection = (typeof MODULE_NAV_SECTIONS)[number];
+
+export type DepartmentRow = {
+  id: string;
+  slug: string;
+  name: string;
+  description: string | null;
+  owner_profile_id: string | null;
+  active: boolean;
+  display_order: number;
+  created_at: string;
+  updated_at: string;
+};
+
+export type DepartmentInsert = {
+  id?: string;
+  slug: string;
+  name: string;
+  description?: string | null;
+  owner_profile_id?: string | null;
+  active?: boolean;
+  display_order?: number;
+  created_at?: string;
+  updated_at?: string;
+};
+
+export type DepartmentUpdate = Partial<DepartmentInsert>;
+
+export type BusinessRoleRow = {
+  id: string;
+  key: string;
+  name: string;
+  description: string | null;
+  department_id: string | null;
+  is_system: boolean;
+  active: boolean;
+  display_order: number;
+  created_at: string;
+  updated_at: string;
+};
+
+export type BusinessRoleInsert = {
+  id?: string;
+  key: string;
+  name: string;
+  description?: string | null;
+  department_id?: string | null;
+  is_system?: boolean;
+  active?: boolean;
+  display_order?: number;
+  created_at?: string;
+  updated_at?: string;
+};
+
+export type BusinessRoleUpdate = Partial<BusinessRoleInsert>;
+
+export type AppModuleRow = {
+  id: string;
+  key: string;
+  slug: string;
+  name: string;
+  description: string | null;
+  href: string;
+  icon_key: string;
+  nav_section: string;
+  is_active: boolean;
+  display_order: number;
+  created_at: string;
+  updated_at: string;
+};
+
+export type AppModuleInsert = {
+  id?: string;
+  key: string;
+  slug: string;
+  name: string;
+  description?: string | null;
+  href: string;
+  icon_key: string;
+  nav_section?: string;
+  is_active?: boolean;
+  display_order?: number;
+  created_at?: string;
+  updated_at?: string;
+};
+
+export type AppModuleUpdate = Partial<AppModuleInsert>;
+
+export type RoleModuleRow = {
+  id: string;
+  business_role_id: string;
+  module_id: string;
+  is_visible: boolean;
+  is_emphasized: boolean;
+  is_default_landing: boolean;
+  display_order: number;
+  created_at: string;
+  updated_at: string;
+};
+
+export type RoleModuleInsert = {
+  id?: string;
+  business_role_id: string;
+  module_id: string;
+  is_visible?: boolean;
+  is_emphasized?: boolean;
+  is_default_landing?: boolean;
+  display_order?: number;
+  created_at?: string;
+  updated_at?: string;
+};
+
+export type RoleModuleUpdate = Partial<RoleModuleInsert>;
+
+export type DashboardWidgetRow = {
+  id: string;
+  key: string;
+  name: string;
+  description: string | null;
+  component_key: string;
+  is_active: boolean;
+  display_order: number;
+  created_at: string;
+  updated_at: string;
+};
+
+export type DashboardWidgetInsert = {
+  id?: string;
+  key: string;
+  name: string;
+  description?: string | null;
+  component_key: string;
+  is_active?: boolean;
+  display_order?: number;
+  created_at?: string;
+  updated_at?: string;
+};
+
+export type DashboardWidgetUpdate = Partial<DashboardWidgetInsert>;
+
+export type RoleDashboardWidgetRow = {
+  id: string;
+  business_role_id: string;
+  widget_id: string;
+  is_visible: boolean;
+  span: number;
+  display_order: number;
+  created_at: string;
+  updated_at: string;
+};
+
+export type RoleDashboardWidgetInsert = {
+  id?: string;
+  business_role_id: string;
+  widget_id: string;
+  is_visible?: boolean;
+  span?: number;
+  display_order?: number;
+  created_at?: string;
+  updated_at?: string;
+};
+
+export type RoleDashboardWidgetUpdate = Partial<RoleDashboardWidgetInsert>;
+
+export type QuickActionRow = {
+  id: string;
+  key: string;
+  label: string;
+  description: string | null;
+  href: string | null;
+  action_key: string | null;
+  icon_key: string | null;
+  is_active: boolean;
+  display_order: number;
+  created_at: string;
+  updated_at: string;
+};
+
+export type QuickActionInsert = {
+  id?: string;
+  key: string;
+  label: string;
+  description?: string | null;
+  href?: string | null;
+  action_key?: string | null;
+  icon_key?: string | null;
+  is_active?: boolean;
+  display_order?: number;
+  created_at?: string;
+  updated_at?: string;
+};
+
+export type QuickActionUpdate = Partial<QuickActionInsert>;
+
+export type RoleQuickActionRow = {
+  id: string;
+  business_role_id: string;
+  quick_action_id: string;
+  is_visible: boolean;
+  display_order: number;
+  created_at: string;
+  updated_at: string;
+};
+
+export type RoleQuickActionInsert = {
+  id?: string;
+  business_role_id: string;
+  quick_action_id: string;
+  is_visible?: boolean;
+  display_order?: number;
+  created_at?: string;
+  updated_at?: string;
+};
+
+export type RoleQuickActionUpdate = Partial<RoleQuickActionInsert>;
+
+export type KnowledgeItemRow = {
+  id: string;
+  title: string;
+  slug: string;
+  type: string;
+  status: string;
+  department_id: string | null;
+  business_role_id: string | null;
+  description: string | null;
+  body: string | null;
+  reference_url: string | null;
+  tags: string[];
+  context_key: string | null;
+  created_by: string | null;
+  updated_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type KnowledgeItemInsert = {
+  id?: string;
+  title: string;
+  slug: string;
+  type: string;
+  status?: string;
+  department_id?: string | null;
+  business_role_id?: string | null;
+  description?: string | null;
+  body?: string | null;
+  reference_url?: string | null;
+  tags?: string[];
+  context_key?: string | null;
+  created_by?: string | null;
+  updated_by?: string | null;
+  created_at?: string;
+  updated_at?: string;
+};
+
+export type KnowledgeItemUpdate = Partial<KnowledgeItemInsert>;
+
+export type KnowledgeItemRoleRow = {
+  id: string;
+  knowledge_item_id: string;
+  business_role_id: string;
+  created_at: string;
+};
+
+export type KnowledgeItemRoleInsert = {
+  id?: string;
+  knowledge_item_id: string;
+  business_role_id: string;
+  created_at?: string;
+};
+
+export type KnowledgeItemRoleUpdate = Partial<KnowledgeItemRoleInsert>;
+
 export type Database = {
   public: {
     Tables: {
@@ -953,6 +1261,157 @@ export type Database = {
             columns: ["compensation_plan_version_id"];
             isOneToOne: false;
             referencedRelation: "compensation_plan_versions";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      departments: {
+        Row: DepartmentRow;
+        Insert: DepartmentInsert;
+        Update: DepartmentUpdate;
+        Relationships: [
+          {
+            foreignKeyName: "departments_owner_profile_id_fkey";
+            columns: ["owner_profile_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      business_roles: {
+        Row: BusinessRoleRow;
+        Insert: BusinessRoleInsert;
+        Update: BusinessRoleUpdate;
+        Relationships: [
+          {
+            foreignKeyName: "business_roles_department_id_fkey";
+            columns: ["department_id"];
+            isOneToOne: false;
+            referencedRelation: "departments";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      app_modules: {
+        Row: AppModuleRow;
+        Insert: AppModuleInsert;
+        Update: AppModuleUpdate;
+        Relationships: [];
+      };
+      role_modules: {
+        Row: RoleModuleRow;
+        Insert: RoleModuleInsert;
+        Update: RoleModuleUpdate;
+        Relationships: [
+          {
+            foreignKeyName: "role_modules_business_role_id_fkey";
+            columns: ["business_role_id"];
+            isOneToOne: false;
+            referencedRelation: "business_roles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "role_modules_module_id_fkey";
+            columns: ["module_id"];
+            isOneToOne: false;
+            referencedRelation: "app_modules";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      dashboard_widgets: {
+        Row: DashboardWidgetRow;
+        Insert: DashboardWidgetInsert;
+        Update: DashboardWidgetUpdate;
+        Relationships: [];
+      };
+      role_dashboard_widgets: {
+        Row: RoleDashboardWidgetRow;
+        Insert: RoleDashboardWidgetInsert;
+        Update: RoleDashboardWidgetUpdate;
+        Relationships: [
+          {
+            foreignKeyName: "role_dashboard_widgets_business_role_id_fkey";
+            columns: ["business_role_id"];
+            isOneToOne: false;
+            referencedRelation: "business_roles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "role_dashboard_widgets_widget_id_fkey";
+            columns: ["widget_id"];
+            isOneToOne: false;
+            referencedRelation: "dashboard_widgets";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      quick_actions: {
+        Row: QuickActionRow;
+        Insert: QuickActionInsert;
+        Update: QuickActionUpdate;
+        Relationships: [];
+      };
+      role_quick_actions: {
+        Row: RoleQuickActionRow;
+        Insert: RoleQuickActionInsert;
+        Update: RoleQuickActionUpdate;
+        Relationships: [
+          {
+            foreignKeyName: "role_quick_actions_business_role_id_fkey";
+            columns: ["business_role_id"];
+            isOneToOne: false;
+            referencedRelation: "business_roles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "role_quick_actions_quick_action_id_fkey";
+            columns: ["quick_action_id"];
+            isOneToOne: false;
+            referencedRelation: "quick_actions";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      knowledge_items: {
+        Row: KnowledgeItemRow;
+        Insert: KnowledgeItemInsert;
+        Update: KnowledgeItemUpdate;
+        Relationships: [
+          {
+            foreignKeyName: "knowledge_items_department_id_fkey";
+            columns: ["department_id"];
+            isOneToOne: false;
+            referencedRelation: "departments";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "knowledge_items_business_role_id_fkey";
+            columns: ["business_role_id"];
+            isOneToOne: false;
+            referencedRelation: "business_roles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      knowledge_item_roles: {
+        Row: KnowledgeItemRoleRow;
+        Insert: KnowledgeItemRoleInsert;
+        Update: KnowledgeItemRoleUpdate;
+        Relationships: [
+          {
+            foreignKeyName: "knowledge_item_roles_knowledge_item_id_fkey";
+            columns: ["knowledge_item_id"];
+            isOneToOne: false;
+            referencedRelation: "knowledge_items";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "knowledge_item_roles_business_role_id_fkey";
+            columns: ["business_role_id"];
+            isOneToOne: false;
+            referencedRelation: "business_roles";
             referencedColumns: ["id"];
           },
         ];

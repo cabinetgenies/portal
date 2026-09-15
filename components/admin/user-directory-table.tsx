@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import {
   UpdatePortalUserForm,
+  type AssignmentOption,
   type ManagerOption,
 } from "@/components/admin/user-forms";
 import { StatusBadge } from "@/components/ui/badge";
@@ -18,10 +19,14 @@ import { formatDate, formatText } from "@/lib/utils/format";
 export function UserDirectoryTable({
   users,
   managers,
+  departments,
+  businessRoles,
   currentUserId,
 }: {
   users: UserDirectoryRow[];
   managers: ManagerOption[];
+  departments: AssignmentOption[];
+  businessRoles: AssignmentOption[];
   currentUserId: string;
 }) {
   return (
@@ -32,6 +37,7 @@ export function UserDirectoryTable({
             <Th>Name</Th>
             <Th>Email</Th>
             <Th>Role</Th>
+            <Th>Business role</Th>
             <Th>Department</Th>
             <Th>Manager</Th>
             <Th>Status</Th>
@@ -57,7 +63,14 @@ export function UserDirectoryTable({
               </Td>
               <Td className="text-ink-muted">{formatText(user.email)}</Td>
               <Td className="text-ink-muted">{user.roleLabel}</Td>
-              <Td className="text-ink-muted">{formatText(user.department)}</Td>
+              <Td className="text-ink-muted">
+                {user.businessRoleName ?? (
+                  <span className="text-ink-subtle">
+                    Not assigned — using the security role&apos;s fallback
+                  </span>
+                )}
+              </Td>
+              <Td className="text-ink-muted">{formatText(user.departmentName)}</Td>
               <Td className="text-ink-muted">{formatText(user.managerName)}</Td>
               <Td>
                 <StatusBadge
@@ -96,7 +109,12 @@ export function UserDirectoryTable({
                     Manage
                   </summary>
                   <div className="mt-3 space-y-4 rounded-lg border border-line bg-surface-muted p-3">
-                    <UpdatePortalUserForm user={user} managers={managers} />
+                    <UpdatePortalUserForm
+                      user={user}
+                      managers={managers}
+                      departments={departments}
+                      businessRoles={businessRoles}
+                    />
                     <div className="flex flex-wrap items-center gap-2 border-t border-line pt-3">
                       <Link
                         href="/sales/commissions/employees"

@@ -10,6 +10,7 @@ import { Panel } from "@/components/ui/panel";
 import { listRecentUserAuditEvents, listUserDirectory } from "@/lib/admin/user-queries";
 import { requireCapability } from "@/lib/auth/dal";
 import { getServiceRoleKey } from "@/lib/env";
+import { loadExperienceCatalog } from "@/lib/experience/queries";
 import { formatDateTime } from "@/lib/utils/format";
 
 export const metadata = {
@@ -31,6 +32,22 @@ export default async function AdminUsersPage() {
     listUserDirectory(),
     listRecentUserAuditEvents(12),
   ]);
+  const catalog = await loadExperienceCatalog();
+
+  // Assignment options come from the registry, and only when the registry is the
+  // real one: the fallback catalog has no rows to write to, so the controls stay
+  // disabled rather than accepting an id that cannot be saved.
+  const editable = catalog.source === "database";
+  const departments = editable
+    ? catalog.departments
+        .filter((department) => department.active)
+        .map((department) => ({ id: department.id, name: department.name }))
+    : [];
+  const businessRoles = editable
+    ? catalog.businessRoles
+        .filter((role) => role.active)
+        .map((role) => ({ id: role.id, name: role.name }))
+    : [];
 
   // The service role key is server-only: the browser is told whether account
   // creation is available, never the credential itself.
@@ -81,7 +98,12 @@ export default async function AdminUsersPage() {
         title="Create a portal account"
         description="Accounts are created through the Supabase Auth Admin API from this server action. auth.users rows are never written with SQL, and the service role key stays on the server."
       >
-        <CreatePortalUserForm managers={managers} canProvision={canProvisionAccounts} />
+        <CreatePortalUserForm
+          managers={managers}
+          departments={departments}
+          businessRoles={businessRoles}
+          canProvision={canProvisionAccounts}
+        />
       </Panel>
 
       <Panel
@@ -89,7 +111,11 @@ export default async function AdminUsersPage() {
         title="Link an existing Supabase Auth user"
         description="For accounts that already exist in Supabase Auth. Creating the account in Supabase first is always a valid route — the sign-up trigger creates the portal profile — and this form covers the case where a profile row is missing."
       >
-        <LinkExistingPortalUserForm managers={managers} />
+        <LinkExistingPortalUserForm
+          managers={managers}
+          departments={departments}
+          businessRoles={businessRoles}
+        />
       </Panel>
 
       <Panel
@@ -107,6 +133,8 @@ export default async function AdminUsersPage() {
           <UserDirectoryTable
             users={directory}
             managers={managers}
+            departments={departments}
+            businessRoles={businessRoles}
             currentUserId={session.userId}
           />
         )}

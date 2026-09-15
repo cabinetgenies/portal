@@ -15,7 +15,10 @@ export type MutationContext =
   | "commission_event"
   | "draw"
   | "rollover"
-  | "user";
+  | "user"
+  | "department"
+  | "role_experience"
+  | "knowledge";
 
 /**
  * Turns database constraint failures into something a person can act on.
@@ -40,6 +43,12 @@ export function mutationErrorState(
                   ? "A portal profile with those details already exists. Check the email address, or configure the existing account in the directory."
                   : context === "audit"
                     ? "A final audit already exists for this job at that revision. Reload the page and try again."
+                  : context === "department"
+                    ? "A department with that name or slug already exists."
+                  : context === "role_experience"
+                    ? "That item is already assigned to this role."
+                  : context === "knowledge"
+                    ? "A knowledge item with that slug already exists."
                   : "A record with those details already exists.",
       );
     case "23P01":

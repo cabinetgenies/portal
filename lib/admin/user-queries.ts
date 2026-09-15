@@ -10,7 +10,9 @@ import {
 import { todayIso } from "@/lib/compensation/queries";
 import type {
   AuditEventRow,
+  BusinessRoleRow,
   CompensationPlanRow,
+  DepartmentRow,
   EmployeeCompensationAssignmentRow,
   EmployeeCompensationSettingsRow,
   EmployeeDrawPeriodRow,
@@ -48,8 +50,22 @@ export const listUserDirectory = cache(async function listUserDirectory(): Promi
         .order("effective_from", { ascending: false }),
     ]);
 
+  // The department and business-role registries come from the Phase 5 migration.
+  // If it has not been applied the read fails, and the directory still renders:
+  // assignment simply shows as unset, which is the truth.
+  const [departments, businessRoles] = await Promise.all([
+    supabase.from("departments").select("id, name, slug"),
+    supabase.from("business_roles").select("id, name, key"),
+  ]);
+
   return buildUserDirectoryRows({
     profiles: unwrap<ProfileRow[]>(profiles, "portal users"),
+    departments: departments.error
+      ? []
+      : ((departments.data ?? []) as Pick<DepartmentRow, "id" | "name" | "slug">[]),
+    businessRoles: businessRoles.error
+      ? []
+      : ((businessRoles.data ?? []) as Pick<BusinessRoleRow, "id" | "name" | "key">[]),
     compensationSettings: unwrap<EmployeeCompensationSettingsRow[]>(
       compensationSettings,
       "compensation eligibility",
@@ -147,3 +163,18 @@ export const listRecentUserAuditEvents = cache(
     });
   },
 );
+
+/**
+ * Active profiles as id/name pairs, for any picker that assigns a person:
+ * department owners today, future department-level approvers tomorrow. The same
+ * rows the user directory already shows, so this adds no new read access.
+ */
+export const listActiveProfileOptions = cache(async function listActiveProfileOptions(): Promise<
+  { id: string; name: string }[]
+> {
+  const directory = await listUserDirectory();
+
+  return directory
+    .filter((row) => row.active)
+    .map((row) => ({ id: row.profileId, name: row.name }));
+});

@@ -30,6 +30,9 @@ import { ROLES, ROLE_DESCRIPTIONS, ROLE_LABELS, type Role } from "@/lib/permissi
 
 export type ManagerOption = { id: string; name: string };
 
+/** A department or business role the account can be assigned to. */
+export type AssignmentOption = { id: string; name: string };
+
 const MODE_LABELS: Record<AccountProvisioningMode, string> = {
   invite: "Invite by email (recommended for employees)",
   password: "Create with a password (test accounts)",
@@ -92,15 +95,110 @@ function ManagerSelect({
   );
 }
 
+/**
+ * Primary department.
+ *
+ * The registry list, not free text: the department is now a row with a slug, a
+ * description and an owner, and the legacy free-text column is kept in step by the
+ * database. When the Phase 5 migration has not been applied, the list is empty and
+ * the control says so instead of pretending to save.
+ */
+function DepartmentSelect({
+  id,
+  departments,
+  defaultValue,
+  error,
+}: {
+  id: string;
+  departments: AssignmentOption[];
+  defaultValue?: string | null;
+  error?: string;
+}) {
+  return (
+    <Field
+      label="Department"
+      htmlFor={id}
+      hint="Where this person belongs. Separate from their business role, which decides their app experience."
+      error={error}
+    >
+      <Select
+        id={id}
+        name="departmentId"
+        defaultValue={defaultValue ?? ""}
+        disabled={departments.length === 0}
+      >
+        <option value="">No department assigned</option>
+        {departments.map((department) => (
+          <option key={department.id} value={department.id}>
+            {department.name}
+          </option>
+        ))}
+      </Select>
+    </Field>
+  );
+}
+
+/**
+ * Primary business role.
+ *
+ * This is what shapes the person's modules, dashboard and quick actions. It is
+ * deliberately next to the security role so the two are configured together and
+ * their difference is obvious.
+ */
+function BusinessRoleSelect({
+  id,
+  businessRoles,
+  defaultValue,
+  error,
+}: {
+  id: string;
+  businessRoles: AssignmentOption[];
+  defaultValue?: string | null;
+  error?: string;
+}) {
+  return (
+    <Field
+      label="Business role"
+      htmlFor={id}
+      hint="Their role experience: modules, dashboard widgets and quick actions. Never a permission — the security role above still decides what they may do."
+      error={error}
+    >
+      <Select
+        id={id}
+        name="businessRoleId"
+        defaultValue={defaultValue ?? ""}
+        disabled={businessRoles.length === 0}
+      >
+        <option value="">No business role assigned (fallback experience)</option>
+        {businessRoles.map((businessRole) => (
+          <option key={businessRole.id} value={businessRole.id}>
+            {businessRole.name}
+          </option>
+        ))}
+      </Select>
+    </Field>
+  );
+}
+
+function assignmentHint(departments: AssignmentOption[], businessRoles: AssignmentOption[]) {
+  if (departments.length > 0 && businessRoles.length > 0) return null;
+
+  return "Department and business-role assignment need the Phase 5 migration (supabase/migrations/20260915230000_business_architecture.sql). Until then each account falls back to its security role.";
+}
+
 // ---------------------------------------------------------------------------
 // Creating a portal account
 // ---------------------------------------------------------------------------
 
 export function CreatePortalUserForm({
   managers,
+  departments,
+  businessRoles,
   canProvision,
 }: {
   managers: ManagerOption[];
+  departments: AssignmentOption[];
+  businessRoles: AssignmentOption[];
   canProvision: boolean;
 }) {
   const [mode, setMode] = useState<AccountProvisioningMode>("invite");
@@ -175,18 +273,16 @@ export function CreatePortalUserForm({
         >
           <TextInput id="create-user-display" name="displayName" autoComplete="off" />
         </Field>
-        <Field
-          label="Department"
-          htmlFor="create-user-department"
-          error={fieldError(state, "department")}
-        >
-          <TextInput
-            id="create-user-department"
-            name="department"
-            placeholder="Sales"
-            autoComplete="off"
-          />
-        </Field>
+        <DepartmentSelect
+          id="create-user-department"
+          departments={departments}
+          error={fieldError(state, "departmentId")}
+        />
+        <BusinessRoleSelect
+          id="create-user-business-role"
+          businessRoles={businessRoles}
+          error={fieldError(state, "businessRoleId")}
+        />
         <RoleSelect id="create-user-role" error={fieldError(state, "role")} />
         <ManagerSelect id="create-user-manager" managers={managers} error={fieldError(state, "managerId")} />
         {mode === "password" ? (
@@ -215,6 +311,12 @@ export function CreatePortalUserForm({
         </span>
       </p>
 
+      {assignmentHint(departments, businessRoles) ? (
+        <p className="rounded-lg border border-dashed border-line-strong px-3 py-2.5 text-xs leading-5 text-ink-muted">
+          {assignmentHint(departments, businessRoles)}
+        </p>
+      ) : null}
+
       <div className="flex flex-wrap items-center gap-3">
         <SubmitButton
           label={mode === "invite" ? "Invite portal user" : "Create portal user"}
@@ -233,8 +335,12 @@ export function CreatePortalUserForm({
 
 export function LinkExistingPortalUserForm({
   managers,
+  departments,
+  businessRoles,
 }: {
   managers: ManagerOption[];
+  departments: AssignmentOption[];
+  businessRoles: AssignmentOption[];
 }) {
   const [state, formAction] = useActionState(linkExistingPortalUser, undefined);
 
@@ -281,18 +387,16 @@ export function LinkExistingPortalUserForm({
         >
           <TextInput id="link-user-display" name="displayName" autoComplete="off" />
         </Field>
-        <Field
-          label="Department"
-          htmlFor="link-user-department"
-          error={fieldError(state, "department")}
-        >
-          <TextInput
-            id="link-user-department"
-            name="department"
-            placeholder="Sales"
-            autoComplete="off"
-          />
-        </Field>
+        <DepartmentSelect
+          id="link-user-department"
+          departments={departments}
+          error={fieldError(state, "departmentId")}
+        />
+        <BusinessRoleSelect
+          id="link-user-business-role"
+          businessRoles={businessRoles}
+          error={fieldError(state, "businessRoleId")}
+        />
         <RoleSelect id="link-user-role" defaultValue="employee" error={fieldError(state, "role")} />
         <ManagerSelect id="link-user-manager" managers={managers} error={fieldError(state, "managerId")} />
       </div>
@@ -321,9 +425,13 @@ export function LinkExistingPortalUserForm({
 export function UpdatePortalUserForm({
   user,
   managers,
+  departments,
+  businessRoles,
 }: {
   user: UserDirectoryRow;
   managers: ManagerOption[];
+  departments: AssignmentOption[];
+  businessRoles: AssignmentOption[];
 }) {
   const [state, formAction] = useActionState(updatePortalUser, undefined);
   const id = (field: string) => `user-${user.profileId}-${field}`;
@@ -361,14 +469,18 @@ export function UpdatePortalUserForm({
             autoComplete="off"
           />
         </Field>
-        <Field label="Department" htmlFor={id("department")} error={fieldError(state, "department")}>
-          <TextInput
-            id={id("department")}
-            name="department"
-            defaultValue={user.department ?? ""}
-            autoComplete="off"
-          />
-        </Field>
+        <DepartmentSelect
+          id={id("department")}
+          departments={departments}
+          defaultValue={user.departmentId}
+          error={fieldError(state, "departmentId")}
+        />
+        <BusinessRoleSelect
+          id={id("business-role")}
+          businessRoles={businessRoles}
+          defaultValue={user.businessRoleId}
+          error={fieldError(state, "businessRoleId")}
+        />
         <RoleSelect id={id("role")} defaultValue={user.role} error={fieldError(state, "role")} />
         <ManagerSelect
           id={id("manager")}
@@ -388,6 +500,12 @@ export function UpdatePortalUserForm({
           </Select>
         </Field>
       </div>
+
+      {assignmentHint(departments, businessRoles) ? (
+        <p className="rounded-lg border border-dashed border-line-strong px-3 py-2.5 text-xs leading-5 text-ink-muted">
+          {assignmentHint(departments, businessRoles)}
+        </p>
+      ) : null}
 
       <div className="flex flex-wrap items-center gap-3">
         <SubmitButton label="Save user" pendingLabel="Saving…" size="sm" />

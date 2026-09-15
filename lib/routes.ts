@@ -42,6 +42,20 @@ export const LEGACY_COMMISSION_REDIRECTS = [
 ] as const;
 
 /**
+ * Where the Phase 5 "preferred" project paths resolve.
+ *
+ * The phase document names /sales/projects and /sales/projects/[id]. The portal
+ * already has canonical routes for both projects and jobs, so rather than standing
+ * up a second project list that would drift from the first, the preferred paths
+ * redirect to them: `/projects` is the module's own route, and a project's detail
+ * is the job record under commissions, where its commission context lives.
+ */
+export const SALES_PROJECT_REDIRECTS = [
+  { source: "/sales/projects", destination: "/projects" },
+  { source: "/sales/projects/:jobId", destination: "/sales/commissions/jobs/:jobId" },
+] as const;
+
+/**
  * True when a navigation item should show as the current section.
  *
  * A deeper path keeps its parent highlighted — `/sales/commissions/jobs` marks

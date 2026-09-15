@@ -26,6 +26,8 @@ function profile(overrides: Partial<ProfileRow> & { id: string }): ProfileRow {
     display_name: null,
     role: "employee",
     department: null,
+    department_id: null,
+    business_role_id: null,
     manager_id: null,
     active: true,
     created_at: "2026-01-01T00:00:00Z",
@@ -85,6 +87,8 @@ function drawPeriod(
 function sources(overrides: Partial<UserDirectorySources> = {}): UserDirectorySources {
   return {
     profiles: [],
+    departments: [],
+    businessRoles: [],
     compensationSettings: [],
     assignments: [],
     plans: [],
@@ -206,6 +210,51 @@ test("active accounts are listed first, then alphabetically", () => {
     rows.map((row) => row.name),
     ["Adam", "Bea", "Zoe"],
   );
+});
+
+test("the directory shows the business role beside the security role", () => {
+  const rows = buildUserDirectoryRows(
+    sources({
+      profiles: [
+        profile({
+          id: "designer",
+          first_name: "Dana",
+          role: "employee",
+          business_role_id: "role-sales-designer",
+          department_id: "dept-sales",
+          department: "Sales",
+        }),
+        profile({ id: "unassigned", first_name: "Sam", role: "employee" }),
+      ],
+      departments: [{ id: "dept-sales", name: "Sales", slug: "sales" }],
+      businessRoles: [{ id: "role-sales-designer", name: "Sales Designer", key: "sales_designer" }],
+    }),
+  );
+
+  const designer = rows.find((row) => row.profileId === "designer");
+  const unassigned = rows.find((row) => row.profileId === "unassigned");
+
+  assert.equal(designer?.role, "employee");
+  assert.equal(designer?.businessRoleName, "Sales Designer");
+  assert.equal(designer?.businessRoleKey, "sales_designer");
+  assert.equal(designer?.departmentId, "dept-sales");
+  assert.equal(designer?.departmentName, "Sales");
+
+  // No business role is a normal state while assignment is rolled out: the shell
+  // falls back to the security role and says so.
+  assert.equal(unassigned?.businessRoleName, null);
+  assert.equal(unassigned?.departmentName, null);
+});
+
+test("a legacy free-text department still displays when no registry department is assigned", () => {
+  const rows = buildUserDirectoryRows(
+    sources({
+      profiles: [profile({ id: "legacy", first_name: "Lee", department: "Sales" })],
+    }),
+  );
+
+  assert.equal(rows[0].departmentId, null);
+  assert.equal(rows[0].departmentName, "Sales");
 });
 
 test("status and draw labels read as sentences", () => {

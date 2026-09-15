@@ -337,6 +337,8 @@ function profile(overrides: Partial<ProfileRow> & { id: string }): ProfileRow {
     display_name: null,
     role: "employee",
     department: null,
+    department_id: null,
+    business_role_id: null,
     manager_id: null,
     active: true,
     created_at: "2026-01-01T00:00:00Z",

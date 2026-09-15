@@ -187,3 +187,30 @@ export function SpinnerIcon({ className }: IconProps) {
     </Icon>
   );
 }
+
+export function InventoryIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M3.5 7.6 12 3.5l8.5 4.1v8.8L12 20.5l-8.5-4.1Z" />
+      <path d="M3.5 7.6 12 11.7l8.5-4.1M12 11.7v8.8" />
+    </Icon>
+  );
+}
+
+export function OperationsIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M14.8 3.6a4.6 4.6 0 0 0-4 6.9L3.9 17.4l2.7 2.7 6.9-6.9a4.6 4.6 0 0 0 6.9-4 4.7 4.7 0 0 0-.2-1.3l-2.9 2.9-2.4-2.4 2.9-2.9a4.7 4.7 0 0 0-3-.9Z" />
+    </Icon>
+  );
+}
+
+export function KnowledgeIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M5.5 4.5h6.2a2.6 2.6 0 0 1 2.6 2.6v12.4a2 2 0 0 0-2-2H5.5Z" />
+      <path d="M18.5 4.5h-4.2v13a2 2 0 0 1 2-2h2.2Z" />
+      <path d="M8.4 8.6h3.3M8.4 11.8h3.3" />
+    </Icon>
+  );
+}

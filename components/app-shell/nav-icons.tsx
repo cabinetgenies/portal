@@ -5,6 +5,9 @@ import {
   AdminIcon,
   CommissionsIcon,
   DashboardIcon,
+  InventoryIcon,
+  KnowledgeIcon,
+  OperationsIcon,
   ProductionIcon,
   ProjectsIcon,
   ReportsIcon,
@@ -25,4 +28,7 @@ export const NAV_ICONS: Record<NavIconKey, ComponentType<IconProps>> = {
   people: UsersIcon,
   requests: ActivityIcon,
   company: ProjectsIcon,
+  inventory: InventoryIcon,
+  operations: OperationsIcon,
+  knowledge: KnowledgeIcon,
 };

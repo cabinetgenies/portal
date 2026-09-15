@@ -4,7 +4,8 @@ import { AppShell } from "@/components/app-shell/app-shell";
 import { ConfigurationNotice } from "@/components/configuration-notice/configuration-notice";
 import { requireSession } from "@/lib/auth/dal";
 import { displayNameFor, initialsFor } from "@/lib/auth/identity";
-import { navigationForCapabilities } from "@/lib/permissions/navigation";
+import { getSessionExperience } from "@/lib/experience/queries";
+import { navigationForExperience } from "@/lib/permissions/navigation";
 import { ROLE_LABELS } from "@/lib/permissions/roles";
 
 /**
@@ -31,13 +32,22 @@ export default async function AuthenticatedLayout({
   const session = await requireSession();
   const name = displayNameFor(session.profile, session.email);
 
+  // Navigation comes from the resolved role experience: configuration plus the
+  // signed-in person's capabilities. Hiding a module here is never a permission —
+  // every route re-checks server-side and Postgres enforces RLS.
+  const state = await getSessionExperience();
+  const experience = state?.experience ?? null;
+
   return (
     <AppShell
-      sections={navigationForCapabilities(session.capabilities)}
+      sections={experience ? navigationForExperience(experience) : []}
       user={{
         name,
         email: session.email,
-        roleLabel: ROLE_LABELS[session.role],
+        // The business role is what the app experience reflects; the security
+        // role stays visible under Admin → Users.
+        roleLabel: experience?.roleName ?? ROLE_LABELS[session.role],
+        departmentName: experience?.departmentName ?? null,
         initials: initialsFor(name),
       }}
     >

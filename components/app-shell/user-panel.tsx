@@ -10,6 +10,8 @@ export type SessionUser = {
   name: string;
   email: string | null;
   roleLabel: string;
+  /** Business-role department, when the profile has one assigned. */
+  departmentName?: string | null;
   initials: string;
 };
 
@@ -76,9 +78,11 @@ export function UserPanel({
             "truncate text-xs",
             tone === "dark" ? "text-white/50" : "text-ink-subtle",
           )}
-          title={user.email ?? undefined}
+          title={[user.roleLabel, user.departmentName, user.email]
+            .filter(Boolean)
+            .join(" · ")}
         >
-          {user.roleLabel}
+          {user.departmentName ? `${user.roleLabel} · ${user.departmentName}` : user.roleLabel}
         </p>
       </div>
       <form action={signOutAction}>

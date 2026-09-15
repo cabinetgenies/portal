@@ -23,8 +23,22 @@ generalise the shared structures for future Sales Manager compensation (see
 | 14 | `migrations/20260915200000_sales_designer_commission_bands_v2.sql` | new Sales Designer band schedule as version `v2` of the production plan: seven fixed GP bands (0/5/10/15/20/25/30%) with inclusive lower and exclusive upper bounds, and the previous version closed the day before it starts |
 | 15 | `migrations/20260915210000_remove_project_categories_from_commissions.sql` | project categories leave the commission system: every job is detached from its category and `jobs.project_category_id` becomes nullable; the column and table are marked dormant |
 | 16 | `migrations/20260915220000_open_below_thirty_band.sql` | correction to v2: the "Below 30%" band becomes open-ended on the lower side (null lower bound), so negative and zero GP resolve to it explicitly at 0% |
+| 17 | `migrations/20260915230000_business_architecture.sql` | departments, business roles, `profiles.department_id` / `profiles.business_role_id` with the department-name sync trigger and the extended profile audit, the module registry, role module experience, the dashboard widget and quick action registries, and the knowledge metadata foundation |
+| 18 | `migrations/20260915230100_business_architecture_rls.sql` | Row Level Security for the business architecture: configuration is readable by signed-in users, writable by admin/CEO only, and published knowledge is readable by everyone |
+| 19 | `migrations/20260915230200_seed_business_architecture.sql` | the ten official departments, the twelve business roles, the module registry, the widget and quick action catalogs, and one default experience per role |
 
 Every script is idempotent, so re-running one is safe.
+
+Migrations 17–19 are Phase 5 (role experience architecture). They are additive:
+nothing is truncated, deleted or dropped, no commission table is touched, and the
+existing security roles stay authoritative. Role configuration decides what is
+*shown*; capabilities and RLS decide what is *allowed*. See
+[docs/role-experience-architecture.md](../docs/role-experience-architecture.md).
+
+The seed reconciles the catalog rows from the code registry on every run, but it
+never overwrites an administrator's role experience: the `role_modules`,
+`role_dashboard_widgets` and `role_quick_actions` inserts are
+`on conflict do nothing`, so re-running the migration cannot undo configured work.
 
 The commission engine is documented in
 [docs/commission-engine.md](../docs/commission-engine.md).

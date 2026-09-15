@@ -2,6 +2,8 @@ import { displayNameFor } from "@/lib/auth/identity";
 import { normalizeRole, roleLabel, type Role } from "@/lib/permissions/roles";
 import type {
   CompensationPlanRow,
+  BusinessRoleRow,
+  DepartmentRow,
   EmployeeCompensationAssignmentRow,
   EmployeeCompensationSettingsRow,
   EmployeeDrawPeriodRow,
@@ -26,6 +28,13 @@ export type UserDirectoryRow = {
   email: string | null;
   role: Role;
   roleLabel: string;
+  /** Security role assignment, plus the business role that shapes the experience. */
+  businessRoleId: string | null;
+  businessRoleName: string | null;
+  businessRoleKey: string | null;
+  /** Primary department: the registry assignment, falling back to the legacy text. */
+  departmentId: string | null;
+  departmentName: string | null;
   department: string | null;
   managerId: string | null;
   managerName: string | null;
@@ -42,6 +51,10 @@ export type UserDirectoryRow = {
 
 export type UserDirectorySources = {
   profiles: readonly ProfileRow[];
+  /** Department registry, for resolving `department_id` to a name. */
+  departments: readonly Pick<DepartmentRow, "id" | "name" | "slug">[];
+  /** Business role registry, for resolving `business_role_id` to a name. */
+  businessRoles: readonly Pick<BusinessRoleRow, "id" | "name" | "key">[];
   compensationSettings: readonly EmployeeCompensationSettingsRow[];
   assignments: readonly EmployeeCompensationAssignmentRow[];
   plans: readonly Pick<CompensationPlanRow, "id" | "name" | "participant_kind">[];
@@ -96,6 +109,8 @@ export function openDrawPeriod(
 
 export function buildUserDirectoryRows({
   profiles,
+  departments,
+  businessRoles,
   compensationSettings,
   assignments,
   plans,
@@ -104,12 +119,20 @@ export function buildUserDirectoryRows({
 }: UserDirectorySources): UserDirectoryRow[] {
   const profileById = new Map(profiles.map((profile) => [profile.id, profile]));
   const planById = new Map(plans.map((plan) => [plan.id, plan]));
+  const departmentById = new Map(departments.map((department) => [department.id, department]));
+  const businessRoleById = new Map(businessRoles.map((businessRole) => [businessRole.id, businessRole]));
 
   const rows = profiles.map<UserDirectoryRow>((profile) => {
     const settings = compensationSettings.find((row) => row.profile_id === profile.id);
     const assignment = assignmentInForceAt(assignments, profile.id, today);
     const plan = assignment ? planById.get(assignment.compensation_plan_id) : undefined;
     const manager = profile.manager_id ? profileById.get(profile.manager_id) : undefined;
+    const department = profile.department_id
+      ? departmentById.get(profile.department_id)
+      : undefined;
+    const businessRole = profile.business_role_id
+      ? businessRoleById.get(profile.business_role_id)
+      : undefined;
     const onDraw = drawPeriodAt(drawPeriods, profile.id, today);
     // The open period is the actionable one: it is what "end draw period" closes.
     const openPeriod = openDrawPeriod(drawPeriods, profile.id);
@@ -125,6 +148,15 @@ export function buildUserDirectoryRows({
       email: profile.email,
       role: normalizeRole(profile.role),
       roleLabel: roleLabel(profile.role),
+      // Both role models are shown side by side on purpose: the security role is
+      // what they may do, the business role is what their app looks like.
+      businessRoleId: profile.business_role_id,
+      businessRoleName: businessRole?.name ?? null,
+      businessRoleKey: businessRole?.key ?? null,
+      // The registry name wins when a department is assigned; the free-text column
+      // is what a profile configured before the registry still carries.
+      departmentId: profile.department_id,
+      departmentName: department?.name ?? profile.department,
       department: profile.department,
       managerId: profile.manager_id,
       managerName: manager ? displayNameFor(manager, manager.email) : null,

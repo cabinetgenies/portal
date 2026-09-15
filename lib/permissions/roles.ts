@@ -136,3 +136,19 @@ export function can(role: Role, capability: Capability): boolean {
 export function isAdministrativeRole(role: Role): boolean {
   return can(role, "administer:portal");
 }
+
+/** Every capability any security role can hold, for read-only previews. */
+export const ALL_CAPABILITIES: readonly Capability[] = Array.from(
+  new Set(ROLES.flatMap((role) => CAPABILITIES_BY_ROLE[role])),
+);
+
+/**
+ * The security roles that hold a capability.
+ *
+ * Used by the role experience preview's permission summary: a business role does
+ * not imply a security role, so the honest answer to "who can actually reach
+ * this?" is the list of security roles that carry the capability.
+ */
+export function securityRolesForCapability(capability: Capability): readonly Role[] {
+  return ROLES.filter((role) => CAPABILITIES_BY_ROLE[role].includes(capability));
+}

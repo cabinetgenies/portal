@@ -52,6 +52,32 @@ const managerField = z
     message: "Choose a manager from the list.",
   });
 
+/**
+ * Department and business role assignment.
+ *
+ * Both are optional: assignment is rolled out, and a profile without a business
+ * role still resolves a sensible experience from its security role. When one is
+ * supplied it has to be a real row, which is what the UUID check enforces before
+ * Postgres checks the foreign key again.
+ */
+const departmentField = z
+  .string()
+  .trim()
+  .optional()
+  .transform((value) => (value && value.length > 0 ? value : null))
+  .refine((value) => value === null || UUID_PATTERN.test(value), {
+    message: "Choose a department from the list.",
+  });
+
+const businessRoleField = z
+  .string()
+  .trim()
+  .optional()
+  .transform((value) => (value && value.length > 0 ? value : null))
+  .refine((value) => value === null || UUID_PATTERN.test(value), {
+    message: "Choose a business role from the list.",
+  });
+
 const booleanField = (label: string) =>
   z.preprocess((value) => {
     if (typeof value === "boolean") return value;
@@ -80,6 +106,8 @@ export const portalUserInviteSchema = z
     displayName: optionalText("Display name", 120),
     role: roleField,
     department: optionalText("Department", 80),
+    departmentId: departmentField,
+    businessRoleId: businessRoleField,
     managerId: managerField,
   })
   .superRefine((value, ctx) => {
@@ -125,6 +153,8 @@ export const portalUserLinkSchema = z.object({
   displayName: optionalText("Display name", 120),
   role: roleField,
   department: optionalText("Department", 80),
+  departmentId: departmentField,
+  businessRoleId: businessRoleField,
   managerId: managerField,
 });
 
@@ -145,6 +175,8 @@ export const portalUserUpdateSchema = z
     displayName: optionalText("Display name", 120),
     role: roleField,
     department: optionalText("Department", 80),
+    departmentId: departmentField,
+    businessRoleId: businessRoleField,
     managerId: managerField,
     active: booleanField("Active"),
   })
