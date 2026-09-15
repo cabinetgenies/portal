@@ -913,6 +913,470 @@ export type KnowledgeItemRoleInsert = {
 
 export type KnowledgeItemRoleUpdate = Partial<KnowledgeItemRoleInsert>;
 
+// ---------------------------------------------------------------------------
+// Performance & Leadership domain types
+// ---------------------------------------------------------------------------
+
+export const MEASURABLE_SCOPES = ["company", "department", "employee"] as const;
+export type MeasurableScope = (typeof MEASURABLE_SCOPES)[number];
+
+export const MEASURABLE_FREQUENCIES = ["weekly", "monthly"] as const;
+export type MeasurableFrequency = (typeof MEASURABLE_FREQUENCIES)[number];
+
+export const MEASURABLE_STATUSES = ["on_track", "off_track", "no_data"] as const;
+export type MeasurableStatus = (typeof MEASURABLE_STATUSES)[number];
+
+export type PerformanceMeasurableRow = {
+  id: string;
+  name: string;
+  scope: string;
+  owner_profile_id: string | null;
+  department_id: string | null;
+  employee_id: string | null;
+  target: number | null;
+  unit: string | null;
+  frequency: string;
+  current_value: number | null;
+  status: string;
+  notes: string | null;
+  knowledge_item_id: string | null;
+  active: boolean;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type PerformanceMeasurableInsert = {
+  id?: string;
+  name: string;
+  scope: string;
+  owner_profile_id?: string | null;
+  department_id?: string | null;
+  employee_id?: string | null;
+  target?: number | null;
+  unit?: string | null;
+  frequency?: string;
+  current_value?: number | null;
+  status?: string;
+  notes?: string | null;
+  knowledge_item_id?: string | null;
+  active?: boolean;
+  created_by?: string | null;
+  created_at?: string;
+  updated_at?: string;
+};
+
+export type PerformanceMeasurableUpdate = Partial<PerformanceMeasurableInsert>;
+
+export type PerformanceScorecardEntryRow = {
+  id: string;
+  measurable_id: string;
+  period_start: string;
+  period_end: string;
+  target_snapshot: number | null;
+  actual_value: number | null;
+  status: string;
+  entered_by: string | null;
+  entered_at: string;
+  notes: string | null;
+};
+
+export type PerformanceScorecardEntryInsert = {
+  id?: string;
+  measurable_id: string;
+  period_start: string;
+  period_end: string;
+  target_snapshot?: number | null;
+  actual_value?: number | null;
+  status?: string;
+  entered_by?: string | null;
+  entered_at?: string;
+  notes?: string | null;
+};
+
+export type PerformanceScorecardEntryUpdate =
+  Partial<PerformanceScorecardEntryInsert>;
+
+export const PRIORITY_STATUSES = [
+  "not_started",
+  "on_track",
+  "at_risk",
+  "off_track",
+  "complete",
+] as const;
+export type PriorityStatus = (typeof PRIORITY_STATUSES)[number];
+
+export type QuarterlyPriorityRow = {
+  id: string;
+  title: string;
+  description: string | null;
+  owner_profile_id: string | null;
+  department_id: string | null;
+  quarter: number;
+  year: number;
+  due_date: string | null;
+  status: string;
+  percent_complete: number;
+  notes: string | null;
+  knowledge_item_id: string | null;
+  created_by: string | null;
+  created_at: string;
+  completed_at: string | null;
+};
+
+export type QuarterlyPriorityInsert = {
+  id?: string;
+  title: string;
+  description?: string | null;
+  owner_profile_id?: string | null;
+  department_id?: string | null;
+  quarter: number;
+  year: number;
+  due_date?: string | null;
+  status?: string;
+  percent_complete?: number;
+  notes?: string | null;
+  knowledge_item_id?: string | null;
+  created_by?: string | null;
+  created_at?: string;
+  completed_at?: string | null;
+};
+
+export type QuarterlyPriorityUpdate = Partial<QuarterlyPriorityInsert>;
+
+export type MeetingTemplateRow = {
+  id: string;
+  name: string;
+  meeting_type: string;
+  team_department_id: string | null;
+  cadence: string;
+  active: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type MeetingTemplateInsert = {
+  id?: string;
+  name: string;
+  meeting_type: string;
+  team_department_id?: string | null;
+  cadence?: string;
+  active?: boolean;
+  created_at?: string;
+  updated_at?: string;
+};
+
+export type MeetingTemplateUpdate = Partial<MeetingTemplateInsert>;
+
+export type MeetingTemplateParticipantRow = {
+  id: string;
+  meeting_template_id: string;
+  profile_id: string;
+  created_at: string;
+};
+
+export type MeetingTemplateParticipantInsert = {
+  id?: string;
+  meeting_template_id: string;
+  profile_id: string;
+  created_at?: string;
+};
+
+export type MeetingTemplateParticipantUpdate =
+  Partial<MeetingTemplateParticipantInsert>;
+
+export type MeetingAgendaSectionRow = {
+  id: string;
+  meeting_template_id: string;
+  section_key: string;
+  title: string;
+  display_order: number;
+  created_at: string;
+  updated_at: string;
+};
+
+export type MeetingAgendaSectionInsert = {
+  id?: string;
+  meeting_template_id: string;
+  section_key: string;
+  title: string;
+  display_order?: number;
+  created_at?: string;
+  updated_at?: string;
+};
+
+export type MeetingAgendaSectionUpdate = Partial<MeetingAgendaSectionInsert>;
+
+export type MeetingRow = {
+  id: string;
+  meeting_template_id: string | null;
+  meeting_type: string;
+  team_department_id: string | null;
+  meeting_date: string;
+  status: string;
+  scorecard_review: string | null;
+  priority_review: string | null;
+  notes: string | null;
+  completed_at: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type MeetingInsert = {
+  id?: string;
+  meeting_template_id?: string | null;
+  meeting_type: string;
+  team_department_id?: string | null;
+  meeting_date: string;
+  status?: string;
+  scorecard_review?: string | null;
+  priority_review?: string | null;
+  notes?: string | null;
+  completed_at?: string | null;
+  created_by?: string | null;
+  created_at?: string;
+  updated_at?: string;
+};
+
+export type MeetingUpdate = Partial<MeetingInsert>;
+
+export type MeetingParticipantRow = {
+  id: string;
+  meeting_id: string;
+  profile_id: string;
+  created_at: string;
+};
+
+export type MeetingParticipantInsert = {
+  id?: string;
+  meeting_id: string;
+  profile_id: string;
+  created_at?: string;
+};
+
+export type MeetingParticipantUpdate = Partial<MeetingParticipantInsert>;
+
+export type MeetingHeadlineRow = {
+  id: string;
+  meeting_id: string | null;
+  title: string;
+  note: string | null;
+  type: string | null;
+  department_id: string | null;
+  created_by: string | null;
+  created_at: string;
+};
+
+export type MeetingHeadlineInsert = {
+  id?: string;
+  meeting_id?: string | null;
+  title: string;
+  note?: string | null;
+  type?: string | null;
+  department_id?: string | null;
+  created_by?: string | null;
+  created_at?: string;
+};
+
+export type MeetingHeadlineUpdate = Partial<MeetingHeadlineInsert>;
+
+export const ISSUE_PRIORITIES = ["low", "normal", "high", "critical"] as const;
+export type IssuePriority = (typeof ISSUE_PRIORITIES)[number];
+
+export const ISSUE_STATUSES = ["open", "discussing", "resolved", "closed"] as const;
+export type IssueStatus = (typeof ISSUE_STATUSES)[number];
+
+export const ISSUE_SOURCES = [
+  "manual",
+  "meeting",
+  "scorecard",
+  "quarterly_priority",
+  "review",
+] as const;
+export type IssueSource = (typeof ISSUE_SOURCES)[number];
+
+export type IssueRow = {
+  id: string;
+  title: string;
+  description: string | null;
+  department_id: string | null;
+  owner_profile_id: string | null;
+  priority: string;
+  status: string;
+  source: string;
+  source_id: string | null;
+  meeting_id: string | null;
+  resolved_at: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type IssueInsert = {
+  id?: string;
+  title: string;
+  description?: string | null;
+  department_id?: string | null;
+  owner_profile_id?: string | null;
+  priority?: string;
+  status?: string;
+  source?: string;
+  source_id?: string | null;
+  meeting_id?: string | null;
+  resolved_at?: string | null;
+  created_by?: string | null;
+  created_at?: string;
+  updated_at?: string;
+};
+
+export type IssueUpdate = Partial<IssueInsert>;
+
+export type IssueNoteRow = {
+  id: string;
+  issue_id: string;
+  author_profile_id: string | null;
+  body: string;
+  created_at: string;
+};
+
+export type IssueNoteInsert = {
+  id?: string;
+  issue_id: string;
+  author_profile_id?: string | null;
+  body: string;
+  created_at?: string;
+};
+
+export type IssueNoteUpdate = Partial<IssueNoteInsert>;
+
+export const ACTION_STATUSES = ["open", "complete", "cancelled"] as const;
+export type ActionStatus = (typeof ACTION_STATUSES)[number];
+
+export const ACTION_SOURCES = [
+  "manual",
+  "meeting",
+  "issue",
+  "review",
+  "quarterly_priority",
+] as const;
+export type ActionSource = (typeof ACTION_SOURCES)[number];
+
+export type ActionItemRow = {
+  id: string;
+  title: string;
+  description: string | null;
+  owner_profile_id: string | null;
+  department_id: string | null;
+  source: string;
+  source_id: string | null;
+  meeting_id: string | null;
+  due_date: string | null;
+  status: string;
+  completed_at: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ActionItemInsert = {
+  id?: string;
+  title: string;
+  description?: string | null;
+  owner_profile_id?: string | null;
+  department_id?: string | null;
+  source?: string;
+  source_id?: string | null;
+  meeting_id?: string | null;
+  due_date?: string | null;
+  status?: string;
+  completed_at?: string | null;
+  created_by?: string | null;
+  created_at?: string;
+  updated_at?: string;
+};
+
+export type ActionItemUpdate = Partial<ActionItemInsert>;
+
+export type DecisionRow = {
+  id: string;
+  title: string;
+  decision: string;
+  issue_id: string | null;
+  meeting_id: string | null;
+  department_id: string | null;
+  decided_by: string | null;
+  decided_at: string;
+  created_at: string;
+};
+
+export type DecisionInsert = {
+  id?: string;
+  title: string;
+  decision: string;
+  issue_id?: string | null;
+  meeting_id?: string | null;
+  department_id?: string | null;
+  decided_by?: string | null;
+  decided_at?: string;
+  created_at?: string;
+};
+
+export type DecisionUpdate = Partial<DecisionInsert>;
+
+export const REVIEW_STATUSES = [
+  "not_started",
+  "in_progress",
+  "employee_input",
+  "manager_review",
+  "complete",
+] as const;
+export type ReviewStatus = (typeof REVIEW_STATUSES)[number];
+
+export type PerformanceReviewRow = {
+  id: string;
+  employee_id: string;
+  manager_id: string | null;
+  period_start: string | null;
+  period_end: string | null;
+  status: string;
+  scheduled_date: string | null;
+  completed_date: string | null;
+  manager_notes: string | null;
+  employee_notes: string | null;
+  overall_summary: string | null;
+  development_actions: string | null;
+  measurable_snapshot_ids: string[];
+  priority_snapshot_ids: string[];
+  knowledge_item_snapshot_ids: string[];
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type PerformanceReviewInsert = {
+  id?: string;
+  employee_id: string;
+  manager_id?: string | null;
+  period_start?: string | null;
+  period_end?: string | null;
+  status?: string;
+  scheduled_date?: string | null;
+  completed_date?: string | null;
+  manager_notes?: string | null;
+  employee_notes?: string | null;
+  overall_summary?: string | null;
+  development_actions?: string | null;
+  measurable_snapshot_ids?: string[];
+  priority_snapshot_ids?: string[];
+  knowledge_item_snapshot_ids?: string[];
+  created_by?: string | null;
+  created_at?: string;
+  updated_at?: string;
+};
+
+export type PerformanceReviewUpdate = Partial<PerformanceReviewInsert>;
+
 export type Database = {
   public: {
     Tables: {
@@ -1412,6 +1876,314 @@ export type Database = {
             columns: ["business_role_id"];
             isOneToOne: false;
             referencedRelation: "business_roles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      performance_measurables: {
+        Row: PerformanceMeasurableRow;
+        Insert: PerformanceMeasurableInsert;
+        Update: PerformanceMeasurableUpdate;
+        Relationships: [
+          {
+            foreignKeyName: "performance_measurables_owner_profile_id_fkey";
+            columns: ["owner_profile_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "performance_measurables_department_id_fkey";
+            columns: ["department_id"];
+            isOneToOne: false;
+            referencedRelation: "departments";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "performance_measurables_employee_id_fkey";
+            columns: ["employee_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "performance_measurables_knowledge_item_id_fkey";
+            columns: ["knowledge_item_id"];
+            isOneToOne: false;
+            referencedRelation: "knowledge_items";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      performance_scorecard_entries: {
+        Row: PerformanceScorecardEntryRow;
+        Insert: PerformanceScorecardEntryInsert;
+        Update: PerformanceScorecardEntryUpdate;
+        Relationships: [
+          {
+            foreignKeyName: "performance_scorecard_entries_measurable_id_fkey";
+            columns: ["measurable_id"];
+            isOneToOne: false;
+            referencedRelation: "performance_measurables";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      quarterly_priorities: {
+        Row: QuarterlyPriorityRow;
+        Insert: QuarterlyPriorityInsert;
+        Update: QuarterlyPriorityUpdate;
+        Relationships: [
+          {
+            foreignKeyName: "quarterly_priorities_owner_profile_id_fkey";
+            columns: ["owner_profile_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "quarterly_priorities_department_id_fkey";
+            columns: ["department_id"];
+            isOneToOne: false;
+            referencedRelation: "departments";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "quarterly_priorities_knowledge_item_id_fkey";
+            columns: ["knowledge_item_id"];
+            isOneToOne: false;
+            referencedRelation: "knowledge_items";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      meeting_templates: {
+        Row: MeetingTemplateRow;
+        Insert: MeetingTemplateInsert;
+        Update: MeetingTemplateUpdate;
+        Relationships: [
+          {
+            foreignKeyName: "meeting_templates_team_department_id_fkey";
+            columns: ["team_department_id"];
+            isOneToOne: false;
+            referencedRelation: "departments";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      meeting_template_participants: {
+        Row: MeetingTemplateParticipantRow;
+        Insert: MeetingTemplateParticipantInsert;
+        Update: MeetingTemplateParticipantUpdate;
+        Relationships: [
+          {
+            foreignKeyName: "meeting_template_participants_meeting_template_id_fkey";
+            columns: ["meeting_template_id"];
+            isOneToOne: false;
+            referencedRelation: "meeting_templates";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "meeting_template_participants_profile_id_fkey";
+            columns: ["profile_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      meeting_agenda_sections: {
+        Row: MeetingAgendaSectionRow;
+        Insert: MeetingAgendaSectionInsert;
+        Update: MeetingAgendaSectionUpdate;
+        Relationships: [
+          {
+            foreignKeyName: "meeting_agenda_sections_meeting_template_id_fkey";
+            columns: ["meeting_template_id"];
+            isOneToOne: false;
+            referencedRelation: "meeting_templates";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      meetings: {
+        Row: MeetingRow;
+        Insert: MeetingInsert;
+        Update: MeetingUpdate;
+        Relationships: [
+          {
+            foreignKeyName: "meetings_meeting_template_id_fkey";
+            columns: ["meeting_template_id"];
+            isOneToOne: false;
+            referencedRelation: "meeting_templates";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "meetings_team_department_id_fkey";
+            columns: ["team_department_id"];
+            isOneToOne: false;
+            referencedRelation: "departments";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      meeting_participants: {
+        Row: MeetingParticipantRow;
+        Insert: MeetingParticipantInsert;
+        Update: MeetingParticipantUpdate;
+        Relationships: [
+          {
+            foreignKeyName: "meeting_participants_meeting_id_fkey";
+            columns: ["meeting_id"];
+            isOneToOne: false;
+            referencedRelation: "meetings";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "meeting_participants_profile_id_fkey";
+            columns: ["profile_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      meeting_headlines: {
+        Row: MeetingHeadlineRow;
+        Insert: MeetingHeadlineInsert;
+        Update: MeetingHeadlineUpdate;
+        Relationships: [
+          {
+            foreignKeyName: "meeting_headlines_meeting_id_fkey";
+            columns: ["meeting_id"];
+            isOneToOne: false;
+            referencedRelation: "meetings";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "meeting_headlines_department_id_fkey";
+            columns: ["department_id"];
+            isOneToOne: false;
+            referencedRelation: "departments";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      issues: {
+        Row: IssueRow;
+        Insert: IssueInsert;
+        Update: IssueUpdate;
+        Relationships: [
+          {
+            foreignKeyName: "issues_department_id_fkey";
+            columns: ["department_id"];
+            isOneToOne: false;
+            referencedRelation: "departments";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "issues_owner_profile_id_fkey";
+            columns: ["owner_profile_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "issues_meeting_id_fkey";
+            columns: ["meeting_id"];
+            isOneToOne: false;
+            referencedRelation: "meetings";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      issue_notes: {
+        Row: IssueNoteRow;
+        Insert: IssueNoteInsert;
+        Update: IssueNoteUpdate;
+        Relationships: [
+          {
+            foreignKeyName: "issue_notes_issue_id_fkey";
+            columns: ["issue_id"];
+            isOneToOne: false;
+            referencedRelation: "issues";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      action_items: {
+        Row: ActionItemRow;
+        Insert: ActionItemInsert;
+        Update: ActionItemUpdate;
+        Relationships: [
+          {
+            foreignKeyName: "action_items_owner_profile_id_fkey";
+            columns: ["owner_profile_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "action_items_department_id_fkey";
+            columns: ["department_id"];
+            isOneToOne: false;
+            referencedRelation: "departments";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "action_items_meeting_id_fkey";
+            columns: ["meeting_id"];
+            isOneToOne: false;
+            referencedRelation: "meetings";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      decisions: {
+        Row: DecisionRow;
+        Insert: DecisionInsert;
+        Update: DecisionUpdate;
+        Relationships: [
+          {
+            foreignKeyName: "decisions_issue_id_fkey";
+            columns: ["issue_id"];
+            isOneToOne: false;
+            referencedRelation: "issues";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "decisions_meeting_id_fkey";
+            columns: ["meeting_id"];
+            isOneToOne: false;
+            referencedRelation: "meetings";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "decisions_department_id_fkey";
+            columns: ["department_id"];
+            isOneToOne: false;
+            referencedRelation: "departments";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      performance_reviews: {
+        Row: PerformanceReviewRow;
+        Insert: PerformanceReviewInsert;
+        Update: PerformanceReviewUpdate;
+        Relationships: [
+          {
+            foreignKeyName: "performance_reviews_employee_id_fkey";
+            columns: ["employee_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "performance_reviews_manager_id_fkey";
+            columns: ["manager_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
             referencedColumns: ["id"];
           },
         ];

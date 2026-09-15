@@ -18,7 +18,8 @@ export type MutationContext =
   | "user"
   | "department"
   | "role_experience"
-  | "knowledge";
+  | "knowledge"
+  | "performance";
 
 /**
  * Turns database constraint failures into something a person can act on.
@@ -49,6 +50,8 @@ export function mutationErrorState(
                     ? "That item is already assigned to this role."
                   : context === "knowledge"
                     ? "A knowledge item with that slug already exists."
+                  : context === "performance"
+                    ? "A record with those details already exists in Performance & Leadership."
                   : "A record with those details already exists.",
       );
     case "23P01":

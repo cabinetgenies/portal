@@ -274,6 +274,7 @@ export const ALL_MODULE_KEYS: readonly string[] = [
   "commissions",
   "requests",
   "people",
+  "performance",
   "inventory",
   "operations",
   "knowledge",
@@ -328,7 +329,16 @@ export const DEFAULT_ROLE_EXPERIENCES: Readonly<Record<string, DefaultRoleExperi
     ],
   },
   sales_leader: {
-    moduleKeys: ["home", "sales", "projects", "commissions", "requests", "people", "knowledge"],
+    moduleKeys: [
+      "home",
+      "sales",
+      "projects",
+      "commissions",
+      "requests",
+      "people",
+      "performance",
+      "knowledge",
+    ],
     emphasizedModuleKeys: ["sales", "commissions"],
     widgets: [
       { key: "my_projects", span: 2 },

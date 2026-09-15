@@ -31,6 +31,12 @@ export const MODULE_CAPABILITIES: Readonly<Record<string, readonly Capability[]>
   ],
   requests: [],
   people: [],
+  performance: [
+    "view:performance-own",
+    "view:performance-team",
+    "view:performance-all",
+    "manage:performance",
+  ],
   inventory: [],
   operations: [],
   knowledge: [],

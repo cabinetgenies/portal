@@ -140,6 +140,15 @@ first administrator, are in [`supabase/README.md`](supabase/README.md).
 | `/sales/commissions` | authenticated | Commission dashboard: projected, pending, approved, paid, draw and rollover cards plus action queues (employees see their own commission instead) |
 | `/sales` | authenticated | Sales landing: the entry point into the commission center. No sales pipeline is built, and nothing is simulated |
 | `/people` | authenticated | Placeholder route for the wider people view (roles and reporting lines live under Admin → Users today) |
+| `/people/[id]` | scoped by role | Role, manager, role expectations, scorecard measurables, quarterly priorities, reviews and open development actions |
+| `/performance` | scoped by role | Performance & Leadership overview: real attention lists and clean empty states |
+| `/performance/scorecards` | scoped by role | Company, department and employee scorecards with append-only entry history |
+| `/performance/priorities` | scoped by role | Company, department and individual quarterly priorities |
+| `/performance/meetings` | scoped by role | Leadership and department meeting list |
+| `/performance/meetings/[id]` | scoped by role | Ordered meeting agenda: scorecard, priorities, headlines, actions, issues, decisions |
+| `/performance/issues` | scoped by role | Issues and shared action items |
+| `/performance/issues/[id]` | scoped by role | Discussion notes, decision and related actions for one issue |
+| `/performance/reviews` | scoped by role | Employee performance reviews and review notes |
 | `/requests` | authenticated | Placeholder route for a general request queue |
 | `/company` | authenticated | Placeholder route for company-wide reference data |
 | `/sales/commissions/payments` | accounting+ | Approval and payment workflow, void-with-reason, immutable paid history |
@@ -181,6 +190,8 @@ lib/
                          ledgers, queries, Server Actions and unit tests
   forms/                 Shared action-state and database-error helpers
   permissions/           Roles, capabilities, navigation configuration
+  performance/           Scorecards, priorities, meetings, issues, actions,
+                         decisions, reviews and Performance RLS/validation
   supabase/              Browser, server, proxy and admin clients plus DB types
   utils/                 Formatting and class-name helpers
 proxy.ts                 Session refresh and optimistic route protection

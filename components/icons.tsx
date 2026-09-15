@@ -215,6 +215,16 @@ export function KnowledgeIcon(props: IconProps) {
   );
 }
 
+export function PerformanceIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M4 20.5h16" />
+      <path d="M7 20.5v-5M12 20.5V6M17 20.5v-8" />
+      <path d="M5 8.5h4M10 4.5h4M15 10.5h4" />
+    </Icon>
+  );
+}
+
 /**
  * The Google mark, in Google's own brand colours.
  *

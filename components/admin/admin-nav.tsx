@@ -6,6 +6,7 @@ const TABS = [
   { label: "Departments", href: "/admin/departments" },
   { label: "Roles", href: "/admin/roles" },
   { label: "Role experiences", href: "/admin/role-experiences" },
+  { label: "Performance", href: "/admin/performance" },
   { label: "Compensation plans", href: "/admin/compensation-plans" },
   { label: "Commission settings", href: "/admin/commission-settings" },
   { label: "Settings", href: "/admin/settings" },

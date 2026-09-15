@@ -93,6 +93,17 @@ export const CORE_MODULES: readonly AppModuleDefinition[] = [
     isActive: true,
   },
   {
+    key: "performance",
+    slug: "performance",
+    name: "Performance & Leadership",
+    description: "Scorecards, quarterly priorities, meetings, issues, actions and reviews.",
+    href: "/performance",
+    iconKey: "performance",
+    navSection: "primary",
+    displayOrder: 65,
+    isActive: true,
+  },
+  {
     key: "inventory",
     slug: "inventory",
     name: "Inventory",

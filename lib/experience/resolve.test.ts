@@ -297,6 +297,7 @@ test("CEO and Admin see every module, including Admin", () => {
       "/sales/commissions",
       "/requests",
       "/people",
+      "/performance",
       "/inventory",
       "/operations",
       "/knowledge",

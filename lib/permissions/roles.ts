@@ -39,6 +39,10 @@ export type Capability =
   | "manage:jobs"
   | "edit:job-financials"
   | "create:job-adjustments"
+  | "view:performance-own"
+  | "view:performance-team"
+  | "view:performance-all"
+  | "manage:performance"
   | "view:compensation-config"
   | "manage:compensation-config"
   | "manage:employee-compensation"
@@ -51,12 +55,19 @@ export type Capability =
   | "manage:draw";
 
 const CAPABILITIES_BY_ROLE: Record<Role, readonly Capability[]> = {
-  employee: ["view:own-profile", "view:jobs-own", "view:own-commission"],
+  employee: [
+    "view:own-profile",
+    "view:jobs-own",
+    "view:own-commission",
+    "view:performance-own",
+  ],
   supervisor: [
     "view:own-profile",
     "view:team-profiles",
     "view:jobs-team",
     "view:own-commission",
+    "view:performance-own",
+    "view:performance-team",
   ],
   accounting: [
     "view:own-profile",
@@ -64,6 +75,7 @@ const CAPABILITIES_BY_ROLE: Record<Role, readonly Capability[]> = {
     "view:jobs-all",
     "edit:job-financials",
     "create:job-adjustments",
+    "view:performance-own",
     "view:compensation-config",
     "calculate:commission",
     "submit:commission",
@@ -78,6 +90,10 @@ const CAPABILITIES_BY_ROLE: Record<Role, readonly Capability[]> = {
     "manage:jobs",
     "edit:job-financials",
     "create:job-adjustments",
+    "view:performance-own",
+    "view:performance-team",
+    "view:performance-all",
+    "manage:performance",
     "view:compensation-config",
     "manage:compensation-config",
     "manage:employee-compensation",
@@ -99,6 +115,10 @@ const CAPABILITIES_BY_ROLE: Record<Role, readonly Capability[]> = {
     "manage:jobs",
     "edit:job-financials",
     "create:job-adjustments",
+    "view:performance-own",
+    "view:performance-team",
+    "view:performance-all",
+    "manage:performance",
     "view:compensation-config",
     "manage:compensation-config",
     "manage:employee-compensation",

@@ -26,6 +26,7 @@ export const NAV_ICON_KEYS = [
   "reports",
   "admin",
   "people",
+  "performance",
   "requests",
   "company",
   "inventory",

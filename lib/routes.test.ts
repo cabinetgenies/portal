@@ -133,6 +133,7 @@ test("the registry describes every module the navigation can show", () => {
       "/sales/commissions",
       "/requests",
       "/people",
+      "/performance",
       "/inventory",
       "/operations",
       "/knowledge",
