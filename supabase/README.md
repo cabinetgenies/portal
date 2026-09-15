@@ -374,3 +374,18 @@ update rather than one screen, and the table also holds the only record of how t
 existing job was categorised. Nothing in the application reads or writes either one
 any more, so they can be dropped in a follow-up once those trigger bodies are
 rewritten. `project_categories` keeps its RLS policies and its single historical row.
+
+## Designer dashboards (Phase 4.2)
+
+`/commissions/employees` and `/commissions/employees/[id]` are a read-only composition
+layer: no schema change, no new calculation. A designer's dashboard is assembled from
+the commission workspace (jobs, events, ledgers, plans, tiers — already loaded in
+batch by the other commission screens) plus a single `commission_audits` query for
+that designer's jobs, so there is no per-job round trip. Every money figure comes from
+the canonical engine's projection or from a commission event's own snapshot.
+
+Visibility is decided by Row Level Security, not by the layout: finance and
+administrators see everything the policies allow, and a sales designer opening their
+own dashboard gets their own events, ledgers and draw periods while the compensation
+configuration their role cannot read simply comes back empty. The page renders that
+state honestly ("not visible to your role") instead of showing blanks.

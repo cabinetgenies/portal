@@ -696,6 +696,8 @@ export type EmployeeCommissionSummary = {
   compensationNotes: string | null;
   planName: string | null;
   assignmentEffectiveFrom: string | null;
+  /** The configured draw rate reduction in force, for the draw schedule. */
+  drawRateReduction: number;
   onDraw: boolean;
   openDrawPeriodFrom: string | null;
   drawBalance: number;
@@ -754,6 +756,7 @@ export const listEmployeeCommissionSummaries = cache(
           ? plansById.get(currentAssignment.compensation_plan_id)?.name ?? null
           : null,
         assignmentEffectiveFrom: currentAssignment?.effective_from ?? null,
+        drawRateReduction: settingsSnapshot(workspace.settings).drawRateReduction,
         onDraw: isOnDrawOn(drawPeriods, today),
         openDrawPeriodFrom:
           drawPeriods.find((period) => period.effective_to === null)?.effective_from ?? null,

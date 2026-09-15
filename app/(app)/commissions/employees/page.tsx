@@ -1,42 +1,28 @@
-import {
-  EmployeeCompensationAssignmentForm,
-  EmployeeCompensationSettingsForm,
-} from "@/components/compensation/employee-compensation-forms";
-import {
-  DrawAdvanceForm,
-  DrawEnrollmentForm,
-  LedgerAdjustmentForm,
-} from "@/components/commission/draw-forms";
+import Link from "next/link";
+import type { ReactNode } from "react";
+
 import { EmptyState } from "@/components/empty-state/empty-state";
 import { LockIcon, UsersIcon } from "@/components/icons";
 import { PageHeader } from "@/components/page-header/page-header";
 import { StatusBadge } from "@/components/ui/badge";
-import { Table, TableWrap, Td, TdNumeric, Th } from "@/components/ui/table";
+import { buttonClassName } from "@/components/ui/button";
 import { requireSession } from "@/lib/auth/dal";
-import {
-  listCompensationPlanOptions,
-  todayIso,
-} from "@/lib/compensation/queries";
-import {
-  listEmployeeCommissionSummaries,
-  type EmployeeCommissionSummary,
-} from "@/lib/commission/event-queries";
-import {
-  commissionEventStatusLabel,
-  commissionEventTypeLabel,
-  DRAW_TRANSACTION_TYPE_LABELS,
-  isDrawTransactionType,
-  isRolloverTransactionType,
-  ROLLOVER_TRANSACTION_TYPE_LABELS,
-} from "@/lib/commission/types";
-import { toNumber } from "@/lib/commission/financials";
+import { listEmployeeCommissionSummaries } from "@/lib/commission/event-queries";
 import { roleLabel } from "@/lib/permissions/roles";
-import { formatDate, formatDateTime, formatMoney, formatPercent, formatText } from "@/lib/utils/format";
+import { formatDate, formatMoney } from "@/lib/utils/format";
 
 export const metadata = {
-  title: "Commission Employees",
+  title: "Commission Designers",
 };
 
+/**
+ * The designer directory.
+ *
+ * A compact list of who participates in commission and what each of them is owed
+ * right now. Configuration controls deliberately live on the designer's own
+ * dashboard, so this page stays scannable and stays a directory rather than a pile of
+ * inline forms.
+ */
 export default async function CommissionEmployeesPage() {
   const session = await requireSession();
   const canView = session.capabilities.includes("view:compensation-config");
@@ -46,280 +32,130 @@ export default async function CommissionEmployeesPage() {
       <EmptyState
         icon={<LockIcon className="h-5 w-5" />}
         title="Commission setup is restricted"
-        description="Commission eligibility, draw status and balances are visible to accounting and administrators."
+        description="Commission eligibility, plan assignment, draw status and balances are visible to accounting and administrators."
       />
     );
   }
 
-  const canManageCompensation = session.capabilities.includes(
-    "manage:employee-compensation",
-  );
-  const canManageDraw = session.capabilities.includes("manage:draw");
-  const canManagePlans = session.capabilities.includes("manage:compensation-config");
-
-  const [employees, planOptions] = await Promise.all([
-    listEmployeeCommissionSummaries(),
-    canManageCompensation ? listCompensationPlanOptions() : Promise.resolve([]),
-  ]);
-  // A job can only reference a sales designer plan, and manager compensation is
-  // explicitly not implemented — so manager plans are not assignable here.
-  const plans = planOptions.filter((plan) => plan.participantKind === "sales_designer");
-  const today = todayIso();
+  const designers = await listEmployeeCommissionSummaries();
 
   return (
     <div className="space-y-6">
       <PageHeader
         eyebrow="Commissions"
-        title="Employees"
-        description="Who is commission eligible, which plan applies to them, whether they are on draw, and what they are owed. Draw and rollover balances are derived from their ledgers."
+        title="Designers"
+        description="Every sales designer with what they are projected to earn, what is waiting on approval or payment, and what they owe back through draw and rollover. Open a designer for their full commission dashboard."
       />
 
-      {employees.length === 0 ? (
+      {designers.length === 0 ? (
         <EmptyState
           icon={<UsersIcon className="h-5 w-5" />}
           title="No portal users yet."
           description="Portal users are created under Admin → Users (or directly in Supabase Authentication). Once they exist, eligibility, plan assignment and draw status are managed here."
         />
       ) : (
-        <TableWrap>
-          <Table caption="Employees with commission eligibility, draw status and balances">
-            <thead>
-              <tr>
-                <Th>Employee</Th>
-                <Th>Eligible</Th>
-                <Th>Current plan</Th>
-                <Th>Draw status</Th>
-                <Th className="text-right">Outstanding draw</Th>
-                <Th className="text-right">Outstanding rollover</Th>
-                <Th className="text-right">Projected commission</Th>
-                <Th className="text-right">Pending approval</Th>
-                <Th className="text-right">Approved / unpaid</Th>
-                <Th className="text-right">Paid YTD</Th>
-                <Th>Setup</Th>
-              </tr>
-            </thead>
-            <tbody>
-              {employees.map((row) => (
-                <tr key={row.profile.id} className="align-top">
-                  <Td>
-                    <span className="font-medium text-ink">
-                      {[row.profile.first_name, row.profile.last_name]
-                        .filter(Boolean)
-                        .join(" ") || formatText(row.profile.display_name)}
-                    </span>
-                    <span className="block text-xs text-ink-subtle">
-                      {formatText(row.profile.email)} · {roleLabel(row.profile.role)}
-                    </span>
-                  </Td>
-                  <Td>
+        <ul className="space-y-4">
+          {designers.map((designer) => (
+            <li
+              key={designer.profile.id}
+              className="space-y-4 rounded-xl border border-line bg-surface p-5"
+            >
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div className="min-w-0 space-y-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Link
+                      href={`/commissions/employees/${designer.profile.id}`}
+                      className="font-medium text-ink underline-offset-4 hover:underline"
+                    >
+                      {designerProfileName(designer.profile)}
+                    </Link>
                     <StatusBadge
-                      label={row.compensationEligible ? "Eligible" : "Not eligible"}
-                      tone={row.compensationEligible ? "positive" : "neutral"}
+                      label={designer.compensationEligible ? "Eligible" : "Not eligible"}
+                      tone={designer.compensationEligible ? "positive" : "neutral"}
                     />
-                  </Td>
-                  <Td className="text-ink-muted">
-                    {formatText(row.planName)}
-                    {row.assignmentEffectiveFrom ? (
-                      <span className="block text-xs text-ink-subtle">
-                        since {formatDate(row.assignmentEffectiveFrom)}
-                      </span>
-                    ) : null}
-                  </Td>
-                  <Td>
                     <StatusBadge
-                      label={row.onDraw ? "On draw" : "Standard rate"}
-                      tone={row.onDraw ? "info" : "neutral"}
+                      label={designer.onDraw ? "On draw" : "Standard rate"}
+                      tone={designer.onDraw ? "info" : "neutral"}
                     />
-                    {row.openDrawPeriodFrom ? (
-                      <span className="block text-xs text-ink-subtle">
-                        since {formatDate(row.openDrawPeriodFrom)}
-                      </span>
-                    ) : null}
-                  </Td>
-                  <TdNumeric>{formatMoney(row.drawBalance)}</TdNumeric>
-                  <TdNumeric>{formatMoney(row.rolloverBalance)}</TdNumeric>
-                  <TdNumeric>{formatMoney(row.projectedCommission)}</TdNumeric>
-                  <TdNumeric>{formatMoney(row.pendingApproval)}</TdNumeric>
-                  <TdNumeric>{formatMoney(row.approvedUnpaid)}</TdNumeric>
-                  <TdNumeric>{formatMoney(row.paidYtd)}</TdNumeric>
-                  <Td>
-                    <details className="min-w-[26rem]">
-                      <summary className="cursor-pointer text-sm font-medium text-ink">
-                        Manage
-                      </summary>
-                      <EmployeeAdminPanel
-                        row={row}
-                        plans={plans.map((plan) => ({ id: plan.id, name: plan.name }))}
-                        today={today}
-                        canManageCompensation={canManageCompensation}
-                        canManageDraw={canManageDraw}
-                        canManagePlans={canManagePlans}
-                      />
-                    </details>
-                  </Td>
-                </tr>
-              ))}
-            </tbody>
-          </Table>
-        </TableWrap>
+                    {designer.profile.active ? null : (
+                      <StatusBadge label="Deactivated" tone="warning" />
+                    )}
+                  </div>
+                  <p className="text-sm text-ink-muted">
+                    {designer.planName ?? "No plan assigned"} ·{" "}
+                    {roleLabel(designer.profile.role)}
+                  </p>
+                </div>
+
+                <Link
+                  href={`/commissions/employees/${designer.profile.id}`}
+                  className={buttonClassName({ size: "sm" })}
+                >
+                  View dashboard
+                </Link>
+              </div>
+
+              <dl className="grid gap-x-6 gap-y-3 border-t border-line pt-4 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5">
+                <Figure label="Projected" value={formatMoney(designer.projectedCommission)} strong />
+                <Figure label="Pending approval" value={formatMoney(designer.pendingApproval)} />
+                <Figure label="Ready to pay" value={formatMoney(designer.approvedUnpaid)} strong />
+                <Figure label="Paid YTD" value={formatMoney(designer.paidYtd)} />
+                <Figure label="Draw balance" value={formatMoney(designer.drawBalance)} />
+                <Figure label="Rollover balance" value={formatMoney(designer.rolloverBalance)} />
+                <Figure label="Draw status" value={designer.onDraw ? "On draw" : "Not on draw"} />
+                <Figure
+                  label="Plan effective"
+                  value={
+                    designer.assignmentEffectiveFrom
+                      ? formatDate(designer.assignmentEffectiveFrom)
+                      : "No assignment"
+                  }
+                />
+              </dl>
+            </li>
+          ))}
+        </ul>
       )}
     </div>
   );
 }
 
-function EmployeeAdminPanel({
-  row,
-  plans,
-  today,
-  canManageCompensation,
-  canManageDraw,
-  canManagePlans,
+function designerProfileName(profile: {
+  first_name: string | null;
+  last_name: string | null;
+  display_name: string | null;
+  email: string | null;
+}) {
+  const combined = [profile.first_name, profile.last_name].filter(Boolean).join(" ");
+
+  return combined || profile.display_name || profile.email || "Portal user";
+}
+
+function Figure({
+  label,
+  value,
+  strong = false,
+  text,
 }: {
-  row: EmployeeCommissionSummary;
-  plans: { id: string; name: string }[];
-  today: string;
-  canManageCompensation: boolean;
-  canManageDraw: boolean;
-  canManagePlans: boolean;
+  label: string;
+  value?: string;
+  strong?: boolean;
+  text?: ReactNode;
 }) {
   return (
-    <div className="mt-3 space-y-5 rounded-lg border border-line bg-surface-muted p-3">
-      {canManageCompensation ? (
-        <section className="space-y-4">
-          <EmployeeCompensationSettingsForm
-            profileId={row.profile.id}
-            compensationEligible={row.compensationEligible}
-            notes={row.compensationNotes}
-          />
-          <div className="border-t border-line pt-4">
-            <EmployeeCompensationAssignmentForm
-              profileId={row.profile.id}
-              plans={plans}
-              defaultEffectiveFrom={today}
-            />
-          </div>
-        </section>
-      ) : null}
-
-      {canManageDraw ? (
-        <section className="space-y-4 border-t border-line pt-4">
-          <h3 className="text-xs font-semibold tracking-[0.12em] text-ink-subtle uppercase">
-            Draw against commission
-          </h3>
-          <DrawEnrollmentForm
-            profileId={row.profile.id}
-            onDraw={row.onDraw}
-            openPeriodFrom={row.openDrawPeriodFrom}
-            today={today}
-          />
-          <div className="grid gap-4 border-t border-line pt-4 lg:grid-cols-2">
-            <DrawAdvanceForm profileId={row.profile.id} />
-            <LedgerAdjustmentForm profileId={row.profile.id} ledger="draw" />
-            <LedgerAdjustmentForm profileId={row.profile.id} ledger="rollover" />
-          </div>
-        </section>
-      ) : null}
-
-      {row.drawPeriods.length > 0 ? (
-        <section className="space-y-2 border-t border-line pt-4">
-          <h3 className="text-xs font-semibold tracking-[0.12em] text-ink-subtle uppercase">
-            Draw history
-          </h3>
-          <ul className="space-y-1 text-xs text-ink-muted">
-            {row.drawPeriods.map((period) => (
-              <li key={period.id}>
-                {formatDate(period.effective_from)} →{" "}
-                {period.effective_to ? formatDate(period.effective_to) : "current"}
-                {period.notes ? ` · ${period.notes}` : ""}
-              </li>
-            ))}
-          </ul>
-        </section>
-      ) : null}
-
-      <section className="space-y-2 border-t border-line pt-4">
-        <h3 className="text-xs font-semibold tracking-[0.12em] text-ink-subtle uppercase">
-          Draw ledger
-        </h3>
-        {row.drawLedger.length === 0 ? (
-          <p className="text-xs text-ink-muted">No draw ledger entries.</p>
-        ) : (
-          <ul className="space-y-1 text-xs text-ink-muted">
-            {row.drawLedger.map((entry) => (
-              <li key={entry.id} className="flex justify-between gap-4">
-                <span>
-                  {formatDate(entry.created_at)} ·{" "}
-                  {isDrawTransactionType(entry.transaction_type)
-                    ? DRAW_TRANSACTION_TYPE_LABELS[entry.transaction_type]
-                    : entry.transaction_type}{" "}
-                  · {entry.reason}
-                </span>
-                <span className="font-mono tabular-nums">
-                  {formatMoney(toNumber(entry.amount))}
-                </span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
-
-      <section className="space-y-2 border-t border-line pt-4">
-        <h3 className="text-xs font-semibold tracking-[0.12em] text-ink-subtle uppercase">
-          Rollover ledger
-        </h3>
-        {row.rolloverLedger.length === 0 ? (
-          <p className="text-xs text-ink-muted">No rollover ledger entries.</p>
-        ) : (
-          <ul className="space-y-1 text-xs text-ink-muted">
-            {row.rolloverLedger.map((entry) => (
-              <li key={entry.id} className="flex justify-between gap-4">
-                <span>
-                  {formatDate(entry.created_at)} ·{" "}
-                  {isRolloverTransactionType(entry.transaction_type)
-                    ? ROLLOVER_TRANSACTION_TYPE_LABELS[entry.transaction_type]
-                    : entry.transaction_type}{" "}
-                  · {entry.reason}
-                </span>
-                <span className="font-mono tabular-nums">
-                  {formatMoney(toNumber(entry.amount))}
-                </span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
-
-      <section className="space-y-2 border-t border-line pt-4">
-        <h3 className="text-xs font-semibold tracking-[0.12em] text-ink-subtle uppercase">
-          Commission events
-        </h3>
-        {row.events.length === 0 ? (
-          <p className="text-xs text-ink-muted">No commission events yet.</p>
-        ) : (
-          <ul className="space-y-1 text-xs text-ink-muted">
-            {row.events.map((event) => (
-              <li key={event.id} className="flex justify-between gap-4">
-                <span>
-                  {formatDateTime(event.created_at)} ·{" "}
-                  {commissionEventTypeLabel(event.event_type)} ·{" "}
-                  {commissionEventStatusLabel(event.status)} ·{" "}
-                  {formatPercent(toNumber(event.effective_commission_rate))}
-                </span>
-                <span className="font-mono tabular-nums">
-                  {formatMoney(toNumber(event.net_payable))}
-                </span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
-
-      {canManagePlans ? (
-        <p className="border-t border-line pt-3 text-xs leading-5 text-ink-subtle">
-          Plan rules and rates are configured under Admin → Commission settings. Historical
-          commission events keep the rates they were calculated with.
-        </p>
-      ) : null}
+    <div className="min-w-0 space-y-0.5">
+      <dt className="text-xs font-medium tracking-[0.08em] text-ink-subtle uppercase">
+        {label}
+      </dt>
+      <dd
+        className={
+          strong
+            ? "font-mono text-base font-semibold tabular-nums text-ink"
+            : "font-mono text-sm tabular-nums text-ink"
+        }
+      >
+        {text ?? value}
+      </dd>
     </div>
   );
 }

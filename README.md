@@ -55,6 +55,11 @@ Internal operations portal for Cabinet Genies.
   the routes, and category-relative band bounds can no longer be created. The dormant
   `project_categories` table and `jobs.project_category_id` column are retained for
   historical reference only (see supabase/README.md).
+- **Phase 4.2 (done):** designer commission dashboards — `/commissions/employees` is a
+  compact designer directory (projected, pending approval, ready to pay, paid YTD,
+  draw and rollover balances) linking into `/commissions/employees/[id]`, a personal
+  dashboard with a commission pipeline, active jobs, the draw schedule and ledger,
+  rollover, filtered event history and a plan/eligibility section. No schema change.
 
 Sales manager bonus calculation and payout, support designer bonuses, split
 commissions, production performance bonuses, payroll batching, Buildertrend
@@ -119,7 +124,8 @@ first administrator, are in [`supabase/README.md`](supabase/README.md).
 | `/commissions/jobs` | scoped by role | Live job list: revenue, GP, GP %, commissionable GP |
 | `/commissions/jobs/new` | admin / CEO | Create a job |
 | `/commissions/jobs/[id]` | scoped by role | Overview, Financials, Commission setup, Commission (projected/final breakdown, events, workflow), Audit / adjustments |
-| `/commissions/employees` | accounting+ | Eligibility, plan, draw status, balances, projected/pending/paid figures and per-employee ledgers |
+| `/commissions/employees` | accounting+ | Designer directory: plan, draw status, projected/pending/ready/paid figures and balances |
+| `/commissions/employees/[id]` | accounting+ (or the designer themselves) | Personal commission dashboard: pipeline, active jobs, draw schedule and ledger, rollover, event history, plan & eligibility |
 | `/commissions/rules` | accounting+ | Read-only plan tiers plus the current rule inputs |
 | `/sales`, `/projects`, `/production`, `/reports` | authenticated | Placeholder module screens |
 | `/admin`, `/admin/users` | admin / CEO | Administration shell, current profile, role model |
