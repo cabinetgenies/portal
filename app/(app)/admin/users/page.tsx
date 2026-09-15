@@ -96,7 +96,7 @@ export default async function AdminUsersPage() {
       <Panel
         id="create-portal-user"
         title="Create a portal account"
-        description="Accounts are created through the Supabase Auth Admin API from this server action. auth.users rows are never written with SQL, and the service role key stays on the server."
+        description="Accounts are created through the Supabase Auth Admin API from this server action, and the profile is activated in the same step — this is an administrator approving the person. auth.users rows are never written with SQL, and the service role key stays on the server."
       >
         <CreatePortalUserForm
           managers={managers}
@@ -109,7 +109,7 @@ export default async function AdminUsersPage() {
       <Panel
         id="link-portal-user"
         title="Link an existing Supabase Auth user"
-        description="For accounts that already exist in Supabase Auth. Creating the account in Supabase first is always a valid route — the sign-up trigger creates the portal profile — and this form covers the case where a profile row is missing."
+        description="For accounts that already exist in Supabase Auth. Creating the account in Supabase first is always a valid route — the sign-up trigger creates the portal profile, which arrives inactive and shows below as a portal user who is not active until you approve them here."
       >
         <LinkExistingPortalUserForm
           managers={managers}
@@ -121,7 +121,7 @@ export default async function AdminUsersPage() {
       <Panel
         id="user-directory"
         title="User directory"
-        description="Every portal profile with its role, reporting line, status and commission setup. Changes are recorded in the audit trail below."
+        description="Every portal profile with its role, reporting line, status and commission setup. People who signed in with Google before being approved appear here as not active — set their role, then switch their status to Active to grant access. Changes are recorded in the audit trail below."
       >
         {directory.length === 0 ? (
           <EmptyState

@@ -1,10 +1,27 @@
 import { NextResponse, type NextRequest } from "next/server";
 
+import {
+  ACCESS_DENIED_ROUTE,
+  DEFAULT_AUTHENTICATED_ROUTE,
+  LOGIN_ROUTE,
+  OAUTH_CALLBACK_ROUTE,
+} from "@/lib/auth/routes";
 import { isSupabaseConfigured } from "@/lib/env";
 import { refreshSession } from "@/lib/supabase/proxy";
 
-const LOGIN_ROUTE = "/login";
-const DEFAULT_AUTHENTICATED_ROUTE = "/home";
+/**
+ * Routes that must be reachable without a session.
+ *
+ * The OAuth callback is the important one: the browser arrives from Supabase
+ * with a code and a PKCE verifier cookie but no session yet, so redirecting it
+ * to /login would throw the code away. /access-denied is here because it has to
+ * be able to explain a sign-in that produced no access.
+ */
+const SESSION_FREE_ROUTES = new Set<string>([
+  LOGIN_ROUTE,
+  OAUTH_CALLBACK_ROUTE,
+  ACCESS_DENIED_ROUTE,
+]);
 
 /**
  * Optimistic route protection.
@@ -40,7 +57,7 @@ export async function proxy(request: NextRequest) {
 
   const { response, user } = session;
 
-  if (!user && !isLoginRoute) {
+  if (!user && !SESSION_FREE_ROUTES.has(pathname)) {
     const loginUrl = request.nextUrl.clone();
     loginUrl.pathname = LOGIN_ROUTE;
     loginUrl.search = "";
@@ -49,6 +66,9 @@ export async function proxy(request: NextRequest) {
   }
 
   if (user && isLoginRoute) {
+    // A signed-in visitor belongs in the application. Which part of it is not
+    // decided here: /home re-checks the profile and sends an unapproved account
+    // on to /access-denied, so this stays a redirect rather than an authorization.
     const homeUrl = request.nextUrl.clone();
     homeUrl.pathname = DEFAULT_AUTHENTICATED_ROUTE;
     homeUrl.search = "";

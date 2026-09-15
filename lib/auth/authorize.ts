@@ -22,6 +22,17 @@ export async function authorizeCapability(
     };
   }
 
+  // Authenticated is not authorized: an account whose profile is missing or
+  // inactive holds no capabilities, and a Server Action is refused outright
+  // rather than being told which capability it lacked.
+  if (session.status !== "authorized") {
+    return {
+      denied: failureState(
+        "Your account does not have access to the portal. Ask an administrator to activate your profile.",
+      ),
+    };
+  }
+
   if (!session.capabilities.includes(capability)) {
     return { denied: failureState("Your role does not allow this change.") };
   }

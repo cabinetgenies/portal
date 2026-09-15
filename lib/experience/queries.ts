@@ -1,8 +1,8 @@
 import { cache } from "react";
 import { redirect } from "next/navigation";
 
-import { getSessionContext, type SessionContext } from "@/lib/auth/dal";
-import { LOGIN_ROUTE } from "@/lib/auth/dal";
+import { getSessionContext, type AuthorizedSession } from "@/lib/auth/dal";
+import { ACCESS_DENIED_ROUTE, LOGIN_ROUTE } from "@/lib/auth/routes";
 import { displayNameFor } from "@/lib/auth/identity";
 import { assignmentSourceLabel, resolveAssignment, type RoleAssignment } from "@/lib/experience/assignment";
 import type {
@@ -271,8 +271,8 @@ function mapConfiguration({
 // ---------------------------------------------------------------------------
 
 export type SessionExperience = {
-  session: SessionContext;
-  profile: ProfileRow | null;
+  session: AuthorizedSession;
+  profile: ProfileRow;
   assignment: RoleAssignment;
   assignmentLabel: string;
   experience: RoleExperience;
@@ -283,15 +283,20 @@ export type SessionExperience = {
 /**
  * Resolves the shell's experience for the signed-in person.
  *
- * Returns null when there is no session, exactly like the data access layer, so a
- * caller can redirect. Never throws for a missing profile or an unapplied
- * migration: an unassigned profile still gets a usable baseline experience and the
- * shell tells the reader why.
+ * Returns null when there is no session, and also when the signed-in profile is
+ * not authorized (missing or inactive) — the caller redirects either way. Never
+ * throws for an unassigned profile or an unapplied migration: an unassigned
+ * profile still gets a usable baseline experience and the shell tells the reader
+ * why. Approval is what decides access; the experience only decides what a
+ * permitted person sees.
  */
 export const getSessionExperience = cache(
   async function getSessionExperience(): Promise<SessionExperience | null> {
     const session = await getSessionContext();
-    if (!session) return null;
+    // No session at all, or a session the portal will not authorize: neither has
+    // an experience to resolve, and both are handled by `requireSessionExperience`
+    // (or by the authenticated layout) with the right destination.
+    if (!session || session.status !== "authorized") return null;
 
     const catalog = await loadExperienceCatalog();
     const assignment = resolveAssignment({
@@ -329,7 +334,9 @@ export async function requireSessionExperience(): Promise<SessionExperience> {
   const state = await getSessionExperience();
 
   if (!state) {
-    redirect(LOGIN_ROUTE);
+    // Sign in, or be told why signing in was not enough.
+    const session = await getSessionContext();
+    redirect(session ? ACCESS_DENIED_ROUTE : LOGIN_ROUTE);
   }
 
   return state;

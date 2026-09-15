@@ -1,7 +1,6 @@
 import type { ReactNode } from "react";
 
 import { AppShell } from "@/components/app-shell/app-shell";
-import { ConfigurationNotice } from "@/components/configuration-notice/configuration-notice";
 import { requireSession } from "@/lib/auth/dal";
 import { displayNameFor, initialsFor } from "@/lib/auth/identity";
 import { getSessionExperience } from "@/lib/experience/queries";
@@ -19,6 +18,9 @@ export const dynamic = "force-dynamic";
 /**
  * Authenticated area. This layout is the gate for every protected route: it
  * verifies the session through the data access layer before rendering the shell.
+ * "Verified" now means the profile exists and is active — an authenticated
+ * account without an approved profile is redirected to /access-denied here, so
+ * the shell is never rendered for it.
  *
  * Note that a layout cannot protect the data inside nested routes by itself —
  * nested pages and Server Actions re-check through `lib/auth/dal.ts`. This layout
@@ -51,14 +53,6 @@ export default async function AuthenticatedLayout({
         initials: initialsFor(name),
       }}
     >
-      {session.profile ? null : (
-        <div className="mb-6">
-          <ConfigurationNotice
-            title="Your profile record is missing"
-            description="This account has no row in public.profiles, so no role could be resolved. Apply supabase/migrations/20260915090000_create_profiles.sql and the missing profile will be created by the auth trigger."
-          />
-        </div>
-      )}
       {children}
     </AppShell>
   );

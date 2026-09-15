@@ -66,6 +66,12 @@ Internal operations portal for Cabinet Genies.
   Plans & Rules and Reports tabs, and every legacy `/commissions/*` path redirects
   permanently to its new home. Routing and navigation only — no business logic,
   permissions or schema changed.
+- **Phase 6 (done):** Google sign-in as an additional way in, on top of the existing
+  email/password sign-in and the same Supabase SSR/PKCE session. Authenticating is not
+  authorizing: a new auth user — a first Google sign-in in particular — gets a profile
+  that is not active, and only an administrator grants access by activating it. Roles,
+  departments, capabilities, RLS and the password form are unchanged. See
+  [docs/google-sign-in.md](docs/google-sign-in.md).
 
 Sales manager bonus calculation and payout, support designer bonuses, split
 commissions, production performance bonuses, payroll batching, Buildertrend
@@ -106,7 +112,11 @@ Required environment variables (see [`.env.example`](.env.example)):
 | --- | --- | --- |
 | `NEXT_PUBLIC_SUPABASE_URL` | yes | Supabase project URL. Safe in the browser. |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | yes | Supabase anon (publishable) key. Safe in the browser — RLS enforces access. |
+| `NEXT_PUBLIC_SITE_URL` | no | The origin Google sign-in returns to. Safe in the browser. Defaults to the request's own host. |
 | `SUPABASE_SERVICE_ROLE_KEY` | no | Server-only. Not required for authentication, only for privileged admin work in a later phase. |
+
+There is no Google secret to configure in this repository: the OAuth client id and
+secret live in Google and Supabase, and the portal never reads them.
 
 If the two required variables are missing, the portal renders an explicit
 configuration notice instead of failing with a stack trace.
@@ -123,7 +133,9 @@ first administrator, are in [`supabase/README.md`](supabase/README.md).
 
 | Route | Access | Phase 1 content |
 | --- | --- | --- |
-| `/login` | public | Email and password sign-in |
+| `/login` | public | Continue with Google, plus the existing email and password form |
+| `/auth/callback` | public | Supabase OAuth callback: exchanges the PKCE code, then applies the profile check |
+| `/access-denied` | authenticated but unauthorized | Says an account authenticated without portal access, and offers Sign out |
 | `/home` | authenticated | Dashboard shell, workspace cards, activity empty state |
 | `/sales/commissions` | authenticated | Commission dashboard: projected, pending, approved, paid, draw and rollover cards plus action queues (employees see their own commission instead) |
 | `/sales` | authenticated | Sales landing: the entry point into the commission center. No sales pipeline is built, and nothing is simulated |
@@ -141,17 +153,20 @@ first administrator, are in [`supabase/README.md`](supabase/README.md).
 | `/admin`, `/admin/users` | admin / CEO | Administration shell, current profile, role model |
 | `/admin/compensation-plans` | admin / CEO | Manage compensation plans, versions and tiers (sales designer plans today; manager plans reserved) |
 | `/admin/commission-settings` | admin / CEO | Deposit payout %, draw rate reduction, draw system on/off, effective-dated history |
-| `/` | public | Redirects to `/home` or `/login` based on session |
+| `/` | public | Routes on session and profile: `/home`, `/access-denied` or `/login` |
 
 ## Architecture
 
 ```
 app/
-  (auth)/login/          Public sign-in route
+  (auth)/login/          Public sign-in route (Google and email/password)
+  (auth)/access-denied/  Authenticated but unauthorized: why, and sign out
+  auth/callback/         Supabase OAuth callback (PKCE code exchange)
   (app)/                 Authenticated shell and protected routes
   error.tsx, global-error.tsx, not-found.tsx
 components/
   app-shell/             Sidebar, mobile drawer, user panel, nav list
+  auth/                  Google sign-in button, sign-out button
   commission/            Job, commission engine, draw and ledger form components
   compensation/          Plan and settings form components
   commissions/, admin/   Module-specific navigation
@@ -174,7 +189,8 @@ scripts/                 Node loader that lets `npm test` run the TypeScript tes
 ```
 
 Security model in one line: `proxy.ts` refreshes sessions and redirects early,
-`lib/auth/dal.ts` verifies every server-side read, and Row Level Security in
+`lib/auth/dal.ts` verifies every server-side read **and requires an active
+approved profile** — a session alone opens nothing — and Row Level Security in
 Postgres is the final authority on what any user can see.
 
 ## Scripts

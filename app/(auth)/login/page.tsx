@@ -1,8 +1,15 @@
 import { redirect } from "next/navigation";
 
+import { GoogleSignInButton } from "@/components/auth/google-sign-in-button";
 import { ConfigurationNotice } from "@/components/configuration-notice/configuration-notice";
-import { DEFAULT_AUTHENTICATED_ROUTE, getSessionContext } from "@/lib/auth/dal";
+import { AlertIcon } from "@/components/icons";
+import { getSessionContext } from "@/lib/auth/dal";
+import { signInErrorMessage } from "@/lib/auth/oauth";
 import { safeRedirectTarget } from "@/lib/auth/redirects";
+import {
+  ACCESS_DENIED_ROUTE,
+  DEFAULT_AUTHENTICATED_ROUTE,
+} from "@/lib/auth/routes";
 import { isSupabaseConfigured } from "@/lib/env";
 
 import { LoginForm } from "./login-form";
@@ -20,12 +27,20 @@ export default async function LoginPage(props: PageProps<"/login">) {
   ]);
 
   if (session) {
-    redirect(DEFAULT_AUTHENTICATED_ROUTE);
+    // A signed-in person never needs this screen, but only an authorized one
+    // belongs in the portal. The rest are told why on /access-denied.
+    redirect(
+      session.status === "authorized" ? DEFAULT_AUTHENTICATED_ROUTE : ACCESS_DENIED_ROUTE,
+    );
   }
 
   const requestedNext = searchParams.next;
   const next = safeRedirectTarget(
     Array.isArray(requestedNext) ? requestedNext[0] : requestedNext,
+  );
+  const requestedError = searchParams.error;
+  const oauthError = signInErrorMessage(
+    Array.isArray(requestedError) ? requestedError[0] : requestedError,
   );
 
   return (
@@ -84,20 +99,41 @@ export default async function LoginPage(props: PageProps<"/login">) {
                 Sign in
               </h2>
               <p className="text-sm leading-6 text-ink-muted">
-                Use the work email and password issued for your Cabinet Genies account.
+                Continue with Google, or use the work email and password issued for your
+                Cabinet Genies account.
               </p>
             </div>
           </div>
 
           {isSupabaseConfigured ? (
-            <LoginForm next={next} />
+            <div className="space-y-6">
+              {oauthError ? (
+                <div className="flex items-start gap-3 rounded-lg border border-line bg-accent-soft px-3 py-2.5">
+                  <AlertIcon className="mt-0.5 h-4 w-4 text-accent-strong" />
+                  <p className="text-sm leading-6 text-accent-strong">{oauthError}</p>
+                </div>
+              ) : null}
+
+              <GoogleSignInButton next={next} />
+
+              <div className="flex items-center gap-3" aria-hidden="true">
+                <span className="h-px flex-1 bg-line" />
+                <span className="text-xs tracking-[0.18em] text-ink-subtle uppercase">
+                  or
+                </span>
+                <span className="h-px flex-1 bg-line" />
+              </div>
+
+              <LoginForm next={next} />
+            </div>
           ) : (
             <ConfigurationNotice />
           )}
 
           <p className="text-xs leading-5 text-ink-subtle">
-            Access is limited to Cabinet Genies personnel. Accounts are created by an
-            administrator — contact yours if you need access.
+            Access is limited to Cabinet Genies personnel. Signing in with Google proves
+            who you are; an administrator still has to approve your portal profile —
+            contact yours if you need access.
           </p>
         </div>
       </section>

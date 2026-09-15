@@ -57,9 +57,15 @@ type DirectoryFields = {
  * Applies the directory fields the sign-up trigger does not set.
  *
  * Creating an auth user fires `on_auth_user_created`, which inserts the profile
- * row with role `employee`. Updating first keeps that insert (and its audit row)
- * and only ever falls back to an insert when the profile row is genuinely missing
- * — for example an auth user created before the profiles migration existed.
+ * row with role `employee` and no access. Updating first keeps that insert (and
+ * its audit row) and only ever falls back to an insert when the profile row is
+ * genuinely missing — for example an auth user created before the profiles
+ * migration existed.
+ *
+ * `active: true` is the approval. Nothing gets portal access by existing in
+ * Supabase Auth — not a Google sign-in, not an account created in the dashboard —
+ * so the one flow that is an administrator deliberately provisioning a colleague
+ * is the one flow that grants it here, in a single audited step.
  */
 async function applyDirectoryFields(
   profileId: string,
@@ -78,6 +84,7 @@ async function applyDirectoryFields(
     department_id: fields.departmentId,
     business_role_id: fields.businessRoleId,
     manager_id: fields.managerId,
+    active: true,
   };
 
   const { data, error } = await supabase

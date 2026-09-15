@@ -26,6 +26,7 @@ generalise the shared structures for future Sales Manager compensation (see
 | 17 | `migrations/20260915230000_business_architecture.sql` | departments, business roles, `profiles.department_id` / `profiles.business_role_id` with the department-name sync trigger and the extended profile audit, the module registry, role module experience, the dashboard widget and quick action registries, and the knowledge metadata foundation |
 | 18 | `migrations/20260915230100_business_architecture_rls.sql` | Row Level Security for the business architecture: configuration is readable by signed-in users, writable by admin/CEO only, and published knowledge is readable by everyone |
 | 19 | `migrations/20260915230200_seed_business_architecture.sql` | the ten official departments, the twelve business roles, the module registry, the widget and quick action catalogs, and one default experience per role |
+| 20 | `migrations/20260915240000_google_sign_in.sql` | new auth users arrive without portal access: the sign-up trigger creates the profile with the provider's name but `active = false`, so Google sign-in (or any other way in) authenticates without authorizing |
 
 Every script is idempotent, so re-running one is safe.
 
@@ -88,19 +89,34 @@ After running the migrations:
 1. Dashboard → **Authentication** → **Users** → **Add user**.
 2. Set the email and a password. Supabase hashes and stores the password; the
    portal never handles password material itself.
-3. The `on_auth_user_created` trigger inserts the matching `profiles` row with
-   the default role `employee`.
-4. Promote the first administrator:
+3. The `on_auth_user_created` trigger inserts the matching `profiles` row with the
+   default role `employee` and **no portal access** (`active = false`). Migration 20
+   made approval explicit: an auth user existing is not the same as a person being
+   allowed in, whether they arrive through a password, an invite or Google.
+4. Approve them in **Admin → Users** — set the role, department and manager, then
+   switch their status to Active. That is the normal path for every account,
+   including colleagues who sign in with Google before being approved.
+5. The very first administrator cannot use that screen (nobody is approved yet),
+   so promote them from the SQL editor:
 
 ```sql
+-- The auth trigger already created the profile with active = false. The
+-- profiles_protect_privileged_columns trigger refuses privileged changes from a
+-- session with no signed-in administrator, which is what a SQL editor session is
+-- (auth.uid() is null there), so it is disabled for these two statements only.
+alter table public.profiles disable trigger profiles_protect_privileged_columns;
+
 update public.profiles
-set role = 'admin'
+set role = 'admin', active = true
 where email = 'admin@cabinetgenies.com';
+
+alter table public.profiles enable trigger profiles_protect_privileged_columns;
 ```
 
-Run that `update` from the SQL editor (which uses the service role and bypasses
-RLS). A signed-in non-admin cannot promote themselves — the
-`profiles_protect_privileged_columns` trigger rejects the write.
+The disable/enable pair is required precisely because that guard works: a
+signed-in non-administrator can never promote themselves, and with no
+administrator signed in there is no one for it to recognize. Afterwards every
+approval happens through the directory, where the trigger can see who is acting.
 
 Optional profile fields can also be supplied when creating a user, via user
 metadata:
@@ -109,14 +125,51 @@ metadata:
 { "first_name": "Dana", "last_name": "Reed", "department": "Sales" }
 ```
 
+Google sign-in supplies its own: `given_name`, `family_name` and `full_name` are
+read by the trigger, so an unapproved Google account still appears in the
+directory as a named person rather than an email address.
+
+## Google sign-in (Phase 6)
+
+Enable the Google provider in **Authentication → Providers → Google**, and add
+the application callback (`https://<your-domain>/auth/callback`) to
+**Authentication → URL Configuration → Redirect URLs**. The full checklist — the
+Google Cloud client, the Supabase callback URL and the environment values — is in
+[docs/google-sign-in.md](../docs/google-sign-in.md).
+
+What the database side guarantees, and why the portal can rely on it:
+
+| Guarantee | Where it lives |
+| --- | --- |
+| One person, one profile — a second Google identity cannot add a row | `profiles.id` is the primary key *and* the FK to `auth.users(id)`; `profiles_email_unique_idx` is unique on `lower(email)` |
+| Signing in twice cannot duplicate anything | `handle_new_user` inserts `on conflict (id) do update` |
+| New identities start without access | `handle_new_user` inserts `active = false`, role `employee` |
+| A pending person cannot approve themselves | `profiles_protect_privileged_columns` rejects `active`/`role`/`department`/`manager_id`/`email` changes from anyone who is not an active administrator |
+| An unapproved account resolves no role at all | `current_profile_role()` and `current_profile_is_admin()` both require `p.active` |
+| Approval is attributable | the `profiles_audit` trigger records `active_status_changed` (and `role_changed`) with the acting administrator |
+
+Existing profiles are untouched by migration 20: the trigger only fires when an
+auth user is created, so every profile that already exists keeps its role and its
+access. Re-running the migration cannot deactivate anybody.
+
 ## Verify
 
 ```sql
--- Every auth user should have exactly one profile row.
+-- Every auth user should have exactly one profile row. A row with active = false
+-- is somebody who has not been approved yet (Google sign-in included) or has been
+-- deactivated; either way they can sign in but cannot open the portal.
 select u.id, u.email, p.role
 from auth.users u
 left join public.profiles p on p.id = u.id
 order by u.created_at desc;
+
+-- Which sign-in methods an account has. Google appears here after the first
+-- Google sign-in, on the same auth user, without a second profile row.
+select u.email, array_agg(i.provider order by i.provider) as providers
+from auth.users u
+join auth.identities i on i.user_id = u.id
+group by u.email
+order by u.email;
 ```
 
 ## What RLS allows

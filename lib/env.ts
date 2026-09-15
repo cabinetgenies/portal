@@ -9,6 +9,7 @@
 
 const supabaseUrl = (process.env.NEXT_PUBLIC_SUPABASE_URL ?? "").trim();
 const supabaseAnonKey = (process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "").trim();
+const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL ?? "").trim();
 
 export const supabaseEnv = {
   url: supabaseUrl,
@@ -17,6 +18,16 @@ export const supabaseEnv = {
 
 export const isSupabaseConfigured =
   supabaseUrl.length > 0 && supabaseAnonKey.length > 0;
+
+/**
+ * The deployed origin, used to build the Google OAuth callback URL.
+ *
+ * Optional, and public by design — it is a URL, not a credential. When it is set
+ * it wins over the incoming request's host header, which is what keeps a spoofed
+ * Host header from steering the OAuth callback somewhere else. Supabase's
+ * redirect allow-list is the second half of that guard.
+ */
+export const publicSiteUrl = siteUrl;
 
 export class SupabaseConfigurationError extends Error {
   constructor(message: string) {
