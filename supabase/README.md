@@ -17,6 +17,7 @@ generalise the shared structures for future Sales Manager compensation (see
 | 8 | `migrations/20260915150100_commission_engine_rls.sql` | Row Level Security for settings, events and both ledgers |
 | 9 | `migrations/20260915150200_seed_cabinet_genies_standard_plan.sql` | production plan `Cabinet Genies Standard GP Commission` (50% → 30%, 45% → 20%, 35% → 10%, below → 0%) |
 | 10 | `migrations/20260915160000_user_directory_audit.sql` | profile audit trail (`user_created`, `role_changed`, `manager_changed`, `active_status_changed`, …) and the admin policy that links a profile to an existing auth user |
+| 11 | `migrations/20260915170000_percentage_based_job_costs.sql` | percentage-based burden and warranty / service contingency: company defaults on `commission_settings`, per-job snapshots on `jobs`, derived dollars kept, and range constraints |
 
 Every script is idempotent, so re-running one is safe.
 
@@ -265,3 +266,25 @@ Recording `deposit_received_date` makes the **deposit** commission eligible and
 recording `gp_audit_completed_date` makes the **final true-up** eligible. Neither
 creates a commission event: events are still calculated deliberately from the
 job's Commission section, so the workflow stays under human control.
+
+## Percentage-based job costs (Phase 3.7)
+
+Burden and warranty / service contingency are rates, not dollar inputs. The base
+for both is **direct job cost** — material + labor + subcontractor + other direct —
+before either is added. Neither is applied to revenue; both are cost-side reserves.
+`computeJobFinancials` derives the dollars and `total_job_cost` includes them once,
+so the stored `jobs.burden_cost` / `jobs.warranty_service_contingency` columns are
+outputs that are kept for historical accuracy, never inputs.
+
+| Layer | Columns | Who edits |
+| --- | --- | --- |
+| Company defaults (effective-dated) | `commission_settings.burden_percent`, `.warranty_contingency_percent` | admin/CEO; accounting can read |
+| Per-job snapshot | `jobs.burden_percent`, `jobs.warranty_contingency_percent` | admin/CEO on the job form |
+| Derived dollars | `jobs.burden_cost`, `jobs.warranty_service_contingency` | nobody — written by the server after each save |
+
+Both columns default to `0.000000`, and every rate is constrained to 0–100%: the
+company defaults stay at 0% until Cabinet Genies sets its real numbers under
+Admin → Commission settings. A job that already had dollar amounts when this
+migration ran had the equivalent rate derived from those dollars, so its total cost
+did not change. A job saved under an older default keeps its own rate forever, which
+is what protects approved and paid commission events from later rule changes.

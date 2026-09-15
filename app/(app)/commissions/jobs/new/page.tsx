@@ -8,7 +8,11 @@ import { buttonClassName } from "@/components/ui/button";
 import { Panel } from "@/components/ui/panel";
 import { requireCapability } from "@/lib/auth/dal";
 import { listProjectCategories, todayIso } from "@/lib/compensation/queries";
-import { loadCommissionWorkspace, settingsSnapshot } from "@/lib/commission/event-queries";
+import {
+  jobCostRateDefaults,
+  loadCommissionWorkspace,
+  settingsSnapshot,
+} from "@/lib/commission/event-queries";
 import { buildJobEntryOptions } from "@/lib/commission/job-entry";
 
 export const metadata = {
@@ -44,6 +48,7 @@ export default async function NewJobPage() {
     planTiers: workspace.planTiers,
     drawPeriods: workspace.drawPeriods,
     settings: settingsSnapshot(workspace.settings),
+    costRates: jobCostRateDefaults(workspace.settings),
     today: todayIso(),
   });
 

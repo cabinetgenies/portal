@@ -50,6 +50,8 @@ export default async function CommissionSettingsPage() {
                   depositPayoutPercent: settings.depositPayoutPercent,
                   drawRateReduction: settings.drawRateReduction,
                   drawEnabled: settings.drawEnabled,
+                  burdenPercent: settings.burdenPercent,
+                  warrantyContingencyPercent: settings.warrantyContingencyPercent,
                   notes: settings.notes,
                 }
               : null
@@ -77,7 +79,9 @@ export default async function CommissionSettingsPage() {
                 <span className="text-ink-muted">
                   Deposit {formatPercent(row.depositPayoutPercent, 0)} · Draw reduction{" "}
                   {(row.drawRateReduction * 100).toFixed(2)} points · Draw system{" "}
-                  {row.drawEnabled ? "enabled" : "disabled"}
+                  {row.drawEnabled ? "enabled" : "disabled"} · Burden{" "}
+                  {(row.burdenPercent * 100).toFixed(2)}% · Warranty{" "}
+                  {(row.warrantyContingencyPercent * 100).toFixed(2)}%
                   {row.notes ? ` · ${row.notes}` : ""}
                 </span>
               </li>
@@ -115,6 +119,14 @@ export default async function CommissionSettingsPage() {
           commission rate by{" "}
           {((settings?.drawRateReduction ?? 0.05) * 100).toFixed(2)} percentage points while
           an employee is enrolled.
+        </p>
+        <p className="text-xs leading-5 text-ink-subtle">
+          Burden is currently{" "}
+          {((settings?.burdenPercent ?? 0) * 100).toFixed(2)}% and warranty / service
+          contingency {((settings?.warrantyContingencyPercent ?? 0) * 100).toFixed(2)}%. Both
+          are applied to direct job cost — material, labor, subcontractor and other direct
+          cost — and are added to total job cost before the commission tier is selected.
+          Jobs already saved keep the rates they were stored with.
         </p>
       </Panel>
     </div>

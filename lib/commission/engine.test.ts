@@ -419,7 +419,8 @@ test("burden lowers GP before tier selection, so it can change the tier", () => 
     contractRevenue: 100_000,
     materialCost: 45_000,
     laborCost: 5_000,
-    burdenCost: 6_000,
+    // 12% of the 50,000 direct cost — the same 6,000 the old dollar input carried.
+    burdenPercent: 0.12,
   });
 
   // 50% GP is the top tier; adding burden drops the job into the 20% band.

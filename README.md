@@ -29,6 +29,11 @@ Internal operations portal for Cabinet Genies.
   the revenue and cost structure and the milestone dates, with a live read-only
   calculation from the shared engine; and a job detail page organised into
   Overview, Financials, Commission and events/history. No migration was required.
+- **Phase 3.7 (done):** percentage-based burden and warranty / service contingency —
+  both are configurable company defaults with a per-job override and snapshot, derive
+  their dollar amounts from direct job cost through the one canonical calculation,
+  and are included in total job cost before the commission tier is selected. The
+  company defaults are 0% until Cabinet Genies sets its real percentages.
 
 Sales manager bonus calculation and payout, support designer bonuses, split
 commissions, production performance bonuses, payroll batching, Buildertrend

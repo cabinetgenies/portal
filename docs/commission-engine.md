@@ -8,6 +8,44 @@ honest over time. The code that implements this document lives in
 Nothing in the UI implements its own formula: previews and stored events both call
 the same engine.
 
+## Job cost, and the percentage base
+
+Burden and warranty / service contingency are **percentages**, not dollar inputs.
+The rule lives once, in `lib/commission/financials.ts`, and is applied before the
+commission tier is selected:
+
+```
+direct_job_cost              = material + labor + subcontractor + other direct
+burden_cost                  = round(direct_job_cost × burden_percent)
+warranty_service_contingency = round(direct_job_cost × warranty_contingency_percent)
+total_job_cost               = direct_job_cost + burden_cost + warranty_service_contingency
+```
+
+**The base is direct job cost** — the four direct cost inputs, before either adder.
+Neither rate is applied to revenue: both are cost-side reserves, and a share of
+revenue would inflate cost on high-revenue jobs. Until Phase 3.7 the two amounts
+were raw dollar columns with no stated basis anywhere in this document or in the
+schema, so the base is defined here deliberately and marked on the columns the
+migration added.
+
+Where the numbers come from:
+
+| Layer | Columns | Edited by |
+| --- | --- | --- |
+| Company defaults | `commission_settings.burden_percent`, `.warranty_contingency_percent` (effective-dated) | Admin/CEO; accounting can view |
+| Per-job snapshot | `jobs.burden_percent`, `jobs.warranty_contingency_percent` | Admin/CEO on the job form |
+| Stored dollars | `jobs.burden_cost`, `jobs.warranty_service_contingency` | Nobody — derived, then stored |
+
+The defaults are 0% until Cabinet Genies sets its real numbers under
+Admin → Commission settings. The percentages in force are always shown on the job
+form and the job detail page, so nothing about the cost basis is hidden.
+
+**Historical protection.** A job keeps the rates it was saved with, and a
+commission event snapshots the commissionable GP and rates it was calculated from.
+Changing the company defaults therefore cannot rewrite an existing job's cost
+structure or any approved or paid commission event. Only a job that has never been
+saved with a rate falls back to the default in force.
+
 ## 1. Rate resolution
 
 Commission is based on **commissionable gross profit**, and the gross-profit

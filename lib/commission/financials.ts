@@ -4,19 +4,29 @@ import type {
   JobFinancialInputs,
   JobFinancialResults,
 } from "@/lib/commission/types";
+import type { JobRow } from "@/lib/supabase/database.types";
 
 /**
  * The single canonical implementation of Cabinet Genies job financial math.
  *
  * Rules that this module owns:
  *   total job revenue        = contract + change orders + other revenue - credits
- *   total job cost           = material + labor + subcontractor + other direct
- *                              + burden + warranty/service contingency
+ *   direct job cost          = material + labor + subcontractor + other direct
+ *   burden cost              = direct job cost x burden percent
+ *   warranty contingency     = direct job cost x warranty contingency percent
+ *   total job cost           = direct job cost + burden + warranty contingency
  *   actual totals            = the above plus revenue/cost adjustments
  *   job gross profit         = actual total revenue - actual total cost
  *   commissionable revenue   = actual total revenue + commissionable revenue adjustments
  *   commissionable cost      = actual total cost + commissionable cost adjustments
  *   commissionable GP        = commissionable revenue - commissionable cost
+ *
+ * Percentage base (Phase 3.7): burden and warranty/service contingency are rates
+ * applied to DIRECT job cost — the four direct inputs above, before either adder.
+ * Neither is applied to revenue: both are cost-side reserves, and a share of
+ * revenue would inflate cost on high-revenue jobs. The rates come from
+ * configuration (commission_settings) with a per-job snapshot on public.jobs;
+ * they are never constants in this module.
  *
  * Commissionable gross profit is deliberately a separate calculation from job
  * gross profit: exclusions (warranty/service contingency, non-commissionable
@@ -86,15 +96,116 @@ export function totalJobRevenue(inputs: JobFinancialInputs) {
   );
 }
 
-export function totalJobCost(inputs: JobFinancialInputs) {
+/**
+ * The base both percentage rates apply to: the four direct cost inputs, before
+ * burden and warranty / service contingency are added.
+ */
+export function directJobCost(inputs: JobFinancialInputs) {
   return fromCents(
     toCents(inputs.materialCost) +
       toCents(inputs.laborCost) +
       toCents(inputs.subcontractorCost) +
-      toCents(inputs.otherDirectCost) +
-      toCents(inputs.burdenCost) +
-      toCents(inputs.warrantyServiceContingency),
+      toCents(inputs.otherDirectCost),
   );
+}
+
+/** A percentage stored as a decimal share, clamped to the valid 0–100% range. */
+export function clampPercent(value: number) {
+  const numeric = toNumber(value);
+
+  if (numeric <= 0) return 0;
+  if (numeric >= 1) return 1;
+
+  return numeric;
+}
+
+export function calculateBurdenCost(directCost: number, burdenPercent: number) {
+  return roundMoney(directCost * clampPercent(burdenPercent));
+}
+
+export function calculateWarrantyServiceContingency(
+  directCost: number,
+  warrantyContingencyPercent: number,
+) {
+  return roundMoney(directCost * clampPercent(warrantyContingencyPercent));
+}
+
+/**
+ * Total job cost with burden and warranty / service contingency derived from
+ * their percentages — the amounts are never added twice, because they are only
+ * ever produced here.
+ */
+export function totalJobCost(inputs: JobFinancialInputs) {
+  const direct = directJobCost(inputs);
+
+  return roundMoney(
+    direct +
+      calculateBurdenCost(direct, inputs.burdenPercent) +
+      calculateWarrantyServiceContingency(direct, inputs.warrantyContingencyPercent),
+  );
+}
+
+export type JobCostRateDefaults = {
+  burdenPercent: number;
+  warrantyContingencyPercent: number;
+};
+
+export const ZERO_JOB_COST_RATES: JobCostRateDefaults = {
+  burdenPercent: 0,
+  warrantyContingencyPercent: 0,
+};
+
+/**
+ * The rates in force for a job: the job's own snapshot when it has one, otherwise
+ * the company default. A job that was saved under an older default keeps the rate
+ * it was saved with, so later setting changes cannot rewrite its cost structure.
+ */
+export function jobCostRatesFromRow(
+  row: {
+    burden_percent: number | null;
+    warranty_contingency_percent: number | null;
+  },
+  defaults: JobCostRateDefaults,
+): JobCostRateDefaults {
+  return {
+    burdenPercent:
+      row.burden_percent === null
+        ? clampPercent(defaults.burdenPercent)
+        : clampPercent(toNumber(row.burden_percent)),
+    warrantyContingencyPercent:
+      row.warranty_contingency_percent === null
+        ? clampPercent(defaults.warrantyContingencyPercent)
+        : clampPercent(toNumber(row.warranty_contingency_percent)),
+  };
+}
+
+/**
+ * The revenue and cost inputs from a stored job row, ready for the calculation.
+ *
+ * The stored `burden_cost` and `warranty_service_contingency` dollars are
+ * deliberately **not** read back in: those amounts are derived from the rates, so
+ * feeding them in as inputs as well would count them twice. The job's own snapshot
+ * rates win; `defaults` (the company settings in force) only fills a job that has
+ * never been saved with a rate.
+ */
+export function jobFinancialInputsFromRow(
+  row: JobRow,
+  defaults: JobCostRateDefaults = ZERO_JOB_COST_RATES,
+): JobFinancialInputs {
+  const rates = jobCostRatesFromRow(row, defaults);
+
+  return {
+    contractRevenue: toNumber(row.contract_revenue),
+    changeOrderRevenue: toNumber(row.change_order_revenue),
+    creditAmount: toNumber(row.credit_amount),
+    otherRevenue: toNumber(row.other_revenue),
+    materialCost: toNumber(row.material_cost),
+    laborCost: toNumber(row.labor_cost),
+    subcontractorCost: toNumber(row.subcontractor_cost),
+    otherDirectCost: toNumber(row.other_direct_cost),
+    burdenPercent: rates.burdenPercent,
+    warrantyContingencyPercent: rates.warrantyContingencyPercent,
+  };
 }
 
 export function sumAdjustments(
@@ -186,6 +297,9 @@ export function computeJobFinancials(
   adjustments: readonly JobAdjustmentInput[] = [],
 ): JobFinancialResults {
   const revenue = actualTotalRevenue(inputs, adjustments);
+  const direct = directJobCost(inputs);
+  const burdenPercent = clampPercent(inputs.burdenPercent);
+  const warrantyContingencyPercent = clampPercent(inputs.warrantyContingencyPercent);
   const cost = actualTotalCost(inputs, adjustments);
   const grossProfit = roundMoney(revenue - cost);
 
@@ -194,6 +308,14 @@ export function computeJobFinancials(
   const commissionableGp = roundMoney(commissionableRev - commissionableCst);
 
   return {
+    directJobCost: direct,
+    burdenCost: calculateBurdenCost(direct, burdenPercent),
+    warrantyServiceContingency: calculateWarrantyServiceContingency(
+      direct,
+      warrantyContingencyPercent,
+    ),
+    burdenPercent,
+    warrantyContingencyPercent,
     actualTotalRevenue: revenue,
     actualTotalCost: cost,
     jobGrossProfit: grossProfit,

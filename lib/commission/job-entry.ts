@@ -6,8 +6,15 @@ import {
   calculateGrossCommission,
   type CommissionSettingsSnapshot,
 } from "@/lib/commission/engine";
-import { computeJobFinancials, toNumber } from "@/lib/commission/financials";
+import {
+  computeJobFinancials,
+  jobCostRatesFromRow,
+  toNumber,
+  ZERO_JOB_COST_RATES,
+  type JobCostRateDefaults,
+} from "@/lib/commission/financials";
 import type { JobFinancialInputs, JobFinancialResults } from "@/lib/commission/types";
+import { fromDecimalPercent, toDecimalPercent } from "@/lib/utils/percent";
 import type {
   CompensationPlanRow,
   CompensationPlanTierRow,
@@ -61,35 +68,58 @@ export const JOB_REVENUE_FIELDS = [
 ] as const;
 
 export const JOB_COST_FIELDS = [
-  { name: "materialCost", column: "material_cost", label: "Material", hint: "" },
-  { name: "laborCost", column: "labor_cost", label: "Labor", hint: "" },
+  {
+    name: "materialCost",
+    column: "material_cost",
+    label: "Cabinet / material cost",
+    hint: "",
+  },
+  {
+    name: "laborCost",
+    column: "labor_cost",
+    label: "Labor / installation cost",
+    hint: "",
+  },
   {
     name: "subcontractorCost",
     column: "subcontractor_cost",
-    label: "Subcontractor",
+    label: "Subcontractor cost",
     hint: "",
   },
   {
     name: "otherDirectCost",
     column: "other_direct_cost",
-    label: "Other direct cost",
-    hint: "",
-  },
-  {
-    name: "burdenCost",
-    column: "burden_cost",
-    label: "Burden",
-    hint: "Included in total job cost by the shared calculation.",
-  },
-  {
-    name: "warrantyServiceContingency",
-    column: "warranty_service_contingency",
-    label: "Warranty / service contingency",
-    hint: "",
+    label: "Other direct costs",
+    hint: "Freight, permits and similar. The schema has no separate freight column.",
   },
 ] as const;
 
 export const JOB_MONEY_FIELDS = [...JOB_REVENUE_FIELDS, ...JOB_COST_FIELDS] as const;
+
+/**
+ * Burden and warranty / service contingency are rates, not amounts. They default
+ * from company settings and can be overridden per job; the dollar amounts are
+ * derived by the canonical calculation.
+ */
+export const JOB_COST_RATE_FIELDS = [
+  {
+    name: "burdenPercent",
+    label: "Burden %",
+    hint: "Applied to direct job cost, before burden and warranty are added.",
+  },
+  {
+    name: "warrantyContingencyPercent",
+    label: "Warranty / service contingency %",
+    hint: "Applied to the same direct job cost base as burden.",
+  },
+] as const;
+
+export type JobCostRateFieldName = (typeof JOB_COST_RATE_FIELDS)[number]["name"];
+export type JobCostRateValues = Record<JobCostRateFieldName, string>;
+
+export function emptyJobCostRateValues(): JobCostRateValues {
+  return { burdenPercent: "0", warrantyContingencyPercent: "0" };
+}
 
 export type JobRevenueFieldName = (typeof JOB_REVENUE_FIELDS)[number]["name"];
 export type JobCostFieldName = (typeof JOB_COST_FIELDS)[number]["name"];
@@ -113,7 +143,10 @@ export function jobMoneyValuesFromJob(job: JobRow): JobMoneyValues {
   ) as JobMoneyValues;
 }
 
-export function jobFinancialInputsFromValues(values: JobMoneyValues): JobFinancialInputs {
+export function jobFinancialInputsFromValues(
+  values: JobMoneyValues,
+  rates: JobCostRateDefaults,
+): JobFinancialInputs {
   return {
     contractRevenue: toNumber(values.contractRevenue),
     changeOrderRevenue: toNumber(values.changeOrderRevenue),
@@ -123,8 +156,38 @@ export function jobFinancialInputsFromValues(values: JobMoneyValues): JobFinanci
     laborCost: toNumber(values.laborCost),
     subcontractorCost: toNumber(values.subcontractorCost),
     otherDirectCost: toNumber(values.otherDirectCost),
-    burdenCost: toNumber(values.burdenCost),
-    warrantyServiceContingency: toNumber(values.warrantyServiceContingency),
+    burdenPercent: rates.burdenPercent,
+    warrantyContingencyPercent: rates.warrantyContingencyPercent,
+  };
+}
+
+/** Percent points as typed in the form ("10") to decimal shares (0.1). */
+export function costRateValuesToDecimals(values: JobCostRateValues): JobCostRateDefaults {
+  return {
+    burdenPercent: toDecimalPercent(
+      Math.max(0, Math.min(100, toNumber(values.burdenPercent))),
+    ),
+    warrantyContingencyPercent: toDecimalPercent(
+      Math.max(0, Math.min(100, toNumber(values.warrantyContingencyPercent))),
+    ),
+  };
+}
+
+/**
+ * The rate fields pre-filled for a job: its own snapshot when it has one,
+ * otherwise the company default, shown as percent points.
+ */
+export function jobCostRateValuesFromJob(
+  job: Pick<JobRow, "burden_percent" | "warranty_contingency_percent">,
+  defaults: JobCostRateDefaults,
+): JobCostRateValues {
+  const rates = jobCostRatesFromRow(job, defaults);
+
+  return {
+    burdenPercent: String(fromDecimalPercent(rates.burdenPercent) ?? 0),
+    warrantyContingencyPercent: String(
+      fromDecimalPercent(rates.warrantyContingencyPercent) ?? 0,
+    ),
   };
 }
 
@@ -158,18 +221,24 @@ export type JobEntryPreview = {
  */
 export function buildJobEntryPreview({
   values,
+  rateValues,
   tiers,
   minimumGpStandard,
   settings,
   onDraw,
 }: {
   values: JobMoneyValues;
+  rateValues: JobCostRateValues;
   tiers: readonly TierWindow[];
   minimumGpStandard: number;
   settings: CommissionSettingsSnapshot;
   onDraw: boolean;
 }): JobEntryPreview {
-  const financials = computeJobFinancials(jobFinancialInputsFromValues(values));
+  // Burden and warranty / service contingency are derived from the rates here by
+  // the same canonical function the Server Action persists with.
+  const financials = computeJobFinancials(
+    jobFinancialInputsFromValues(values, costRateValuesToDecimals(rateValues)),
+  );
   const warnings: string[] = [];
   const tier =
     tiers.length > 0
@@ -252,6 +321,8 @@ export type JobEntryOptions = {
   designers: JobEntryDesigner[];
   plans: JobEntryPlan[];
   settings: CommissionSettingsSnapshot;
+  /** Company default burden and warranty rates for a new job. */
+  costRates: JobCostRateDefaults;
 };
 
 export type JobEntryOptionSources = {
@@ -263,6 +334,8 @@ export type JobEntryOptionSources = {
   planTiers: readonly CompensationPlanTierRow[];
   drawPeriods: readonly EmployeeDrawPeriodRow[];
   settings: CommissionSettingsSnapshot;
+  /** Company default cost rates; defaults to 0% when a caller omits them. */
+  costRates?: JobCostRateDefaults;
   today: string;
 };
 
@@ -323,6 +396,7 @@ export function buildJobEntryOptions({
   planTiers,
   drawPeriods,
   settings,
+  costRates = ZERO_JOB_COST_RATES,
   today,
 }: JobEntryOptionSources): JobEntryOptions {
   const designerPlans = plans.filter((plan) => plan.participant_kind === "sales_designer");
@@ -378,6 +452,7 @@ export function buildJobEntryOptions({
       }))
       .sort((a, b) => a.name.localeCompare(b.name)),
     settings,
+    costRates,
   };
 }
 

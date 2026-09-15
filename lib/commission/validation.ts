@@ -48,6 +48,23 @@ const signedMoneyField = (label: string) =>
       .max(1_000_000_000, `${label} is larger than this portal supports.`),
   );
 
+/**
+ * A cost rate entered as percent points (10 = 10%) and stored as a decimal share.
+ *
+ * Blank is meaningful: it means "use the company default", which the Server Action
+ * resolves before the canonical calculation runs. Negative and above-100% values
+ * are data-entry errors, rejected here as well as by the database constraints.
+ */
+const optionalPercentPoints = (label: string) =>
+  z.preprocess(
+    (value) => (value === "" || value === null || value === undefined ? null : value),
+    z.coerce
+      .number({ error: `${label} must be a number.` })
+      .min(0, `${label} cannot be negative.`)
+      .max(100, `${label} cannot be more than 100%.`)
+      .nullable(),
+  );
+
 const dateField = (label: string) =>
   z.preprocess(
     (value) => (value === "" || value === null || value === undefined ? null : value),
@@ -96,8 +113,8 @@ export const jobFinancialsSchema = z.object({
   laborCost: moneyField("Labor cost"),
   subcontractorCost: moneyField("Subcontractor cost"),
   otherDirectCost: moneyField("Other direct cost"),
-  burdenCost: moneyField("Burden cost"),
-  warrantyServiceContingency: moneyField("Warranty/service contingency"),
+  burdenPercent: optionalPercentPoints("Burden percentage"),
+  warrantyContingencyPercent: optionalPercentPoints("Warranty contingency percentage"),
 });
 
 export type JobFinancialsInput = z.infer<typeof jobFinancialsSchema>;
@@ -121,8 +138,8 @@ export const jobEntrySchema = jobOverviewSchema.omit({ jobId: true }).extend({
   laborCost: moneyField("Labor cost"),
   subcontractorCost: moneyField("Subcontractor cost"),
   otherDirectCost: moneyField("Other direct cost"),
-  burdenCost: moneyField("Burden"),
-  warrantyServiceContingency: moneyField("Warranty / service contingency"),
+  burdenPercent: optionalPercentPoints("Burden percentage"),
+  warrantyContingencyPercent: optionalPercentPoints("Warranty contingency percentage"),
 });
 
 export type JobEntryInput = z.infer<typeof jobEntrySchema>;

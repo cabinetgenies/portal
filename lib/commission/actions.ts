@@ -9,7 +9,8 @@ import {
   resolveSalePlanSnapshot,
   type PlanVersionWindow,
 } from "@/lib/compensation/plan-resolution";
-import { computeJobFinancials } from "@/lib/commission/financials";
+import { computeJobFinancials, type JobCostRateDefaults } from "@/lib/commission/financials";
+import { getCommissionSettings, jobCostRateDefaults } from "@/lib/commission/event-queries";
 import { adjustmentInputsFromRows, financialInputsFromJob } from "@/lib/commission/queries";
 import {
   failureState,
@@ -27,6 +28,7 @@ import {
   jobOverviewSchema,
 } from "@/lib/commission/validation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { toDecimalPercent } from "@/lib/utils/percent";
 import type {
   CompensationPlanVersionRow,
   JobFinancialAdjustmentRow,
@@ -55,6 +57,35 @@ function soldDateRequirement(status: string, soldDate: string | null) {
   }
 
   return null;
+}
+
+/**
+ * Resolves the cost rates a save should use: the submitted per-job override when
+ * there is one, otherwise the company default in force. The resolved rates are
+ * written onto the job, which is what makes the calculation reproducible after the
+ * company default changes.
+ */
+async function resolveJobCostRates(overrides: {
+  burdenPercent: number | null;
+  warrantyContingencyPercent: number | null;
+}): Promise<JobCostRateDefaults> {
+  if (
+    overrides.burdenPercent !== null &&
+    overrides.warrantyContingencyPercent !== null
+  ) {
+    return {
+      burdenPercent: overrides.burdenPercent,
+      warrantyContingencyPercent: overrides.warrantyContingencyPercent,
+    };
+  }
+
+  const defaults = jobCostRateDefaults(await getCommissionSettings());
+
+  return {
+    burdenPercent: overrides.burdenPercent ?? defaults.burdenPercent,
+    warrantyContingencyPercent:
+      overrides.warrantyContingencyPercent ?? defaults.warrantyContingencyPercent,
+  };
 }
 
 /**
@@ -113,9 +144,10 @@ async function validateJobPlanPairing(
 /** Recomputes and persists the derived columns from the stored inputs. */
 async function refreshJobTotals(jobId: string) {
   const supabase = await createSupabaseServerClient();
-  const [jobResult, adjustmentsResult] = await Promise.all([
+  const [jobResult, adjustmentsResult, settings] = await Promise.all([
     supabase.from("jobs").select("*").eq("id", jobId).maybeSingle(),
     supabase.from("job_financial_adjustments").select("*").eq("job_id", jobId),
+    getCommissionSettings(),
   ]);
 
   if (jobResult.error || !jobResult.data) {
@@ -124,13 +156,17 @@ async function refreshJobTotals(jobId: string) {
 
   const job = jobResult.data as JobRow;
   const financials = computeJobFinancials(
-    financialInputsFromJob(job),
+    financialInputsFromJob(job, jobCostRateDefaults(settings)),
     adjustmentInputsFromRows((adjustmentsResult.data ?? []) as JobFinancialAdjustmentRow[]),
   );
 
   await supabase
     .from("jobs")
     .update({
+      burden_percent: financials.burdenPercent,
+      warranty_contingency_percent: financials.warrantyContingencyPercent,
+      burden_cost: financials.burdenCost,
+      warranty_service_contingency: financials.warrantyServiceContingency,
       actual_total_revenue: financials.actualTotalRevenue,
       actual_total_cost: financials.actualTotalCost,
       job_gross_profit: financials.jobGrossProfit,
@@ -171,6 +207,15 @@ export async function createJob(
 
   if (planError) return planError;
 
+  const rates = await resolveJobCostRates({
+    burdenPercent:
+      data.burdenPercent === null ? null : toDecimalPercent(data.burdenPercent),
+    warrantyContingencyPercent:
+      data.warrantyContingencyPercent === null
+        ? null
+        : toDecimalPercent(data.warrantyContingencyPercent),
+  });
+
   // Derived figures are written through the canonical calculation even when the
   // job starts at zero, so a new row can never disagree with the domain rules.
   const financials = computeJobFinancials({
@@ -182,8 +227,8 @@ export async function createJob(
     laborCost: data.laborCost,
     subcontractorCost: data.subcontractorCost,
     otherDirectCost: data.otherDirectCost,
-    burdenCost: data.burdenCost,
-    warrantyServiceContingency: data.warrantyServiceContingency,
+    burdenPercent: rates.burdenPercent,
+    warrantyContingencyPercent: rates.warrantyContingencyPercent,
   });
 
   const supabase = await createSupabaseServerClient();
@@ -208,8 +253,10 @@ export async function createJob(
       labor_cost: data.laborCost,
       subcontractor_cost: data.subcontractorCost,
       other_direct_cost: data.otherDirectCost,
-      burden_cost: data.burdenCost,
-      warranty_service_contingency: data.warrantyServiceContingency,
+      burden_percent: rates.burdenPercent,
+      warranty_contingency_percent: rates.warrantyContingencyPercent,
+      burden_cost: financials.burdenCost,
+      warranty_service_contingency: financials.warrantyServiceContingency,
       compensation_plan_id: data.compensationPlanId,
       compensation_plan_version_id: data.compensationPlanVersionId,
       actual_total_revenue: financials.actualTotalRevenue,
@@ -299,8 +346,28 @@ export async function updateJobFinancials(
 
   if (adjustmentError) return mutationErrorState(adjustmentError, "adjustment");
 
+  const rates = await resolveJobCostRates({
+    burdenPercent:
+      money.burdenPercent === null ? null : toDecimalPercent(money.burdenPercent),
+    warrantyContingencyPercent:
+      money.warrantyContingencyPercent === null
+        ? null
+        : toDecimalPercent(money.warrantyContingencyPercent),
+  });
+
   const financials = computeJobFinancials(
-    money,
+    {
+      contractRevenue: money.contractRevenue,
+      changeOrderRevenue: money.changeOrderRevenue,
+      creditAmount: money.creditAmount,
+      otherRevenue: money.otherRevenue,
+      materialCost: money.materialCost,
+      laborCost: money.laborCost,
+      subcontractorCost: money.subcontractorCost,
+      otherDirectCost: money.otherDirectCost,
+      burdenPercent: rates.burdenPercent,
+      warrantyContingencyPercent: rates.warrantyContingencyPercent,
+    },
     adjustmentInputsFromRows((adjustments ?? []) as JobFinancialAdjustmentRow[]),
   );
 
@@ -315,8 +382,10 @@ export async function updateJobFinancials(
       labor_cost: money.laborCost,
       subcontractor_cost: money.subcontractorCost,
       other_direct_cost: money.otherDirectCost,
-      burden_cost: money.burdenCost,
-      warranty_service_contingency: money.warrantyServiceContingency,
+      burden_percent: rates.burdenPercent,
+      warranty_contingency_percent: rates.warrantyContingencyPercent,
+      burden_cost: financials.burdenCost,
+      warranty_service_contingency: financials.warrantyServiceContingency,
       actual_total_revenue: financials.actualTotalRevenue,
       actual_total_cost: financials.actualTotalCost,
       job_gross_profit: financials.jobGrossProfit,

@@ -53,8 +53,15 @@ export async function saveCommissionSettings(
   const parsed = commissionSettingsSchema.safeParse(formDataToObject(formData));
   if (!parsed.success) return validationErrorState(parsed.error);
 
-  const { effectiveFrom, depositPayoutPercent, drawRateReduction, drawEnabled, notes } =
-    parsed.data;
+  const {
+    effectiveFrom,
+    depositPayoutPercent,
+    drawRateReduction,
+    drawEnabled,
+    burdenPercent,
+    warrantyContingencyPercent,
+    notes,
+  } = parsed.data;
 
   const supabase = await createSupabaseServerClient();
   const { error } = await supabase.from("commission_settings").upsert(
@@ -63,6 +70,8 @@ export async function saveCommissionSettings(
       deposit_payout_percent: toDecimalPercent(depositPayoutPercent),
       draw_rate_reduction: toDecimalPercent(drawRateReduction),
       draw_enabled: drawEnabled,
+      burden_percent: toDecimalPercent(burdenPercent),
+      warranty_contingency_percent: toDecimalPercent(warrantyContingencyPercent),
       notes,
       created_by: auth.userId,
     },
@@ -77,7 +86,7 @@ export async function saveCommissionSettings(
   revalidatePath("/commissions/jobs");
 
   return successState(
-    "Commission settings saved. These values apply to calculations made from the effective date onward; existing commission events keep their snapshot.",
+    "Commission settings saved. These values apply to calculations made from the effective date onward. Jobs already saved keep the burden and warranty rates they were stored with, and existing commission events keep their snapshot.",
   );
 }
 

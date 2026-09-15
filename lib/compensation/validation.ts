@@ -126,6 +126,14 @@ export const commissionSettingsSchema = z.object({
     .number({ error: "Draw rate reduction must be a number." })
     .min(0, "Draw rate reduction must be between 0 and 100 percentage points.")
     .max(100, "Draw rate reduction must be between 0 and 100 percentage points."),
+  burdenPercent: z.coerce
+    .number({ error: "Burden percentage must be a number." })
+    .min(0, "Burden percentage cannot be negative.")
+    .max(100, "Burden percentage cannot be more than 100%."),
+  warrantyContingencyPercent: z.coerce
+    .number({ error: "Warranty contingency percentage must be a number." })
+    .min(0, "Warranty contingency percentage cannot be negative.")
+    .max(100, "Warranty contingency percentage cannot be more than 100%."),
   drawEnabled: booleanField("Draw system enabled"),
   notes: optionalText(400),
 });

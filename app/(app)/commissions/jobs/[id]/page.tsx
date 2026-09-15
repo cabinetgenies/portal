@@ -27,8 +27,13 @@ import {
 import {
   getJobDetail,
 } from "@/lib/commission/queries";
-import { getJobCommissionContext } from "@/lib/commission/event-queries";
-import { toNumber } from "@/lib/commission/financials";
+import {
+  getCommissionSettings,
+  getJobCommissionContext,
+  jobCostRateDefaults,
+} from "@/lib/commission/event-queries";
+import { directJobCost, jobCostRatesFromRow, toNumber } from "@/lib/commission/financials";
+import { financialInputsFromJob } from "@/lib/commission/queries";
 import {
   ADJUSTMENT_TYPE_LABELS,
   isAdjustmentType,
@@ -74,6 +79,12 @@ export default async function JobDetailPage(props: PageProps<"/commissions/jobs/
   const canVoid = session.capabilities.includes("void:commission");
 
   const commissionContext = await getJobCommissionContext(id);
+  const commissionSettings = await getCommissionSettings();
+  const costRateDefaults = jobCostRateDefaults(commissionSettings);
+  // The job's own snapshot wins; the company default only fills a job that has
+  // never been saved with a rate.
+  const costRates = jobCostRatesFromRow(job, costRateDefaults);
+  const directCostValue = directJobCost(financialInputsFromJob(job, costRateDefaults));
 
   // Anything already approved or paid keeps the figures it was calculated with.
   const recognizedEvents = (commissionContext?.events ?? []).filter(
@@ -237,20 +248,47 @@ export default async function JobDetailPage(props: PageProps<"/commissions/jobs/
         ) : null}
 
         {canEditFinancials ? (
-          <JobFinancialsForm job={job} adjustments={adjustmentInputs} />
+          <JobFinancialsForm
+            job={job}
+            adjustments={adjustmentInputs}
+            costRates={costRateDefaults}
+          />
         ) : (
           <dl className="grid gap-x-8 gap-y-4 sm:grid-cols-2 lg:grid-cols-3">
-            <ReadOnly label="Total job revenue" value={formatMoney(job.actual_total_revenue)} />
-            <ReadOnly label="Total job cost" value={formatMoney(job.actual_total_cost)} />
-            <ReadOnly label="Job gross profit" value={formatMoney(job.job_gross_profit)} />
-            <ReadOnly label="Job GP %" value={formatPercent(job.job_gp_percent)} />
+            <ReadOnly
+              label="Total job revenue"
+              value={formatMoney(toNumber(job.actual_total_revenue))}
+            />
+            <ReadOnly label="Direct job cost" value={formatMoney(directCostValue)} />
+            <ReadOnly
+              label="Burden"
+              value={`${formatPercent(costRates.burdenPercent, 2)} · ${formatMoney(
+                toNumber(job.burden_cost),
+              )}`}
+            />
+            <ReadOnly
+              label="Warranty / service contingency"
+              value={`${formatPercent(
+                costRates.warrantyContingencyPercent,
+                2,
+              )} · ${formatMoney(toNumber(job.warranty_service_contingency))}`}
+            />
+            <ReadOnly
+              label="Total job cost"
+              value={formatMoney(toNumber(job.actual_total_cost))}
+            />
+            <ReadOnly
+              label="Job gross profit"
+              value={formatMoney(toNumber(job.job_gross_profit))}
+            />
+            <ReadOnly label="Job GP %" value={formatPercent(toNumber(job.job_gp_percent))} />
             <ReadOnly
               label="Commissionable GP"
-              value={formatMoney(job.commissionable_gross_profit)}
+              value={formatMoney(toNumber(job.commissionable_gross_profit))}
             />
             <ReadOnly
               label="Commissionable GP %"
-              value={formatPercent(job.commissionable_gp_percent)}
+              value={formatPercent(toNumber(job.commissionable_gp_percent))}
             />
           </dl>
         )}

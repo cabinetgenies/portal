@@ -27,6 +27,8 @@ export function CommissionSettingsForm({
     depositPayoutPercent: number;
     drawRateReduction: number;
     drawEnabled: boolean;
+    burdenPercent: number;
+    warrantyContingencyPercent: number;
     notes: string | null;
   } | null;
   defaultEffectiveFrom: string;
@@ -88,7 +90,46 @@ export function CommissionSettingsForm({
             required
           />
         </Field>
-        <div className="flex items-end pb-1">
+      </div>
+
+      <div className="grid gap-3 border-t border-line pt-4 sm:grid-cols-2 lg:grid-cols-4">
+        <Field
+          label="Burden (%)"
+          htmlFor="settings-burden"
+          hint="Applied to direct job cost: material + labor + subcontractor + other direct."
+          error={fieldError(state, "burdenPercent")}
+        >
+          <TextInput
+            id="settings-burden"
+            name="burdenPercent"
+            type="number"
+            step="0.01"
+            min="0"
+            max="100"
+            defaultValue={fromDecimalPercent(settings?.burdenPercent ?? 0) ?? 0}
+            required
+          />
+        </Field>
+        <Field
+          label="Warranty / service contingency (%)"
+          htmlFor="settings-warranty"
+          hint="Applied to the same direct job cost base as burden."
+          error={fieldError(state, "warrantyContingencyPercent")}
+        >
+          <TextInput
+            id="settings-warranty"
+            name="warrantyContingencyPercent"
+            type="number"
+            step="0.01"
+            min="0"
+            max="100"
+            defaultValue={
+              fromDecimalPercent(settings?.warrantyContingencyPercent ?? 0) ?? 0
+            }
+            required
+          />
+        </Field>
+        <div className="flex items-end pb-1 sm:col-span-2">
           <CheckboxField
             label="Draw system enabled"
             name="drawEnabled"
@@ -97,6 +138,14 @@ export function CommissionSettingsForm({
           />
         </div>
       </div>
+
+      <p className="text-xs leading-5 text-ink-subtle">
+        Burden and warranty percentages are the company defaults for new jobs. A job
+        snapshots the rates it was saved with, so changing these never rewrites an existing
+        job&apos;s cost structure or any commission already calculated from it. Both rates
+        apply to direct job cost — never to revenue — and are included in total job cost
+        before the commission tier is selected.
+      </p>
 
       <Field label="Notes" htmlFor="settings-notes" error={fieldError(state, "notes")}>
         <TextInput

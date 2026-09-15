@@ -272,6 +272,8 @@ export type JobRow = {
   commissionable_cost: number;
   commissionable_gross_profit: number;
   commissionable_gp_percent: number;
+  burden_percent: number | null;
+  warranty_contingency_percent: number | null;
   compensation_plan_id: string | null;
   compensation_plan_version_id: string | null;
   created_by: string | null;
@@ -309,6 +311,8 @@ export type JobInsert = {
   commissionable_cost?: number;
   commissionable_gross_profit?: number;
   commissionable_gp_percent?: number;
+  burden_percent?: number | null;
+  warranty_contingency_percent?: number | null;
   compensation_plan_id?: string | null;
   compensation_plan_version_id?: string | null;
   created_by?: string | null;
@@ -368,6 +372,8 @@ export type CommissionSettingsRow = {
   deposit_payout_percent: number;
   draw_rate_reduction: number;
   draw_enabled: boolean;
+  burden_percent: number;
+  warranty_contingency_percent: number;
   notes: string | null;
   created_by: string | null;
   created_at: string;
@@ -380,6 +386,8 @@ export type CommissionSettingsInsert = {
   deposit_payout_percent?: number;
   draw_rate_reduction?: number;
   draw_enabled?: boolean;
+  burden_percent?: number;
+  warranty_contingency_percent?: number;
   notes?: string | null;
   created_by?: string | null;
   created_at?: string;

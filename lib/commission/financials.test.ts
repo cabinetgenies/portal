@@ -4,11 +4,14 @@ import test from "node:test";
 import {
   actualTotalCost,
   actualTotalRevenue,
+  calculateBurdenCost,
+  calculateWarrantyServiceContingency,
   commissionableCost,
   commissionableGrossProfit,
   commissionableGrossProfitPercent,
   commissionableRevenue,
   computeJobFinancials,
+  directJobCost,
   jobGrossProfit,
   jobGrossProfitPercent,
   roundMoney,
@@ -49,17 +52,20 @@ test("credits reduce total job revenue", () => {
   assert.equal(totalJobRevenue(job), 41_800);
 });
 
-test("total job cost sums every cost component including warranty/service contingency", () => {
+test("total job cost is direct cost plus the derived burden and warranty contingency", () => {
   const job = inputs({
     materialCost: 12_000,
     laborCost: 8_000,
     subcontractorCost: 3_000,
     otherDirectCost: 750,
-    burdenCost: 1_250,
-    warrantyServiceContingency: 500,
+    burdenPercent: 0.1,
+    warrantyContingencyPercent: 0.05,
   });
 
-  assert.equal(totalJobCost(job), 25_500);
+  assert.equal(directJobCost(job), 23_750);
+  assert.equal(calculateBurdenCost(23_750, 0.1), 2_375);
+  assert.equal(calculateWarrantyServiceContingency(23_750, 0.05), 1_187.5);
+  assert.equal(totalJobCost(job), 27_312.5);
 });
 
 test("job gross profit is revenue minus cost and is independent of commission rules", () => {
@@ -136,7 +142,8 @@ test("commissionable gross profit equals job gross profit when nothing is exclud
     changeOrderRevenue: 5_000,
     materialCost: 20_000,
     laborCost: 10_000,
-    warrantyServiceContingency: 1_000,
+    burdenPercent: 0.1,
+    warrantyContingencyPercent: 0.05,
   });
 
   const results = computeJobFinancials(job);
@@ -152,11 +159,11 @@ test("explicit exclusions reduce commissionable gross profit without touching jo
     contractRevenue: 50_000,
     materialCost: 20_000,
     laborCost: 10_000,
-    warrantyServiceContingency: 1_000,
+    burdenPercent: 0.1,
   });
 
-  // Warranty/service contingency is excluded from commissions here because the
-  // business said so, not because the calculation hardcodes it.
+  // Cost is excluded from the commission base here because the business said so,
+  // not because the calculation hardcodes it.
   const adjustments: JobAdjustmentInput[] = [
     { adjustmentType: "commissionable_revenue", amount: -2_000 },
     { adjustmentType: "commissionable_cost", amount: -1_000 },
@@ -164,13 +171,14 @@ test("explicit exclusions reduce commissionable gross profit without touching jo
 
   const results = computeJobFinancials(job, adjustments);
 
-  assert.equal(results.jobGrossProfit, 19_000);
+  // direct 30,000 + 10% burden = 33,000 cost
+  assert.equal(results.jobGrossProfit, 17_000);
   assert.equal(results.commissionableRevenue, 48_000);
-  assert.equal(results.commissionableCost, 30_000);
-  assert.equal(results.commissionableGrossProfit, 18_000);
-  assert.equal(commissionableGrossProfit(job, adjustments), 18_000);
+  assert.equal(results.commissionableCost, 32_000);
+  assert.equal(results.commissionableGrossProfit, 16_000);
+  assert.equal(commissionableGrossProfit(job, adjustments), 16_000);
   assert.equal(commissionableRevenue(job, adjustments), 48_000);
-  assert.equal(commissionableCost(job, adjustments), 30_000);
+  assert.equal(commissionableCost(job, adjustments), 32_000);
 });
 
 test("a pure commissionable exclusion lowers commissionable GP below job GP", () => {
@@ -201,20 +209,25 @@ test("computeJobFinancials is the single source of every derived figure", () => 
     laborCost: 25_000,
     subcontractorCost: 5_000,
     otherDirectCost: 1_000,
-    burdenCost: 4_000,
-    warrantyServiceContingency: 2_000,
+    burdenPercent: 0.1,
+    warrantyContingencyPercent: 0.05,
   });
 
   const results = computeJobFinancials(job);
 
   assert.deepEqual(results, {
+    directJobCost: 61_000,
+    burdenCost: 6_100,
+    warrantyServiceContingency: 3_050,
+    burdenPercent: 0.1,
+    warrantyContingencyPercent: 0.05,
     actualTotalRevenue: 107_000,
-    actualTotalCost: 67_000,
-    jobGrossProfit: 40_000,
-    jobGpPercent: 0.373832,
+    actualTotalCost: 70_150,
+    jobGrossProfit: 36_850,
+    jobGpPercent: 0.344393,
     commissionableRevenue: 107_000,
-    commissionableCost: 67_000,
-    commissionableGrossProfit: 40_000,
-    commissionableGpPercent: 0.373832,
+    commissionableCost: 70_150,
+    commissionableGrossProfit: 36_850,
+    commissionableGpPercent: 0.344393,
   });
 });

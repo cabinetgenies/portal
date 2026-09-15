@@ -1,5 +1,3 @@
-import type { JobRow } from "@/lib/supabase/database.types";
-
 export const JOB_STATUSES = [
   "presale",
   "sold",
@@ -66,6 +64,15 @@ export const ADJUSTMENT_TYPE_HINTS: Record<AdjustmentType, string> = {
  * The revenue and cost inputs a job is built from. Money only — these are the
  * numbers accounting enters, and they are independent of commission rules.
  */
+/**
+ * The inputs a job's financials are calculated from.
+ *
+ * Direct costs are entered. Burden and warranty / service contingency are
+ * *percentages* of direct job cost and their dollar amounts are derived by
+ * `computeJobFinancials`. Percentages are decimal shares (0.1 = 10%) and are
+ * always resolved before reaching this type: from the job's own snapshot when it
+ * has one, otherwise from the company default in `commission_settings`.
+ */
 export type JobFinancialInputs = {
   contractRevenue: number;
   changeOrderRevenue: number;
@@ -75,8 +82,8 @@ export type JobFinancialInputs = {
   laborCost: number;
   subcontractorCost: number;
   otherDirectCost: number;
-  burdenCost: number;
-  warrantyServiceContingency: number;
+  burdenPercent: number;
+  warrantyContingencyPercent: number;
 };
 
 export type JobAdjustmentInput = {
@@ -86,6 +93,15 @@ export type JobAdjustmentInput = {
 
 /** Everything derived from the inputs above, in one shape. */
 export type JobFinancialResults = {
+  /** material + labor + subcontractor + other direct — the base for both rates. */
+  directJobCost: number;
+  /** Derived: directJobCost x burdenPercent, rounded to cents. */
+  burdenCost: number;
+  /** Derived: directJobCost x warrantyContingencyPercent, rounded to cents. */
+  warrantyServiceContingency: number;
+  /** The rates those amounts were derived from, echoed for snapshotting. */
+  burdenPercent: number;
+  warrantyContingencyPercent: number;
   actualTotalRevenue: number;
   actualTotalCost: number;
   jobGrossProfit: number;
@@ -105,8 +121,8 @@ export const EMPTY_JOB_FINANCIAL_INPUTS: JobFinancialInputs = {
   laborCost: 0,
   subcontractorCost: 0,
   otherDirectCost: 0,
-  burdenCost: 0,
-  warrantyServiceContingency: 0,
+  burdenPercent: 0,
+  warrantyContingencyPercent: 0,
 };
 
 /** Narrows a stored string status to the constrained set. */
@@ -128,21 +144,6 @@ export function isAdjustmentType(value: unknown): value is AdjustmentType {
   );
 }
 
-/** Pulls the money inputs out of a stored job row. */
-export function jobFinancialInputsFromRow(row: JobRow): JobFinancialInputs {
-  return {
-    contractRevenue: row.contract_revenue,
-    changeOrderRevenue: row.change_order_revenue,
-    creditAmount: row.credit_amount,
-    otherRevenue: row.other_revenue,
-    materialCost: row.material_cost,
-    laborCost: row.labor_cost,
-    subcontractorCost: row.subcontractor_cost,
-    otherDirectCost: row.other_direct_cost,
-    burdenCost: row.burden_cost,
-    warrantyServiceContingency: row.warranty_service_contingency,
-  };
-}
 
 // ---------------------------------------------------------------------------
 // Commission events, payout stages and ledger vocabulary

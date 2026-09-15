@@ -1,7 +1,13 @@
 import { cache } from "react";
 
 import { displayNameFor } from "@/lib/auth/identity";
-import { computeJobFinancials, toNumber } from "@/lib/commission/financials";
+import {
+  computeJobFinancials,
+  jobFinancialInputsFromRow,
+  toNumber,
+  ZERO_JOB_COST_RATES,
+  type JobCostRateDefaults,
+} from "@/lib/commission/financials";
 import { isAdjustmentType, type AdjustmentType } from "@/lib/commission/types";
 import type {
   AuditEventRow,
@@ -184,20 +190,18 @@ export const getJobDetail = cache(async function getJobDetail(jobId: string) {
   } satisfies JobDetail;
 });
 
-/** The revenue/cost inputs from a stored job row, ready for the domain functions. */
-export function financialInputsFromJob(job: JobRow) {
-  return {
-    contractRevenue: toNumber(job.contract_revenue),
-    changeOrderRevenue: toNumber(job.change_order_revenue),
-    creditAmount: toNumber(job.credit_amount),
-    otherRevenue: toNumber(job.other_revenue),
-    materialCost: toNumber(job.material_cost),
-    laborCost: toNumber(job.labor_cost),
-    subcontractorCost: toNumber(job.subcontractor_cost),
-    otherDirectCost: toNumber(job.other_direct_cost),
-    burdenCost: toNumber(job.burden_cost),
-    warrantyServiceContingency: toNumber(job.warranty_service_contingency),
-  };
+/**
+ * The revenue/cost inputs from a stored job row, ready for the domain functions.
+ *
+ * Burden and warranty / service contingency are rates, not amounts: the job's own
+ * snapshot wins, and `defaults` (the company settings in force) only covers a job
+ * that has never been saved with a rate.
+ */
+export function financialInputsFromJob(
+  job: JobRow,
+  defaults: JobCostRateDefaults = ZERO_JOB_COST_RATES,
+) {
+  return jobFinancialInputsFromRow(job, defaults);
 }
 
 /** Stored adjustments narrowed to the supported types. */
@@ -219,9 +223,10 @@ export function adjustmentInputsFromRows(rows: readonly JobFinancialAdjustmentRo
 export function recomputeJobFinancials(
   job: JobRow,
   adjustments: readonly JobFinancialAdjustmentRow[],
+  defaults: JobCostRateDefaults = ZERO_JOB_COST_RATES,
 ) {
   return computeJobFinancials(
-    financialInputsFromJob(job),
+    financialInputsFromJob(job, defaults),
     adjustmentInputsFromRows(adjustments),
   );
 }

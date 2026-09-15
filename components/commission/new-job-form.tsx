@@ -16,8 +16,10 @@ import { toNumber } from "@/lib/commission/financials";
 import {
   buildJobEntryPreview,
   emptyJobMoneyValues,
+  JOB_COST_RATE_FIELDS,
   JOB_COST_FIELDS,
   JOB_REVENUE_FIELDS,
+  type JobCostRateValues,
   type JobEntryOptions,
   type JobMoneyFieldName,
   type JobMoneyValues,
@@ -29,6 +31,7 @@ import {
 } from "@/lib/commission/types";
 import type { ProjectCategoryRow } from "@/lib/supabase/database.types";
 import { formatMoney, formatPercent } from "@/lib/utils/format";
+import { fromDecimalPercent } from "@/lib/utils/percent";
 
 /**
  * Creating a commission job.
@@ -51,6 +54,12 @@ export function NewJobForm({
 }) {
   const [state, formAction] = useActionState(createJob, undefined);
   const [values, setValues] = useState<JobMoneyValues>(() => emptyJobMoneyValues());
+  const [rateValues, setRateValues] = useState<JobCostRateValues>(() => ({
+    burdenPercent: String(fromDecimalPercent(options.costRates.burdenPercent) ?? 0),
+    warrantyContingencyPercent: String(
+      fromDecimalPercent(options.costRates.warrantyContingencyPercent) ?? 0,
+    ),
+  }));
   const [categoryId, setCategoryId] = useState("");
   const [designerId, setDesignerId] = useState("");
   const [planId, setPlanId] = useState("");
@@ -64,6 +73,7 @@ export function NewJobForm({
 
   const preview = buildJobEntryPreview({
     values,
+    rateValues,
     tiers: version?.tiers ?? [],
     // Postgres numeric can arrive as a string; the engine expects a number.
     minimumGpStandard: toNumber(category?.minimum_gp_standard),
@@ -73,6 +83,9 @@ export function NewJobForm({
 
   const setValue = (name: JobMoneyFieldName, value: string) =>
     setValues((current) => ({ ...current, [name]: value }));
+
+  const setRateValue = (name: keyof JobCostRateValues, value: string) =>
+    setRateValues((current) => ({ ...current, [name]: value }));
 
   function selectDesigner(nextDesignerId: string) {
     setDesignerId(nextDesignerId);
@@ -298,7 +311,7 @@ export function NewJobForm({
 
           <fieldset className="space-y-4 border-t border-line pt-6">
             <legend className="text-xs font-semibold tracking-[0.12em] text-ink-subtle uppercase">
-              Costs
+              Direct costs
             </legend>
             <div className="grid gap-4 sm:grid-cols-2">
               {JOB_COST_FIELDS.map((field) => (
@@ -323,11 +336,65 @@ export function NewJobForm({
                 </Field>
               ))}
             </div>
+          </fieldset>
+
+          <fieldset className="space-y-4 border-t border-line pt-6">
+            <legend className="text-xs font-semibold tracking-[0.12em] text-ink-subtle uppercase">
+              Burden and warranty contingency
+            </legend>
             <p className="text-xs leading-5 text-ink-subtle">
-              Total job cost is the sum of these six inputs, burden included. Job gross profit
-              is revenue minus that total — the single shared calculation, not a form-local
-              formula.
+              Both rates apply to direct job cost — the four inputs above, before either is
+              added — and are included in total job cost before the commission tier is
+              selected. They default from Admin → Commission settings and can be overridden
+              for this job; the rates used are stored on the job.
             </p>
+            <div className="grid gap-4 sm:grid-cols-2">
+              {JOB_COST_RATE_FIELDS.map((field) => (
+                <Field
+                  key={field.name}
+                  label={field.label}
+                  htmlFor={`rate-${field.name}`}
+                  hint={field.hint}
+                  error={fieldError(state, field.name)}
+                >
+                  <TextInput
+                    id={`rate-${field.name}`}
+                    name={field.name}
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    max="100"
+                    inputMode="decimal"
+                    value={rateValues[field.name]}
+                    onChange={(event) => setRateValue(field.name, event.target.value)}
+                  />
+                </Field>
+              ))}
+            </div>
+            <dl className="grid gap-x-6 gap-y-3 rounded-lg border border-line bg-surface-muted p-4 sm:grid-cols-2 lg:grid-cols-4">
+              <DerivedFigure
+                label="Direct job cost"
+                value={formatMoney(preview.financials.directJobCost)}
+              />
+              <DerivedFigure
+                label="Calculated burden"
+                value={`${formatMoney(preview.financials.burdenCost)} · ${formatPercent(
+                  preview.financials.burdenPercent,
+                  2,
+                )}`}
+              />
+              <DerivedFigure
+                label="Calculated warranty contingency"
+                value={`${formatMoney(
+                  preview.financials.warrantyServiceContingency,
+                )} · ${formatPercent(preview.financials.warrantyContingencyPercent, 2)}`}
+              />
+              <DerivedFigure
+                label="Total cost"
+                value={formatMoney(preview.financials.actualTotalCost)}
+                emphasis
+              />
+            </dl>
           </fieldset>
 
           <fieldset className="space-y-4 border-t border-line pt-6">
@@ -411,7 +478,25 @@ export function NewJobForm({
                 label="Revenue"
                 value={formatMoney(preview.financials.actualTotalRevenue)}
               />
-              <PreviewRow label="Cost" value={formatMoney(preview.financials.actualTotalCost)} />
+              <PreviewRow
+                label="Direct job cost"
+                value={formatMoney(preview.financials.directJobCost)}
+              />
+              <PreviewRow
+                label={`Burden (${formatPercent(preview.financials.burdenPercent, 2)})`}
+                value={formatMoney(preview.financials.burdenCost)}
+              />
+              <PreviewRow
+                label={`Warranty contingency (${formatPercent(
+                  preview.financials.warrantyContingencyPercent,
+                  2,
+                )})`}
+                value={formatMoney(preview.financials.warrantyServiceContingency)}
+              />
+              <PreviewRow
+                label="Total cost"
+                value={formatMoney(preview.financials.actualTotalCost)}
+              />
               <PreviewRow
                 label="Commissionable GP"
                 value={formatMoney(preview.financials.commissionableGrossProfit)}
@@ -500,6 +585,33 @@ function PreviewRow({
   return (
     <div className="flex items-baseline justify-between gap-4">
       <dt className="text-xs leading-5 text-ink-muted">{label}</dt>
+      <dd
+        className={
+          emphasis
+            ? "font-mono text-sm font-semibold tabular-nums text-ink"
+            : "font-mono text-sm tabular-nums text-ink"
+        }
+      >
+        {value}
+      </dd>
+    </div>
+  );
+}
+
+function DerivedFigure({
+  label,
+  value,
+  emphasis = false,
+}: {
+  label: string;
+  value: string;
+  emphasis?: boolean;
+}) {
+  return (
+    <div className="min-w-0 space-y-0.5">
+      <dt className="text-xs font-medium tracking-[0.08em] text-ink-subtle uppercase">
+        {label}
+      </dt>
       <dd
         className={
           emphasis

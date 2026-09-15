@@ -9,7 +9,7 @@ import {
   type CommissionEventCalculation,
   type CommissionSettingsSnapshot,
 } from "@/lib/commission/engine";
-import { toNumber } from "@/lib/commission/financials";
+import { toNumber, type JobCostRateDefaults } from "@/lib/commission/financials";
 import type { TierWindow } from "@/lib/compensation/plan-resolution";
 import {
   isCommissionEventType,
@@ -50,6 +50,10 @@ export type CommissionSettings = {
   depositPayoutPercent: number;
   drawRateReduction: number;
   drawEnabled: boolean;
+  /** Company default burden rate as a decimal share (0.1 = 10%). */
+  burdenPercent: number;
+  /** Company default warranty / service contingency rate as a decimal share. */
+  warrantyContingencyPercent: number;
   notes: string | null;
 };
 
@@ -68,7 +72,23 @@ function mapSettings(row: CommissionSettingsRow | null): CommissionSettings | nu
     depositPayoutPercent: toNumber(row.deposit_payout_percent),
     drawRateReduction: toNumber(row.draw_rate_reduction),
     drawEnabled: row.draw_enabled,
+    burdenPercent: toNumber(row.burden_percent),
+    warrantyContingencyPercent: toNumber(row.warranty_contingency_percent),
     notes: row.notes,
+  };
+}
+
+/**
+ * The company cost rates a job falls back to when it carries no snapshot of its
+ * own. Kept separate from the engine's `CommissionSettingsSnapshot`: these rates
+ * shape job cost, not the commission rate.
+ */
+export function jobCostRateDefaults(
+  settings: CommissionSettings | null,
+): JobCostRateDefaults {
+  return {
+    burdenPercent: settings?.burdenPercent ?? 0,
+    warrantyContingencyPercent: settings?.warrantyContingencyPercent ?? 0,
   };
 }
 

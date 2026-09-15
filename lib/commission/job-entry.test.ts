@@ -9,6 +9,7 @@ import {
   emptyJobMoneyValues,
   jobFinancialInputsFromValues,
   jobMoneyValuesFromJob,
+  type JobCostRateValues,
   type JobMoneyValues,
 } from "@/lib/commission/job-entry";
 import type {
@@ -67,10 +68,19 @@ function values(overrides: Partial<JobMoneyValues> = {}): JobMoneyValues {
 
 function preview(
   money: Partial<JobMoneyValues>,
-  options: { tiers?: TierWindow[]; onDraw?: boolean; settings?: CommissionSettingsSnapshot } = {},
+  options: {
+    tiers?: TierWindow[];
+    onDraw?: boolean;
+    settings?: CommissionSettingsSnapshot;
+    rateValues?: JobCostRateValues;
+  } = {},
 ) {
   return buildJobEntryPreview({
     values: values(money),
+    rateValues: options.rateValues ?? {
+      burdenPercent: "0",
+      warrantyContingencyPercent: "0",
+    },
     tiers: options.tiers ?? PRODUCTION_TIERS,
     minimumGpStandard: 0.35,
     settings: options.settings ?? SETTINGS,
@@ -96,21 +106,29 @@ test("the documented 50 GP test case produces 30% and a $7,500 deposit target", 
   assert.deepEqual([...result.warnings], []);
 });
 
-test("burden is part of total job cost, so the same GP band is reached from the cost lines", () => {
-  const result = preview({
-    contractRevenue: "100000",
-    materialCost: "30000",
-    laborCost: "10000",
-    subcontractorCost: "5000",
-    otherDirectCost: "1000",
-    burdenCost: "3000",
-    warrantyServiceContingency: "1000",
-  });
+test("burden and warranty contingency are derived from direct cost and included in total cost", () => {
+  const result = preview(
+    {
+      contractRevenue: "100000",
+      materialCost: "30000",
+      laborCost: "10000",
+      subcontractorCost: "5000",
+      otherDirectCost: "1000",
+    },
+    { rateValues: { burdenPercent: "10", warrantyContingencyPercent: "5" } },
+  );
 
-  assert.equal(result.financials.actualTotalCost, 50000);
-  assert.equal(result.financials.jobGrossProfit, 50000);
-  assert.equal(result.standardRate, 0.3);
-  assert.equal(result.projectedGrossCommission, 15000);
+  // direct 46,000 -> burden 4,600, warranty 2,300, total 52,900
+  assert.equal(result.financials.directJobCost, 46000);
+  assert.equal(result.financials.burdenCost, 4600);
+  assert.equal(result.financials.warrantyServiceContingency, 2300);
+  assert.equal(result.financials.actualTotalCost, 52900);
+  assert.equal(result.financials.jobGrossProfit, 47100);
+  assert.equal(result.financials.jobGpPercent, 0.471);
+  // 47.1% GP falls in the 45–50% band, so the derived costs changed the tier.
+  assert.equal(result.tierLabel, "45% to under 50% GP");
+  assert.equal(result.standardRate, 0.2);
+  assert.equal(result.projectedGrossCommission, 9420);
 });
 
 test("band boundaries resolve to the tier the engine would use", () => {
@@ -198,7 +216,13 @@ test("money values round-trip from a stored job back into the preview inputs", (
   const roundTripped = preview(jobMoneyValuesFromJob(job));
 
   assert.equal(roundTripped.projectedGrossCommission, 15000);
-  assert.equal(jobFinancialInputsFromValues(jobMoneyValuesFromJob(job)).contractRevenue, 100000);
+  assert.equal(
+    jobFinancialInputsFromValues(jobMoneyValuesFromJob(job), {
+      burdenPercent: 0,
+      warrantyContingencyPercent: 0,
+    }).contractRevenue,
+    100000,
+  );
 });
 
 // ---------------------------------------------------------------------------
