@@ -1,4 +1,7 @@
-import { EmployeeCommissionAssignmentForm, EmployeeCommissionSettingsForm } from "@/components/commission/employee-commission-forms";
+import {
+  EmployeeCompensationAssignmentForm,
+  EmployeeCompensationSettingsForm,
+} from "@/components/compensation/employee-compensation-forms";
 import { EmptyState } from "@/components/empty-state/empty-state";
 import { LockIcon, UsersIcon } from "@/components/icons";
 import { PageHeader } from "@/components/page-header/page-header";
@@ -6,9 +9,10 @@ import { StatusBadge } from "@/components/ui/badge";
 import { Table, TableWrap, Td, Th } from "@/components/ui/table";
 import { requireSession } from "@/lib/auth/dal";
 import {
-  listEmployeeCommissionOverview,
-  listPlanSelectOptions,
-} from "@/lib/commission/queries";
+  listCompensationPlanOptions,
+  listEmployeeCompensationOverview,
+  todayIso,
+} from "@/lib/compensation/queries";
 import { displayNameFor } from "@/lib/auth/identity";
 import { roleLabel } from "@/lib/permissions/roles";
 import { formatDate, formatText } from "@/lib/utils/format";
@@ -17,33 +21,33 @@ export const metadata = {
   title: "Commission Employees",
 };
 
-export default async function CommissionEmployeesPage() {
+export default async function CompensationEmployeesPage() {
   const session = await requireSession();
-  const canView = session.capabilities.includes("view:commission-config");
+  const canView = session.capabilities.includes("view:compensation-config");
 
   if (!canView) {
     return (
       <EmptyState
         icon={<LockIcon className="h-5 w-5" />}
-        title="Commission setup is restricted"
-        description="Commission eligibility and plan assignments are visible to accounting and administrators."
+        title="Compensation setup is restricted"
+        description="Compensation eligibility and plan assignments are visible to accounting and administrators."
       />
     );
   }
 
-  const canManage = session.capabilities.includes("manage:employee-commission");
+  const canManage = session.capabilities.includes("manage:employee-compensation");
   const [employees, plans] = await Promise.all([
-    listEmployeeCommissionOverview(),
-    canManage ? listPlanSelectOptions() : Promise.resolve([]),
+    listEmployeeCompensationOverview(),
+    canManage ? listCompensationPlanOptions() : Promise.resolve([]),
   ]);
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayIso();
 
   return (
     <div className="space-y-6">
       <PageHeader
         eyebrow="Commissions"
         title="Employees"
-        description="Who is commission eligible and which plan applies to them. Plan assignments are effective-dated, so changing a plan adds history instead of overwriting it."
+        description="Who participates in a compensation plan and which plan applies to them. Plan assignments are effective-dated, so changing a plan adds history instead of overwriting it. Sales manager plans are configured the same way once manager compensation is implemented."
       />
 
       {employees.length === 0 ? (
@@ -86,12 +90,14 @@ export default async function CommissionEmployeesPage() {
                   </Td>
                   <Td>
                     <StatusBadge
-                      label={row.settings?.commission_eligible ? "Eligible" : "Not eligible"}
-                      tone={row.settings?.commission_eligible ? "positive" : "neutral"}
+                      label={
+                        row.settings?.compensation_eligible ? "Eligible" : "Not eligible"
+                      }
+                      tone={row.settings?.compensation_eligible ? "positive" : "neutral"}
                     />
                   </Td>
                   <Td className="text-ink-muted">
-                    {formatText(row.currentPlanName)}
+                    {formatText(row.currentPlan?.name)}
                     {row.currentAssignment ? (
                       <span className="block text-xs text-ink-subtle">
                         from {formatDate(row.currentAssignment.effective_from)}
@@ -106,13 +112,15 @@ export default async function CommissionEmployeesPage() {
                           Manage
                         </summary>
                         <div className="mt-3 space-y-5 rounded-lg border border-line bg-surface-muted p-3">
-                          <EmployeeCommissionSettingsForm
+                          <EmployeeCompensationSettingsForm
                             profileId={row.profile.id}
-                            commissionEligible={row.settings?.commission_eligible ?? false}
+                            compensationEligible={
+                              row.settings?.compensation_eligible ?? false
+                            }
                             notes={row.settings?.notes ?? null}
                           />
                           <div className="border-t border-line pt-4">
-                            <EmployeeCommissionAssignmentForm
+                            <EmployeeCompensationAssignmentForm
                               profileId={row.profile.id}
                               plans={plans.map((plan) => ({ id: plan.id, name: plan.name }))}
                               defaultEffectiveFrom={today}

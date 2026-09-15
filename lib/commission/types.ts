@@ -62,15 +62,6 @@ export const ADJUSTMENT_TYPE_HINTS: Record<AdjustmentType, string> = {
     "Moves cost out of (or into) the commissionable base. A negative amount excludes cost from commissions.",
 };
 
-export const THRESHOLD_TYPES = ["fixed", "project_minimum"] as const;
-
-export type ThresholdType = (typeof THRESHOLD_TYPES)[number];
-
-export const THRESHOLD_TYPE_LABELS: Record<ThresholdType, string> = {
-  fixed: "Fixed percentage",
-  project_minimum: "Project minimum GP standard",
-};
-
 /**
  * The revenue and cost inputs a job is built from. Money only — these are the
  * numbers accounting enters, and they are independent of commission rules.

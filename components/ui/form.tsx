@@ -11,7 +11,7 @@ import { useFormStatus } from "react-dom";
 import { AlertIcon, SpinnerIcon } from "@/components/icons";
 import { Button, type ButtonVariant } from "@/components/ui/button";
 import { cn } from "@/lib/utils/cn";
-import type { ActionState } from "@/lib/commission/validation";
+import type { ActionState } from "@/lib/forms/action-state";
 
 const CONTROL_CLASS =
   "w-full rounded-lg border border-line bg-white px-3 text-sm text-ink outline-none transition-colors placeholder:text-ink-subtle focus:border-accent focus-visible:outline-2 focus-visible:outline-offset-0 focus-visible:outline-accent disabled:bg-surface-muted disabled:text-ink-muted aria-[invalid=true]:border-accent-strong";

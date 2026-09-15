@@ -10,11 +10,21 @@ Internal operations portal for Cabinet Genies.
   effective-dated versions and GP tiers, employee commission settings and dated
   plan assignments, job financials with job vs. commissionable gross profit,
   append-only adjustments and an audit trail.
+- **Phase 3 preparation (done):** the shared compensation layer generalised for
+  future Sales Manager compensation — a participant kind on plans, effective-dated
+  manager relationships with attribution primitives, and a documented extension
+  point. No manager bonus is calculated, approved or paid.
 
-Commission *payout* math, the 50% deposit payout, true-up, payroll batching,
-Buildertrend integration, split commissions, payment approvals, the sales
-pipeline, project management, production scheduling and notifications are
-intentionally **not** implemented yet.
+Commission *payout* math, sales manager bonus calculation, the 50% deposit
+payout, true-up, payroll batching, Buildertrend integration, split commissions,
+payment approvals, the sales pipeline, project management, production scheduling
+and notifications are intentionally **not** implemented yet.
+
+Two rules are structural, not conventions: a job has exactly **one** sales
+designer and Cabinet Genies does **not** split commissions, so there is no split
+table and no share-of-someone-else column anywhere. Manager compensation will be
+its own bonus/override on qualifying jobs. See
+[docs/compensation-architecture.md](docs/compensation-architecture.md).
 
 ## Stack
 
@@ -68,7 +78,7 @@ first administrator, are in [`supabase/README.md`](supabase/README.md).
 | `/sales`, `/projects`, `/production`, `/reports` | authenticated | Placeholder module screens |
 | `/admin`, `/admin/users` | admin / CEO | Administration shell, current profile, role model |
 | `/admin/project-categories` | admin / CEO | Manage project categories and minimum GP standards |
-| `/admin/commission-plans` | admin / CEO | Manage plans, versions and tiers |
+| `/admin/compensation-plans` | admin / CEO | Manage compensation plans, versions and tiers (sales designer plans today; manager plans reserved) |
 | `/` | public | Redirects to `/home` or `/login` based on session |
 
 ## Architecture
@@ -86,8 +96,11 @@ components/
   ui/                    Small shared primitives (form fields, tables, panels, badges)
 lib/
   auth/                  Data access layer (session checks) and Server Actions
-  commission/            Domain types, financial math, plan resolution, validation,
-                         queries, Server Actions and unit tests
+  compensation/          Compensation vocabulary, effective-dated plan resolution,
+                         manager attribution, validation, queries, Server Actions
+  commission/            Job domain: types, financial math, validation, queries,
+                         Server Actions
+  forms/                 Shared action-state and database-error helpers
   permissions/           Roles, capabilities, navigation configuration
   supabase/              Browser, server, proxy and admin clients plus DB types
   utils/                 Formatting and class-name helpers

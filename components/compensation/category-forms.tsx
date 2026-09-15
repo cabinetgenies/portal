@@ -10,8 +10,8 @@ import {
   TextInput,
   fieldError,
 } from "@/components/ui/form";
-import { saveProjectCategory } from "@/lib/commission/actions";
-import { fromDecimalPercent } from "@/lib/commission/validation";
+import { saveProjectCategory } from "@/lib/compensation/actions";
+import { fromDecimalPercent } from "@/lib/utils/percent";
 import type { ProjectCategoryRow } from "@/lib/supabase/database.types";
 
 const GRID = "grid gap-3 sm:grid-cols-2 lg:grid-cols-[1.4fr_0.8fr_0.9fr_0.6fr_auto]";

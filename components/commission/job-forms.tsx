@@ -13,7 +13,7 @@ import {
   fieldError,
 } from "@/components/ui/form";
 import { createJob, updateJobOverview } from "@/lib/commission/actions";
-import type { DesignerOption } from "@/lib/commission/queries";
+import type { SalesDesignerOption } from "@/lib/compensation/queries";
 import {
   JOB_STATUSES,
   JOB_STATUS_LABELS,
@@ -28,7 +28,7 @@ type JobFormProps = {
     code: string;
     minimum_gp_standard: number;
   }[];
-  designers: DesignerOption[];
+  designers: SalesDesignerOption[];
   job?: JobRow;
 };
 
@@ -157,9 +157,9 @@ export function JobOverviewForm({ categories, designers, job }: JobFormProps) {
           <AlertIcon className="mt-0.5 h-4 w-4 text-accent-strong" />
           <p className="text-sm leading-6 text-accent-strong">
             {selectedDesigner.name} has no commission plan assignment in force today
-            {selectedDesigner.commissionEligible
+            {selectedDesigner.compensationEligible
               ? ""
-              : " and is not marked commission eligible"}
+              : " and is not marked compensation eligible"}
             . The job can still be saved; assign a plan under Commissions → Employees before
             the job is sold.
           </p>

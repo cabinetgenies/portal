@@ -10,7 +10,7 @@ import {
   tierContainsGpPercent,
   type PlanVersionWindow,
   type TierWindow,
-} from "@/lib/commission/plan-resolution";
+} from "@/lib/compensation/plan-resolution";
 
 const version = (
   overrides: Partial<PlanVersionWindow> & { id: string },

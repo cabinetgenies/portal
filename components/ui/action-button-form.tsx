@@ -4,7 +4,7 @@ import { useActionState } from "react";
 
 import { SpinnerIcon } from "@/components/icons";
 import { Button, type ButtonVariant } from "@/components/ui/button";
-import type { ActionState } from "@/lib/commission/validation";
+import type { ActionState } from "@/lib/forms/action-state";
 
 /**
  * A form with a single button and hidden fields — used for state toggles such as

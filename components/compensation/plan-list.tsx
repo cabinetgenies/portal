@@ -1,19 +1,22 @@
 import { ActionButtonForm } from "@/components/ui/action-button-form";
 import { StatusBadge } from "@/components/ui/badge";
 import {
-  CommissionPlanEditForm,
-  CommissionPlanVersionForm,
-  CommissionTierForm,
-} from "@/components/commission/plan-forms";
+  CompensationPlanEditForm,
+  CompensationPlanVersionForm,
+  CompensationPlanTierForm,
+} from "@/components/compensation/plan-forms";
 import { EmptyState } from "@/components/empty-state/empty-state";
 import { CommissionsIcon } from "@/components/icons";
 import { Table, TableWrap, Td, TdNumeric, Th } from "@/components/ui/table";
 import {
-  setCommissionPlanActive,
-  setCommissionPlanVersionActive,
-} from "@/lib/commission/actions";
-import type { ThresholdType } from "@/lib/commission/types";
-import type { PlanWithVersions } from "@/lib/commission/queries";
+  setCompensationPlanActive,
+  setCompensationPlanVersionActive,
+} from "@/lib/compensation/actions";
+import type { PlanWithVersions } from "@/lib/compensation/queries";
+import {
+  participantKindLabel,
+  type ThresholdType,
+} from "@/lib/compensation/types";
 import { formatDate, formatPercent } from "@/lib/utils/format";
 
 /**
@@ -75,6 +78,10 @@ export function PlanList({
                     label={plan.plan_type === "straight_gp" ? "Straight GP" : plan.plan_type}
                     tone="info"
                   />
+                  <StatusBadge
+                    label={participantKindLabel(plan.participant_kind)}
+                    tone="neutral"
+                  />
                   {openVersion ? (
                     <StatusBadge
                       label={`Current: ${openVersion.version_name}`}
@@ -92,7 +99,7 @@ export function PlanList({
               </div>
               {canEdit ? (
                 <ActionButtonForm
-                  action={setCommissionPlanActive}
+                  action={setCompensationPlanActive}
                   fields={{ planId: plan.id, active: plan.active ? "false" : "true" }}
                   label={plan.active ? "Deactivate plan" : "Activate plan"}
                   pendingLabel="Working…"
@@ -106,7 +113,7 @@ export function PlanList({
                   Edit plan details
                 </summary>
                 <div className="pt-3">
-                  <CommissionPlanEditForm plan={plan} />
+                  <CompensationPlanEditForm plan={plan} />
                 </div>
               </details>
             ) : null}
@@ -142,7 +149,7 @@ export function PlanList({
                       </div>
                       {canEdit ? (
                         <ActionButtonForm
-                          action={setCommissionPlanVersionActive}
+                          action={setCompensationPlanVersionActive}
                           fields={{
                             versionId: version.id,
                             active: version.active ? "false" : "true",
@@ -204,7 +211,7 @@ export function PlanList({
                           Add tier to {version.version_name}
                         </summary>
                         <div className="pt-3">
-                          <CommissionTierForm
+                          <CompensationPlanTierForm
                             versionId={version.id}
                             suggestedSortOrder={version.tiers.length + 1}
                           />
@@ -221,7 +228,7 @@ export function PlanList({
                     Add a new version
                   </summary>
                   <div className="pt-3">
-                    <CommissionPlanVersionForm
+                    <CompensationPlanVersionForm
                       planId={plan.id}
                       suggestedStart={today}
                     />

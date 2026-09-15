@@ -12,21 +12,21 @@ import {
   fieldError,
 } from "@/components/ui/form";
 import {
-  createEmployeeCommissionAssignment,
-  saveEmployeeCommissionSettings,
-} from "@/lib/commission/actions";
+  createEmployeeCompensationAssignment,
+  saveEmployeeCompensationSettings,
+} from "@/lib/compensation/actions";
 
-export function EmployeeCommissionSettingsForm({
+export function EmployeeCompensationSettingsForm({
   profileId,
-  commissionEligible,
+  compensationEligible,
   notes,
 }: {
   profileId: string;
-  commissionEligible: boolean;
+  compensationEligible: boolean;
   notes: string | null;
 }) {
   const [state, formAction] = useActionState(
-    saveEmployeeCommissionSettings,
+    saveEmployeeCompensationSettings,
     undefined,
   );
 
@@ -34,9 +34,9 @@ export function EmployeeCommissionSettingsForm({
     <form action={formAction} className="space-y-3">
       <input type="hidden" name="profileId" value={profileId} />
       <CheckboxField
-        label="Commission eligible"
-        name="commissionEligible"
-        defaultChecked={commissionEligible}
+        label="Compensation eligible"
+        name="compensationEligible"
+        defaultChecked={compensationEligible}
         hint="Eligibility alone does not set a rate — the plan assignment below does."
       />
       <Field label="Notes" htmlFor={`settings-notes-${profileId}`}>
@@ -55,7 +55,7 @@ export function EmployeeCommissionSettingsForm({
   );
 }
 
-export function EmployeeCommissionAssignmentForm({
+export function EmployeeCompensationAssignmentForm({
   profileId,
   plans,
   defaultEffectiveFrom,
@@ -65,7 +65,7 @@ export function EmployeeCommissionAssignmentForm({
   defaultEffectiveFrom: string;
 }) {
   const [state, formAction] = useActionState(
-    createEmployeeCommissionAssignment,
+    createEmployeeCompensationAssignment,
     undefined,
   );
 
@@ -82,13 +82,13 @@ export function EmployeeCommissionAssignmentForm({
       <input type="hidden" name="profileId" value={profileId} />
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <Field
-          label="Commission plan"
+          label="Compensation plan"
           htmlFor={`assignment-plan-${profileId}`}
-          error={fieldError(state, "commissionPlanId")}
+          error={fieldError(state, "compensationPlanId")}
         >
           <Select
             id={`assignment-plan-${profileId}`}
-            name="commissionPlanId"
+            name="compensationPlanId"
             required
             defaultValue=""
           >

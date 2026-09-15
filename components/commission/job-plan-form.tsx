@@ -5,7 +5,7 @@ import { useActionState, useState } from "react";
 import { ActionButtonForm } from "@/components/ui/action-button-form";
 import { Field, FormAlert, Select, SubmitButton, fieldError } from "@/components/ui/form";
 import {
-  assignJobCommissionPlan,
+  assignJobCompensationPlan,
   attachPlanEffectiveOnSoldDate,
 } from "@/lib/commission/actions";
 
@@ -13,6 +13,7 @@ export type PlanOption = {
   id: string;
   name: string;
   active: boolean;
+  participantKind: string;
   versions: {
     id: string;
     versionName: string;
@@ -29,7 +30,7 @@ export type PlanOption = {
  * deliberate administrator decision, and the database refuses plan changes on a
  * sold job from any other role.
  */
-export function JobPlanAssignmentForm({
+export function JobCompensationPlanForm({
   jobId,
   plans,
   currentPlanId,
@@ -42,9 +43,10 @@ export function JobPlanAssignmentForm({
   currentVersionId: string | null;
   soldDate: string | null;
 }) {
-  const [state, formAction] = useActionState(assignJobCommissionPlan, undefined);
+  const [state, formAction] = useActionState(assignJobCompensationPlan, undefined);
+  const designerPlans = plans.filter((plan) => plan.participantKind === "sales_designer");
   const [planId, setPlanId] = useState(currentPlanId ?? "");
-  const selectedPlan = plans.find((plan) => plan.id === planId);
+  const selectedPlan = designerPlans.find((plan) => plan.id === planId);
   const versions = selectedPlan?.versions ?? [];
 
   return (
@@ -53,18 +55,18 @@ export function JobPlanAssignmentForm({
         <input type="hidden" name="jobId" value={jobId} />
         <div className="grid gap-3 sm:grid-cols-2">
           <Field
-            label="Commission plan"
+            label="Compensation plan"
             htmlFor={`job-plan-${jobId}`}
-            error={fieldError(state, "commissionPlanId")}
+            error={fieldError(state, "compensationPlanId")}
           >
             <Select
               id={`job-plan-${jobId}`}
-              name="commissionPlanId"
+              name="compensationPlanId"
               value={planId}
               onChange={(event) => setPlanId(event.target.value)}
             >
               <option value="">No plan attached</option>
-              {plans.map((plan) => (
+              {designerPlans.map((plan) => (
                 <option key={plan.id} value={plan.id}>
                   {plan.name}
                   {plan.active ? "" : " (inactive)"}
@@ -76,11 +78,11 @@ export function JobPlanAssignmentForm({
             label="Plan version"
             htmlFor={`job-plan-version-${jobId}`}
             hint="Versions are effective-dated and are never re-resolved for a sold job."
-            error={fieldError(state, "commissionPlanVersionId")}
+            error={fieldError(state, "compensationPlanVersionId")}
           >
             <Select
               id={`job-plan-version-${jobId}`}
-              name="commissionPlanVersionId"
+              name="compensationPlanVersionId"
               defaultValue={currentVersionId ?? ""}
               key={planId}
             >
@@ -96,10 +98,16 @@ export function JobPlanAssignmentForm({
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
-          <SubmitButton label="Save commission plan" pendingLabel="Saving…" size="sm" />
+          <SubmitButton label="Save compensation plan" pendingLabel="Saving…" size="sm" />
           <FormAlert state={state} className="flex-1" />
         </div>
       </form>
+
+      <p className="text-xs leading-5 text-ink-subtle">
+        Only sales designer plans can be attached to a job. A sales manager plan is
+        never attached here: manager compensation is attributed to qualifying jobs
+        separately and is never a share of the designer&apos;s commission.
+      </p>
 
       <div className="flex flex-wrap items-start gap-3 border-t border-line pt-4">
         <ActionButtonForm

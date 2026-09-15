@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 
 import {
   CheckboxField,
@@ -13,13 +13,21 @@ import {
   fieldError,
 } from "@/components/ui/form";
 import {
-  saveCommissionPlan,
-  saveCommissionPlanVersion,
-  saveCommissionTier,
-} from "@/lib/commission/actions";
+  saveCompensationPlan,
+  saveCompensationPlanVersion,
+  saveCompensationTier,
+} from "@/lib/compensation/actions";
+import {
+  PARTICIPANT_KINDS,
+  PARTICIPANT_KIND_LABELS,
+  PARTICIPANT_KIND_NOTES,
+  IMPLEMENTED_PARTICIPANT_KINDS,
+  isParticipantKind,
+} from "@/lib/compensation/types";
 
-export function CommissionPlanCreateForm() {
-  const [state, formAction] = useActionState(saveCommissionPlan, undefined);
+export function CompensationPlanCreateForm() {
+  const [state, formAction] = useActionState(saveCompensationPlan, undefined);
+  const [participantKind, setParticipantKind] = useState<string>("sales_designer");
 
   return (
     <form action={formAction} className="space-y-4">
@@ -32,6 +40,30 @@ export function CommissionPlanCreateForm() {
             required
             invalid={Boolean(fieldError(state, "name"))}
           />
+        </Field>
+        <Field
+          label="Compensates"
+          htmlFor="plan-participant"
+          hint="Manager plans are reserved for the phase that implements manager bonuses."
+          error={fieldError(state, "participantKind")}
+        >
+          <Select
+            id="plan-participant"
+            name="participantKind"
+            value={participantKind}
+            onChange={(event) => setParticipantKind(event.target.value)}
+          >
+            {PARTICIPANT_KINDS.map((kind) => (
+              <option
+                key={kind}
+                value={kind}
+                disabled={!IMPLEMENTED_PARTICIPANT_KINDS.includes(kind)}
+              >
+                {PARTICIPANT_KIND_LABELS[kind]}
+                {IMPLEMENTED_PARTICIPANT_KINDS.includes(kind) ? "" : " (reserved)"}
+              </option>
+            ))}
+          </Select>
         </Field>
         <Field
           label="Plan type"
@@ -55,6 +87,13 @@ export function CommissionPlanCreateForm() {
           placeholder="What this plan applies to and who approved it."
         />
       </Field>
+
+      {isParticipantKind(participantKind) ? (
+        <p className="text-xs leading-5 text-ink-subtle">
+          {PARTICIPANT_KIND_NOTES[participantKind]}
+        </p>
+      ) : null}
+
       <div className="flex flex-wrap items-center gap-3">
         <CheckboxField label="Active" name="active" defaultChecked />
         <SubmitButton label="Add plan" pendingLabel="Adding…" />
@@ -64,17 +103,25 @@ export function CommissionPlanCreateForm() {
   );
 }
 
-export function CommissionPlanEditForm({
+export function CompensationPlanEditForm({
   plan,
 }: {
-  plan: { id: string; name: string; description: string | null; plan_type: string; active: boolean };
+  plan: {
+    id: string;
+    name: string;
+    description: string | null;
+    participant_kind: string;
+    plan_type: string;
+    active: boolean;
+  };
 }) {
-  const [state, formAction] = useActionState(saveCommissionPlan, undefined);
+  const [state, formAction] = useActionState(saveCompensationPlan, undefined);
 
   return (
     <form action={formAction} className="space-y-3">
       <input type="hidden" name="id" value={plan.id} />
       <input type="hidden" name="planType" value={plan.plan_type} />
+      <input type="hidden" name="participantKind" value={plan.participant_kind} />
       <div className="grid gap-3 sm:grid-cols-2">
         <Field label="Plan name" htmlFor={`plan-name-${plan.id}`} error={fieldError(state, "name")}>
           <TextInput
@@ -101,18 +148,18 @@ export function CommissionPlanEditForm({
   );
 }
 
-export function CommissionPlanVersionForm({
+export function CompensationPlanVersionForm({
   planId,
   suggestedStart,
 }: {
   planId: string;
   suggestedStart: string;
 }) {
-  const [state, formAction] = useActionState(saveCommissionPlanVersion, undefined);
+  const [state, formAction] = useActionState(saveCompensationPlanVersion, undefined);
 
   return (
     <form action={formAction} className="space-y-4">
-      <input type="hidden" name="commissionPlanId" value={planId} />
+      <input type="hidden" name="compensationPlanId" value={planId} />
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <Field
           label="Version name"
@@ -168,18 +215,18 @@ export function CommissionPlanVersionForm({
   );
 }
 
-export function CommissionTierForm({
+export function CompensationPlanTierForm({
   versionId,
   suggestedSortOrder,
 }: {
   versionId: string;
   suggestedSortOrder: number;
 }) {
-  const [state, formAction] = useActionState(saveCommissionTier, undefined);
+  const [state, formAction] = useActionState(saveCompensationTier, undefined);
 
   return (
     <form action={formAction} className="space-y-4">
-      <input type="hidden" name="commissionPlanVersionId" value={versionId} />
+      <input type="hidden" name="compensationPlanVersionId" value={versionId} />
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         <Field
           label="Evaluation order"

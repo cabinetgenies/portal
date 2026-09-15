@@ -7,7 +7,10 @@ import { PageHeader } from "@/components/page-header/page-header";
 import { buttonClassName } from "@/components/ui/button";
 import { Panel } from "@/components/ui/panel";
 import { requireCapability } from "@/lib/auth/dal";
-import { listDesignerOptions, listProjectCategories } from "@/lib/commission/queries";
+import {
+  listProjectCategories,
+  listSalesDesignerOptions,
+} from "@/lib/compensation/queries";
 
 export const metadata = {
   title: "New job",
@@ -27,7 +30,7 @@ export default async function NewJobPage() {
 
   const [categories, designers] = await Promise.all([
     listProjectCategories(),
-    listDesignerOptions(),
+    listSalesDesignerOptions(),
   ]);
 
   return (

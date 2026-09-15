@@ -1,5 +1,5 @@
 import { roundPercent } from "@/lib/commission/financials";
-import type { ThresholdType } from "@/lib/commission/types";
+import type { ThresholdType } from "@/lib/compensation/types";
 
 /**
  * Effective-dated plan resolution.

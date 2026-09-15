@@ -5,7 +5,7 @@ import type { ReactNode } from "react";
 import { JobAdjustmentForm } from "@/components/commission/job-adjustment-form";
 import { JobFinancialsForm } from "@/components/commission/job-financials-form";
 import { JobOverviewForm } from "@/components/commission/job-forms";
-import { JobPlanAssignmentForm } from "@/components/commission/job-plan-form";
+import { JobCompensationPlanForm } from "@/components/commission/job-plan-form";
 import { EmptyState } from "@/components/empty-state/empty-state";
 import { ActivityIcon } from "@/components/icons";
 import { PageHeader } from "@/components/page-header/page-header";
@@ -17,12 +17,14 @@ import { requireSession } from "@/lib/auth/dal";
 import {
   resolveTierForGpPercent,
   type TierWindow,
-} from "@/lib/commission/plan-resolution";
+} from "@/lib/compensation/plan-resolution";
+import {
+  listCompensationPlanOptions,
+  listProjectCategories,
+  listSalesDesignerOptions,
+} from "@/lib/compensation/queries";
 import {
   getJobDetail,
-  listDesignerOptions,
-  listPlanSelectOptions,
-  listProjectCategories,
 } from "@/lib/commission/queries";
 import {
   ADJUSTMENT_TYPE_LABELS,
@@ -30,8 +32,8 @@ import {
   jobStatusLabel,
   jobStatusTone,
   type JobAdjustmentInput,
-  type ThresholdType,
 } from "@/lib/commission/types";
+import type { ThresholdType } from "@/lib/compensation/types";
 import { formatDate, formatDateTime, formatMoney, formatPercent, formatText } from "@/lib/utils/format";
 
 export const metadata = {
@@ -60,12 +62,12 @@ export default async function JobDetailPage(props: PageProps<"/commissions/jobs/
   const canManageJobs = session.capabilities.includes("manage:jobs");
   const canEditFinancials = session.capabilities.includes("edit:job-financials");
   const canAdjust = session.capabilities.includes("create:job-adjustments");
-  const canViewConfig = session.capabilities.includes("view:commission-config");
+  const canViewConfig = session.capabilities.includes("view:compensation-config");
 
   const [categories, designers, planOptions] = await Promise.all([
     canManageJobs ? listProjectCategories() : Promise.resolve([]),
-    canManageJobs ? listDesignerOptions() : Promise.resolve([]),
-    canViewConfig && canManageJobs ? listPlanSelectOptions() : Promise.resolve([]),
+    canManageJobs ? listSalesDesignerOptions() : Promise.resolve([]),
+    canViewConfig && canManageJobs ? listCompensationPlanOptions() : Promise.resolve([]),
   ]);
 
   const adjustmentInputs: JobAdjustmentInput[] = adjustments.flatMap((adjustment) =>
@@ -236,18 +238,19 @@ export default async function JobDetailPage(props: PageProps<"/commissions/jobs/
             )}
 
             {canManageJobs ? (
-              <JobPlanAssignmentForm
+              <JobCompensationPlanForm
                 jobId={job.id}
                 plans={planOptions}
-                currentPlanId={job.commission_plan_id}
-                currentVersionId={job.commission_plan_version_id}
+                currentPlanId={job.compensation_plan_id}
+                currentVersionId={job.compensation_plan_version_id}
                 soldDate={job.sold_date}
               />
             ) : null}
 
             <p className="text-xs leading-5 text-ink-subtle">
-              Bands are shown for context only. This phase stores the rules and the job&apos;s
-              financials; it does not calculate commission dollars.
+              Bands are shown for context only. This phase stores the rules and the
+              job&apos;s financials; it does not calculate commission dollars or any
+              sales manager bonus.
             </p>
           </div>
         ) : (
@@ -395,6 +398,9 @@ function auditActionLabel(action: string) {
       return "Sales designer changed";
     case "project_category_changed":
       return "Project category changed";
+    case "compensation_plan_assigned":
+      return "Compensation plan assigned";
+    // Historical rows written before the compensation rename.
     case "commission_plan_assigned":
       return "Commission plan assigned";
     case "job_financials_changed":

@@ -1,13 +1,13 @@
 import {
   ProjectCategoryCreateForm,
   ProjectCategoryEditForm,
-} from "@/components/commission/category-forms";
+} from "@/components/compensation/category-forms";
 import { EmptyState } from "@/components/empty-state/empty-state";
 import { ProjectsIcon } from "@/components/icons";
 import { StatusBadge } from "@/components/ui/badge";
 import { Panel } from "@/components/ui/panel";
 import { requireCapability } from "@/lib/auth/dal";
-import { listProjectCategories } from "@/lib/commission/queries";
+import { listProjectCategories } from "@/lib/compensation/queries";
 import { formatPercent } from "@/lib/utils/format";
 
 export const metadata = {
@@ -15,13 +15,13 @@ export const metadata = {
 };
 
 export default async function ProjectCategoriesPage() {
-  const session = await requireCapability("manage:commission-config");
+  const session = await requireCapability("manage:compensation-config");
 
   if (!session.isAllowed) {
     return (
       <EmptyState
         title="Project categories are managed by administrators"
-        description="Your role can view commission configuration but not change it."
+        description="Your role can view compensation configuration but not change it."
       />
     );
   }
@@ -33,7 +33,7 @@ export default async function ProjectCategoriesPage() {
       <Panel
         id="category-create"
         title="Add a project category"
-        description="Categories are configuration records, not code. Each one carries its own minimum GP standard, which commission tiers can reference instead of a hardcoded number."
+        description="Categories are configuration records, not code. Each one carries its own minimum GP standard, which compensation tiers can reference instead of a hardcoded number."
       >
         <ProjectCategoryCreateForm />
       </Panel>

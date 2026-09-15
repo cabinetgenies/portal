@@ -1,16 +1,25 @@
 # Supabase setup
 
 Apply the migrations in order. Phase 1 created `public.profiles` and its security
-model; Phase 2 adds the commission domain.
+model; Phase 2 added the commission domain; the Phase 3 preparation migrations
+generalise the shared structures for future Sales Manager compensation (see
+[docs/compensation-architecture.md](../docs/compensation-architecture.md)).
 
 | Order | Migration | What it creates |
 | --- | --- | --- |
 | 1 | `migrations/20260915090000_create_profiles.sql` | `profiles`, the `auth.users` trigger, RLS, role helpers |
-| 2 | `migrations/20260915120000_create_commission_domain.sql` | project categories, commission plans, effective-dated versions, tiers, employee settings/assignments, jobs, financial adjustments, audit log, guard-rail triggers |
+| 2 | `migrations/20260915120000_create_commission_domain.sql` | project categories, compensation plans, effective-dated versions, tiers, employee settings/assignments, jobs, financial adjustments, audit log, guard-rail triggers |
 | 3 | `migrations/20260915120100_commission_domain_rls.sql` | Row Level Security policies and grants for the commission domain |
 | 4 | `migrations/20260915120200_seed_sen_straight_gp_example.sql` | optional, editable sample plan (`SEN Straight GP Example`) |
+| 5 | `migrations/20260915130000_generalize_compensation_domain.sql` | renames the shared tables and columns to compensation terminology, adds `participant_kind`, guards jobs against manager plans, neutralises policy and audit names |
+| 6 | `migrations/20260915140000_employee_reporting_periods.sql` | effective-dated manager relationships, `manager_of_profile_at`, `direct_report_ids_at` |
 
 Every script is idempotent, so re-running one is safe.
+
+Migration 4 deliberately uses the Phase 2 table names: it runs *before* the
+rename in migration 5, which carries its rows across unchanged. Some constraint
+and trigger names keep the Phase 2 `commission_*` prefix after the rename; they
+are cosmetic and cannot be referenced by application code.
 
 ## Apply the migration
 
@@ -37,13 +46,13 @@ After running the migrations:
    sells, each with its own minimum GP standard. Nothing is seeded here on
    purpose — categories are business data, and invented numbers would be treated
    as real later.
-2. **Admin → Commission plans**: if you ran the optional seed, review
+2. **Admin → Compensation plans**: if you ran the optional seed, review
    `SEN Straight GP Example`. It is a sample, not the confirmed policy — rename,
    edit or delete it once the real plan is agreed.
 3. Give the real plan an effective-dated version, then add its GP tiers. Tiers
    can reference the project's minimum GP standard instead of a fixed number
    (`threshold_type = project_minimum`).
-4. **Commissions → Employees**: mark who is commission eligible and which plan
+4. **Commissions → Employees**: mark who is compensation eligible and which plan
    applies to them, effective-dated.
 5. **Commissions → Jobs**: create jobs, then let accounting enter the financial
    inputs on each job.
@@ -96,13 +105,14 @@ Profiles (Phase 1):
 | admin | all profiles | all profiles |
 | ceo | all profiles | all profiles |
 
-Commission domain (Phase 2):
+Compensation domain (Phase 2, renamed in the Phase 3 preparation migration):
 
 | Table | Read | Write |
 | --- | --- | --- |
 | `project_categories` | any portal user (reference data) | admin, ceo |
-| `commission_plans`, `commission_plan_versions`, `commission_tiers` | accounting, admin, ceo | admin, ceo |
-| `employee_commission_settings`, `employee_commission_assignments` | accounting, admin, ceo | admin, ceo |
+| `compensation_plans`, `compensation_plan_versions`, `compensation_plan_tiers` | accounting, admin, ceo | admin, ceo |
+| `employee_compensation_settings`, `employee_compensation_assignments` | accounting, admin, ceo | admin, ceo |
+| `employee_reporting_periods` | the employee themselves, accounting, admin, ceo | admin, ceo (maintained automatically by the `profiles.manager_id` trigger) |
 | `jobs` | own jobs (employee); own and direct reports' jobs (supervisor); all jobs (accounting, admin, ceo) | insert: admin, ceo. Update: accounting (financials, status and milestone dates only), admin, ceo. No delete for anyone — cancel instead |
 | `job_financial_adjustments` | accounting, admin, ceo | insert only (append-only) |
 | `audit_events` | accounting, admin, ceo | none — written only by SECURITY DEFINER triggers |
@@ -112,15 +122,37 @@ Anonymous (unauthenticated) requests can read nothing: table privileges for the
 
 Database guard rails on top of RLS:
 
-* `jobs_protect_sold_plan` — a sold job's commission plan or version can only be
+* `jobs_validate_plan_reference` — a job may only reference a *sales designer*
+  compensation plan; a manager plan can never be attached to a job.
+* `jobs_protect_sold_plan` — a sold job's compensation plan or version can only be
   changed by an administrator.
 * `jobs_enforce_update_permissions` — accounting cannot change job identity,
   category, sales designer or plan assignment.
-* `commission_plan_versions_prevent_overlap` and
-  `employee_commission_assignments_prevent_overlap` — two active versions of one
-  plan (or two assignments for one employee) cannot cover the same day.
+* `compensation_plan_versions_prevent_overlap`,
+  `employee_compensation_assignments_prevent_overlap` and
+  `employee_reporting_periods_prevent_overlap` — two active versions of one plan,
+  two assignments for one employee, or two managers for one employee cannot cover
+  the same day.
 * `job_financial_adjustments_no_update` plus the `audit_events` triggers — history
   rows are append-only.
+
+## Manager relationships and attribution
+
+`profiles.manager_id` stays the current reporting relationship (and the basis for
+supervisor job visibility). `employee_reporting_periods` preserves who managed
+whom over time; the `profiles_sync_reporting_period` trigger closes the open
+period and opens a new one whenever `manager_id` changes.
+
+Two functions are the documented access paths for future sales manager bonus
+attribution:
+
+* `manager_of_profile_at(profile_id, on_date)` — the manager in force on a date,
+  falling back to the current pointer for dates before history began.
+* `direct_report_ids_at(manager_id, on_date)` — the manager's active direct
+  reports on a date.
+
+`lib/compensation/attribution.ts` mirrors both in TypeScript and is unit tested.
+Nothing calculates or pays a manager bonus yet.
 
 ## Derived job figures
 
