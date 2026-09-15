@@ -69,7 +69,8 @@ const PRODUCTION_BANDS: TierWindow[] = [
     sortOrder: 7,
     label: "Below 30% GP (no commission)",
     rate: 0,
-    lower: { thresholdType: "fixed", value: 0 },
+    // Open-ended below 30%: negative and zero GP belong here too.
+    lower: { thresholdType: "fixed", value: null },
     upper: { thresholdType: "fixed", value: 0.3 },
   },
 ];

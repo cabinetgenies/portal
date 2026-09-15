@@ -106,7 +106,11 @@ Current bands (version `v2`, effective 2026-09-15):
 | < 30% | 0% |
 
 Below 30% GP is a hard floor: the rate is exactly zero, with no interpolation or
-curve between bands, and the outcome for a loss-making job is the same 0%.
+curve between bands. That bottom band is **open-ended on the lower side** (a null
+lower bound, as v1's bottom band always was), so negative GP, zero GP and positive
+GP under 30% all belong to it explicitly. A loss-making job therefore resolves to
+the "Below 30%" band rather than matching nothing, which keeps it auditable: the
+final audit reports that band at 0% instead of flagging a missing tier.
 
 Those numbers are **configuration** (`compensation_plan_tiers`), not constants in
 code — `lib/commission/financials.ts` and the engine resolve the rate from the rows.

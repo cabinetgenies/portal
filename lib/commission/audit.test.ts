@@ -260,6 +260,56 @@ test("a job under 35% GP is auditable on the plan's 0% band, not blocked", () =>
   assert.equal(finalTrueUpOutcome(snapshot.finalTrueUp), "settled");
 });
 
+test("a negative-GP job is fully auditable on the open-ended bottom band", () => {
+  // The v2 schedule's bottom band is open-ended, so a loss-making job resolves to
+  // "Below 30%" at 0% and the audit proceeds like any other.
+  const v2Bands: TierWindow[] = [
+    {
+      sortOrder: 1,
+      label: "49% GP and above",
+      rate: 0.3,
+      lower: { thresholdType: "fixed", value: 0.49 },
+      upper: { thresholdType: "fixed", value: null },
+    },
+    {
+      sortOrder: 7,
+      label: "Below 30% GP (no commission)",
+      rate: 0,
+      lower: { thresholdType: "fixed", value: null },
+      upper: { thresholdType: "fixed", value: 0.3 },
+    },
+  ];
+
+  // 100,000 revenue over 120,000 cost → -20% GP.
+  const calculation = buildJobEntryLiveCalculation({
+    values: { contractRevenue: "100000", originalCost: "120000" },
+    rateValues: { burdenPercent: "0", warrantyContingencyPercent: "0" },
+    changeOrders: [],
+    tiers: v2Bands,
+    minimumGpStandard: 0,
+    settings: SETTINGS,
+    onDraw: false,
+  });
+
+  assert.equal(calculation.profit.grossProfitPercent, -0.2);
+  assert.equal(calculation.commission.tierLabel, "Below 30% GP (no commission)");
+  assert.equal(calculation.commission.standardRate, 0);
+  assert.equal(calculation.commission.projectedGrossCommission, 0);
+
+  // Readiness must not treat a loss-making job as a configuration error.
+  assert.deepEqual([...auditReadiness({ calculation, hasPlanVersion: true })], []);
+
+  const snapshot = buildFinalAuditSnapshot({ calculation });
+
+  assert.equal(snapshot.finalGpPercent, -0.2);
+  assert.equal(snapshot.tierLabel, "Below 30% GP (no commission)");
+  assert.equal(snapshot.standardCommissionRate, 0);
+  assert.equal(snapshot.effectiveCommissionRate, 0);
+  assert.equal(snapshot.finalGrossCommission, 0);
+  assert.equal(snapshot.finalTrueUp, 0);
+  assert.equal(finalTrueUpOutcome(snapshot.finalTrueUp), "settled");
+});
+
 test("a gap in the tier bands blocks finalization", () => {
   // A plan version whose bands stop at 50%: a 40% GP job then matches nothing, and
   // the audit says so instead of finalizing at a rate nobody chose.

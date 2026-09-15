@@ -88,7 +88,9 @@ const V2_TIERS: TierWindow[] = [
     sortOrder: 7,
     label: "Below 30% GP (no commission)",
     rate: 0,
-    lower: { thresholdType: "fixed", value: 0 },
+    // Open-ended on the lower side: every GP below 30% belongs here, including
+    // negative and zero GP.
+    lower: { thresholdType: "fixed", value: null },
     upper: { thresholdType: "fixed", value: 0.3 },
   },
 ];
@@ -128,6 +130,29 @@ const V1_TIERS: TierWindow[] = [
 const rateFor = (gpPercent: number, tiers: TierWindow[] = V2_TIERS) =>
   calculateStandardCommissionRate(gpPercent, tiers, 0.36);
 
+const bandFor = (gpPercent: number, tiers: TierWindow[] = V2_TIERS) =>
+  tiers.find(
+    (tier) =>
+      (tier.lower.value === null || gpPercent >= tier.lower.value) &&
+      (tier.upper.value === null || gpPercent < tier.upper.value),
+  )?.label ?? null;
+
+test("every GP below 30% resolves to the Below 30% band at 0%", () => {
+  // Negative GP is a normal outcome, not a gap in the configuration: the bottom band
+  // is open-ended, so a loss-making job is auditable like any other.
+  assert.equal(bandFor(-0.2), "Below 30% GP (no commission)");
+  assert.equal(rateFor(-0.2), 0);
+  assert.equal(bandFor(-0.01), "Below 30% GP (no commission)");
+  assert.equal(rateFor(-0.01), 0);
+  assert.equal(bandFor(0), "Below 30% GP (no commission)");
+  assert.equal(rateFor(0), 0);
+  assert.equal(bandFor(0.2999), "Below 30% GP (no commission)");
+  assert.equal(rateFor(0.2999), 0);
+  // ...and the first band above it still earns 5%.
+  assert.equal(bandFor(0.3), "30% to under 35% GP");
+  assert.equal(rateFor(0.3), 0.05);
+});
+
 test("every band boundary resolves to the specified rate", () => {
   assert.equal(rateFor(0.2999), 0, "29.99% GP must earn nothing");
   assert.equal(rateFor(0.3), 0.05);
@@ -157,8 +182,9 @@ test("the floor is hard: nothing below 30% GP is smoothed or interpolated", () =
     );
   }
 
-  // A loss-making job earns nothing: no band matches below 0%, so the rate is 0.
+  // A loss-making job earns nothing — it matches the open-ended bottom band.
   assert.equal(rateFor(-0.05), 0);
+  assert.equal(bandFor(-0.05), "Below 30% GP (no commission)");
 });
 
 test("draw reduces the rate by points and never below zero", () => {
@@ -425,7 +451,8 @@ test("the new bands are contiguous: every GP percentage lands in exactly one ban
         (tier.upper.value === null || gpPercent < tier.upper.value),
     );
 
-  for (let gp = 0; gp <= 0.8; gp += 0.0007) {
+  // Start below zero: the bottom band is unbounded, so the whole range is covered.
+  for (let gp = -0.5; gp <= 0.8; gp += 0.0007) {
     const rounded = Number(gp.toFixed(6));
     const matches = V2_TIERS.filter(
       (tier) =>

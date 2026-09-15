@@ -22,6 +22,7 @@ generalise the shared structures for future Sales Manager compensation (see
 | 13 | `migrations/20260915190000_final_commission_audit.sql` | the final commission audit: `commission_audits` snapshot table with revisions, RLS, audit trigger, one open audit per job, and finalized-requires-actor constraints |
 | 14 | `migrations/20260915200000_sales_designer_commission_bands_v2.sql` | new Sales Designer band schedule as version `v2` of the production plan: seven fixed GP bands (0/5/10/15/20/25/30%) with inclusive lower and exclusive upper bounds, and the previous version closed the day before it starts |
 | 15 | `migrations/20260915210000_remove_project_categories_from_commissions.sql` | project categories leave the commission system: every job is detached from its category and `jobs.project_category_id` becomes nullable; the column and table are marked dormant |
+| 16 | `migrations/20260915220000_open_below_thirty_band.sql` | correction to v2: the "Below 30%" band becomes open-ended on the lower side (null lower bound), so negative and zero GP resolve to it explicitly at 0% |
 
 Every script is idempotent, so re-running one is safe.
 
