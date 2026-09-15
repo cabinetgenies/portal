@@ -32,17 +32,41 @@ export type Capability =
   | "view:all-profiles"
   | "manage:profiles"
   | "view:financials"
-  | "administer:portal";
+  | "administer:portal"
+  | "view:jobs-own"
+  | "view:jobs-team"
+  | "view:jobs-all"
+  | "manage:jobs"
+  | "edit:job-financials"
+  | "create:job-adjustments"
+  | "view:commission-config"
+  | "manage:commission-config"
+  | "manage:employee-commission";
 
 const CAPABILITIES_BY_ROLE: Record<Role, readonly Capability[]> = {
-  employee: ["view:own-profile"],
-  supervisor: ["view:own-profile", "view:team-profiles"],
-  accounting: ["view:own-profile", "view:financials"],
+  employee: ["view:own-profile", "view:jobs-own"],
+  supervisor: ["view:own-profile", "view:team-profiles", "view:jobs-team"],
+  accounting: [
+    "view:own-profile",
+    "view:financials",
+    "view:jobs-all",
+    "edit:job-financials",
+    "create:job-adjustments",
+    "view:commission-config",
+  ],
   admin: [
     "view:own-profile",
     "view:team-profiles",
     "view:all-profiles",
     "manage:profiles",
+    "view:financials",
+    "view:jobs-all",
+    "manage:jobs",
+    "edit:job-financials",
+    "create:job-adjustments",
+    "view:commission-config",
+    "manage:commission-config",
+    "manage:employee-commission",
     "administer:portal",
   ],
   ceo: [
@@ -51,6 +75,13 @@ const CAPABILITIES_BY_ROLE: Record<Role, readonly Capability[]> = {
     "view:all-profiles",
     "manage:profiles",
     "view:financials",
+    "view:jobs-all",
+    "manage:jobs",
+    "edit:job-financials",
+    "create:job-adjustments",
+    "view:commission-config",
+    "manage:commission-config",
+    "manage:employee-commission",
     "administer:portal",
   ],
 };

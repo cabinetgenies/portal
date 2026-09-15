@@ -9,8 +9,8 @@ export default function CommissionsPage() {
   return (
     <EmptyState
       icon={<CommissionsIcon className="h-5 w-5" />}
-      title="Commission tracking is being configured."
-      description="The commission module is the first major build after this foundation. Jobs, employees, payments, rules and reports will come online together — no calculation logic runs yet."
+      title="Commission data is live; payouts are not."
+      description="Jobs, project categories, commission plans and effective-dated versions are now real records. Payment calculation, the 50% deposit payout, true-up and payroll batching are the next phase and are deliberately not implemented yet."
     />
   );
 }

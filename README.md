@@ -1,12 +1,20 @@
 # Cabinet Genies Portal
 
-Internal operations portal for Cabinet Genies. Phase 1 is the production
-foundation: authentication, the user and role model, the protected application
-shell, the dashboard shell, the navigation architecture and placeholder module
-routes.
+Internal operations portal for Cabinet Genies.
 
-Commission calculations, sales pipeline, project management, production
-scheduling and payroll are intentionally **not** implemented yet.
+- **Phase 1 (done):** authentication, the user and role model, the protected
+  application shell, the dashboard shell, the navigation architecture and
+  placeholder module routes.
+- **Phase 2 (done):** the commission domain — jobs, sales-designer assignment,
+  project categories with their own minimum GP standards, commission plans with
+  effective-dated versions and GP tiers, employee commission settings and dated
+  plan assignments, job financials with job vs. commissionable gross profit,
+  append-only adjustments and an audit trail.
+
+Commission *payout* math, the 50% deposit payout, true-up, payroll batching,
+Buildertrend integration, split commissions, payment approvals, the sales
+pipeline, project management, production scheduling and notifications are
+intentionally **not** implemented yet.
 
 ## Stack
 
@@ -15,6 +23,7 @@ scheduling and payroll are intentionally **not** implemented yet.
 - TypeScript
 - Tailwind CSS 4
 - Supabase (Auth + Postgres with Row Level Security)
+- Zod (shared validation for forms and Server Actions)
 - Vercel
 
 ## Getting started
@@ -50,9 +59,16 @@ first administrator, are in [`supabase/README.md`](supabase/README.md).
 | --- | --- | --- |
 | `/login` | public | Email and password sign-in |
 | `/home` | authenticated | Dashboard shell, workspace cards, activity empty state |
-| `/commissions` | authenticated | Module shell plus Dashboard/Jobs/Employees/Payments/Rules/Reports placeholders |
+| `/commissions` | authenticated | Module dashboard. Payments and reports remain placeholders |
+| `/commissions/jobs` | scoped by role | Live job list: revenue, GP, GP %, commissionable GP |
+| `/commissions/jobs/new` | admin / CEO | Create a job |
+| `/commissions/jobs/[id]` | scoped by role | Overview, Financials, Commission setup, Audit / adjustments |
+| `/commissions/employees` | accounting+ | Commission eligibility and dated plan assignments |
+| `/commissions/rules` | accounting+ | Read-only plans, versions and tiers |
 | `/sales`, `/projects`, `/production`, `/reports` | authenticated | Placeholder module screens |
 | `/admin`, `/admin/users` | admin / CEO | Administration shell, current profile, role model |
+| `/admin/project-categories` | admin / CEO | Manage project categories and minimum GP standards |
+| `/admin/commission-plans` | admin / CEO | Manage plans, versions and tiers |
 | `/` | public | Redirects to `/home` or `/login` based on session |
 
 ## Architecture
@@ -64,16 +80,20 @@ app/
   error.tsx, global-error.tsx, not-found.tsx
 components/
   app-shell/             Sidebar, mobile drawer, user panel, nav list
+  commission/            Job, plan, category and employee commission forms
   commissions/, admin/   Module-specific navigation
   page-header/, metric-card/, empty-state/, module-card/, configuration-notice/
-  ui/                    Small shared primitives
+  ui/                    Small shared primitives (form fields, tables, panels, badges)
 lib/
   auth/                  Data access layer (session checks) and Server Actions
+  commission/            Domain types, financial math, plan resolution, validation,
+                         queries, Server Actions and unit tests
   permissions/           Roles, capabilities, navigation configuration
   supabase/              Browser, server, proxy and admin clients plus DB types
   utils/                 Formatting and class-name helpers
 proxy.ts                 Session refresh and optimistic route protection
 supabase/migrations/     Database schema and RLS
+scripts/                 Node loader that lets `npm test` run the TypeScript tests
 ```
 
 Security model in one line: `proxy.ts` refreshes sessions and redirects early,
@@ -87,5 +107,12 @@ npm run dev      # development server
 npm run build    # production build
 npm run start    # run the production build
 npm run lint     # ESLint
-npx tsc --noEmit # type check
+npm run typecheck # tsc --noEmit
+npm test         # unit tests for the pure commission domain functions
 ```
+
+The tests cover the financial domain (revenue, credits, cost, gross profit, gross
+profit percentage, zero-revenue behaviour, commissionable gross profit and
+adjustments) and effective-dated plan resolution (version windows, sale
+snapshots, tier thresholds relative to a project category's minimum GP standard).
+They need no database and no Supabase instance.
