@@ -62,7 +62,7 @@ function jobRow(overrides: Partial<JobRow> = {}): JobRow {
     job_number: null,
     job_name: "Commission test",
     customer_name: null,
-    project_category_id: "category-1",
+    project_category_id: null,
     status: "sold",
     sales_designer_id: null,
     sold_date: "2026-09-15",

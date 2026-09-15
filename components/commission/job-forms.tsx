@@ -22,12 +22,6 @@ import {
 import type { JobRow } from "@/lib/supabase/database.types";
 
 type JobFormProps = {
-  categories: {
-    id: string;
-    name: string;
-    code: string;
-    minimum_gp_standard: number;
-  }[];
   designers: SalesDesignerOption[];
   job?: JobRow;
 };
@@ -38,7 +32,7 @@ type JobFormProps = {
  * The designer picker shows whether the selected person has a commission plan
  * assignment in force, but it never blocks the save — the warning is informational.
  */
-export function JobOverviewForm({ categories, designers, job }: JobFormProps) {
+export function JobOverviewForm({ designers, job }: JobFormProps) {
   const [state, formAction] = useActionState(
     job ? updateJobOverview : createJob,
     undefined,
@@ -89,30 +83,6 @@ export function JobOverviewForm({ categories, designers, job }: JobFormProps) {
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <Field
-          label="Project category"
-          htmlFor="project-category"
-          error={fieldError(state, "projectCategoryId")}
-          hint="Each category carries its own minimum GP standard."
-        >
-          <Select
-            id="project-category"
-            name="projectCategoryId"
-            defaultValue={job?.project_category_id ?? ""}
-            required
-            invalid={Boolean(fieldError(state, "projectCategoryId"))}
-          >
-            <option value="" disabled>
-              Select a category
-            </option>
-            {categories.map((category) => (
-              <option key={category.id} value={category.id}>
-                {category.name} ({category.code})
-              </option>
-            ))}
-          </Select>
-        </Field>
-
         <Field label="Status" htmlFor="job-status" error={fieldError(state, "status")}>
           <Select
             id="job-status"

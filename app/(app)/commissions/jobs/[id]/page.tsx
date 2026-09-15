@@ -23,7 +23,6 @@ import { Table, TableWrap, Td, TdNumeric, Th } from "@/components/ui/table";
 import { requireSession } from "@/lib/auth/dal";
 import {
   listCompensationPlanOptions,
-  listProjectCategories,
   listSalesDesignerOptions,
 } from "@/lib/compensation/queries";
 import {
@@ -78,7 +77,6 @@ export default async function JobDetailPage(props: PageProps<"/commissions/jobs/
 
   const {
     job,
-    category,
     designer,
     adjustments,
     changeOrders,
@@ -117,7 +115,8 @@ export default async function JobDetailPage(props: PageProps<"/commissions/jobs/
       changeOrderCost: changeOrderRollUp.cost,
     },
     tiers: tierWindows,
-    minimumGpStandard: toNumber(category?.minimum_gp_standard),
+    // Rates come from the plan version's fixed GP bands; no category minimum GP.
+    minimumGpStandard: 0,
     settings: settingsSnapshot(commissionSettings),
     onDraw: commissionContext?.onDraw ?? false,
     previouslyRecognized: commissionContext?.previouslyRecognized ?? 0,
@@ -150,8 +149,7 @@ export default async function JobDetailPage(props: PageProps<"/commissions/jobs/
     0,
   );
 
-  const [categories, designers, planOptions] = await Promise.all([
-    canManageJobs ? listProjectCategories() : Promise.resolve([]),
+  const [designers, planOptions] = await Promise.all([
     canManageJobs ? listSalesDesignerOptions() : Promise.resolve([]),
     canViewConfig && canManageJobs ? listCompensationPlanOptions() : Promise.resolve([]),
   ]);
@@ -172,9 +170,9 @@ export default async function JobDetailPage(props: PageProps<"/commissions/jobs/
         eyebrow={job.job_number ? `Job ${job.job_number}` : "Job"}
         title={job.job_name}
         description={
-          category
-            ? `${category.name} · minimum GP ${formatPercent(category.minimum_gp_standard)}`
-            : "Project category unavailable"
+          planVersion
+            ? `${plan?.name ?? "Compensation plan"} · ${planVersion.version_name}`
+            : "No compensation plan version attached"
         }
         actions={
           <Link
@@ -229,13 +227,12 @@ export default async function JobDetailPage(props: PageProps<"/commissions/jobs/
         description="Job identity, workflow status, milestone dates and the sales designer. Changes here are recorded in the audit trail."
       >
         {canManageJobs ? (
-          <JobOverviewForm categories={categories} designers={designers} job={job} />
+          <JobOverviewForm designers={designers} job={job} />
         ) : (
           <dl className="grid gap-x-8 gap-y-4 sm:grid-cols-2 lg:grid-cols-4">
             <ReadOnly label="Job name" value={job.job_name} />
             <ReadOnly label="Job number" value={formatText(job.job_number)} />
             <ReadOnly label="Customer" value={formatText(job.customer_name)} />
-            <ReadOnly label="Category" value={formatText(category?.name)} />
             <ReadOnly label="Status" value={jobStatusLabel(job.status)} />
             <ReadOnly
               label="Sales designer"
@@ -504,7 +501,7 @@ export default async function JobDetailPage(props: PageProps<"/commissions/jobs/
                 <EmptyState
                   icon={<ActivityIcon className="h-5 w-5" />}
                   title="No audit events recorded yet."
-                  description="Status changes, sales designer changes, category changes, plan assignment and financial edits are logged automatically."
+                  description="Status changes, sales designer changes, plan assignment and financial edits are logged automatically."
                 />
               ) : (
                 <ul className="space-y-2">
@@ -586,8 +583,6 @@ function auditActionLabel(action: string) {
       return "Status changed";
     case "sales_designer_changed":
       return "Sales designer changed";
-    case "project_category_changed":
-      return "Project category changed";
     case "compensation_plan_assigned":
       return "Compensation plan assigned";
     // Historical rows written before the compensation rename.

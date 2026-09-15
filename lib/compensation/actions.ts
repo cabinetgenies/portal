@@ -10,7 +10,6 @@ import {
   compensationTierSchema,
   employeeCompensationAssignmentSchema,
   employeeCompensationSettingsSchema,
-  projectCategorySchema,
 } from "@/lib/compensation/validation";
 import {
   failureState,
@@ -33,7 +32,6 @@ import { toDecimalPercent } from "@/lib/utils/percent";
 
 function revalidateCompensation() {
   revalidatePath("/admin/compensation-plans");
-  revalidatePath("/admin/project-categories");
   revalidatePath("/commissions/rules");
   revalidatePath("/commissions/employees");
   revalidatePath("/commissions/jobs");
@@ -88,42 +86,6 @@ export async function saveCommissionSettings(
   return successState(
     "Commission settings saved. These values apply to calculations made from the effective date onward. Jobs already saved keep the burden and warranty rates they were stored with, and existing commission events keep their snapshot.",
   );
-}
-
-// ---------------------------------------------------------------------------
-// Project categories (reference data that carries each category's GP standard)
-// ---------------------------------------------------------------------------
-
-export async function saveProjectCategory(
-  _previousState: ActionState,
-  formData: FormData,
-): Promise<ActionState> {
-  const auth = await authorizeCapability("manage:compensation-config");
-  if ("denied" in auth) return auth.denied;
-
-  const parsed = projectCategorySchema.safeParse(formDataToObject(formData));
-  if (!parsed.success) return validationErrorState(parsed.error);
-
-  const { id, name, code, minimumGpStandardPercent, sortOrder, active } = parsed.data;
-  const supabase = await createSupabaseServerClient();
-  const payload = {
-    name,
-    code: code.toUpperCase(),
-    minimum_gp_standard: toDecimalPercent(minimumGpStandardPercent),
-    sort_order: sortOrder,
-    active,
-  };
-
-  const result = id
-    ? await supabase.from("project_categories").update(payload).eq("id", id)
-    : await supabase.from("project_categories").insert(payload);
-
-  if (result.error) return mutationErrorState(result.error, "category");
-
-  revalidatePath("/admin/project-categories");
-  revalidatePath("/commissions/jobs");
-
-  return successState(id ? "Category updated." : "Category created.");
 }
 
 // ---------------------------------------------------------------------------

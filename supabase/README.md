@@ -21,6 +21,7 @@ generalise the shared structures for future Sales Manager compensation (see
 | 12 | `migrations/20260915180000_change_orders_and_original_cost.sql` | simplified job financials: `jobs.original_cost` and `jobs.change_order_cost`, the `job_change_orders` table with RLS and audit, and an audit trigger for the financial inputs |
 | 13 | `migrations/20260915190000_final_commission_audit.sql` | the final commission audit: `commission_audits` snapshot table with revisions, RLS, audit trigger, one open audit per job, and finalized-requires-actor constraints |
 | 14 | `migrations/20260915200000_sales_designer_commission_bands_v2.sql` | new Sales Designer band schedule as version `v2` of the production plan: seven fixed GP bands (0/5/10/15/20/25/30%) with inclusive lower and exclusive upper bounds, and the previous version closed the day before it starts |
+| 15 | `migrations/20260915210000_remove_project_categories_from_commissions.sql` | project categories leave the commission system: every job is detached from its category and `jobs.project_category_id` becomes nullable; the column and table are marked dormant |
 
 Every script is idempotent, so re-running one is safe.
 
@@ -53,10 +54,9 @@ npx supabase db push
 
 After running the migrations:
 
-1. **Admin → Project categories**: add the categories Cabinet Genies actually
-   sells, each with its own minimum GP standard. Nothing is seeded here on
-   purpose — categories are business data, and invented numbers would be treated
-   as real later.
+1. **Commission bands**: review the production plan's GP bands under
+   Admin → Compensation plans. (Project categories, once part of this checklist,
+   were removed from the commission system in Phase 4.1 — see below.)
 2. **Admin → Compensation plans**: if you ran the optional seed, review
    `SEN Straight GP Example`. It is a sample, not the confirmed policy — rename,
    edit or delete it once the real plan is agreed.
@@ -120,7 +120,6 @@ Compensation domain (Phase 2, renamed in the Phase 3 preparation migration):
 
 | Table | Read | Write |
 | --- | --- | --- |
-| `project_categories` | any portal user (reference data) | admin, ceo |
 | `compensation_plans`, `compensation_plan_versions`, `compensation_plan_tiers` | accounting, admin, ceo | admin, ceo |
 | `employee_compensation_settings`, `employee_compensation_assignments` | accounting, admin, ceo | admin, ceo |
 | `employee_reporting_periods` | the employee themselves, accounting, admin, ceo | admin, ceo (maintained automatically by the `profiles.manager_id` trigger) |
@@ -138,7 +137,7 @@ Database guard rails on top of RLS:
 * `jobs_protect_sold_plan` — a sold job's compensation plan or version can only be
   changed by an administrator.
 * `jobs_enforce_update_permissions` — accounting cannot change job identity,
-  category, sales designer or plan assignment.
+  sales designer or plan assignment.
 * `compensation_plan_versions_prevent_overlap`,
   `employee_compensation_assignments_prevent_overlap` and
   `employee_reporting_periods_prevent_overlap` — two active versions of one plan,
@@ -349,3 +348,28 @@ consequence of the audit rather than a field typed in beside normal job entry. T
 final true-up action refuses to run without a finalized audit and records the audit
 id and revision in the event's `calculation_metadata`, so the payout can always be
 traced back to the snapshot it was based on.
+
+## Project categories removed (Phase 4.1)
+
+Project categories are no longer part of the commission system. Commission is
+calculated from job revenue, job costs, burden, warranty contingency, change orders,
+the resulting GP% and the attached plan version — nothing else. The rate comes from
+the plan version's GP bands, so `threshold_type = 'project_minimum'` is no longer
+reachable from the application: the tier form offers fixed bounds only, and the
+validation rejects a category-relative bound. Tiers that already carry that type
+still resolve (the resolver keeps the support) so historical plans load unchanged.
+
+What changed in the database:
+
+* every job was detached from its category (`project_category_id` set to null);
+* `jobs.project_category_id` is now nullable, so a job is created and edited with no
+  category at all.
+
+**Retained, deliberately:** the column and the `project_categories` table are still
+in the schema, marked `DORMANT` in their comments. Dropping the column means
+rewriting `jobs_enforce_update_permissions` and `log_job_audit_event` in the same
+migration, because both reference it by name — a mistake there would break every job
+update rather than one screen, and the table also holds the only record of how the
+existing job was categorised. Nothing in the application reads or writes either one
+any more, so they can be dropped in a follow-up once those trigger bodies are
+rewritten. `project_categories` keeps its RLS policies and its single historical row.

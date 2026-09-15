@@ -61,8 +61,6 @@ const PRODUCTION_TIERS: TierWindow[] = [
   },
 ];
 
-const CATEGORY_ID = "11111111-1111-4111-8111-111111111111";
-
 /** 100,000 revenue over 50,000 of direct cost — the documented 50 GP test job. */
 function job(
   overrides: Partial<JobFinancialInputs> = {},
@@ -81,7 +79,8 @@ function jobRow(overrides: Partial<JobRow> = {}): JobRow {
     job_number: null,
     job_name: "Commission Test 50 GP",
     customer_name: null,
-    project_category_id: CATEGORY_ID,
+    // Dormant since Phase 4.1 — a commission job no longer belongs to a category.
+    project_category_id: null,
     status: "sold",
     sales_designer_id: null,
     sold_date: "2026-09-15",
@@ -337,11 +336,10 @@ test("negative percentages are rejected", () => {
 
   const entry = jobEntrySchema.safeParse({
     jobName: "Commission Test 50 GP",
-    projectCategoryId: CATEGORY_ID,
     status: "sold",
     soldDate: "2026-09-15",
     contractRevenue: "100000",
-    materialCost: "50000",
+    originalCost: "50000",
     burdenPercent: "-5",
     warrantyContingencyPercent: "5",
   });
@@ -367,11 +365,10 @@ test("percentages above the maximum are rejected", () => {
 
   const entry = jobEntrySchema.safeParse({
     jobName: "Commission Test 50 GP",
-    projectCategoryId: CATEGORY_ID,
     status: "sold",
     soldDate: "2026-09-15",
     contractRevenue: "100000",
-    materialCost: "50000",
+    originalCost: "50000",
     burdenPercent: "150",
     warrantyContingencyPercent: "5",
   });
@@ -382,11 +379,10 @@ test("percentages above the maximum are rejected", () => {
 test("a blank percentage means 'use the company default', not zero", () => {
   const parsed = jobEntrySchema.safeParse({
     jobName: "Commission Test 50 GP",
-    projectCategoryId: CATEGORY_ID,
     status: "sold",
     soldDate: "2026-09-15",
     contractRevenue: "100000",
-    materialCost: "50000",
+    originalCost: "50000",
     burdenPercent: "",
     warrantyContingencyPercent: "5",
   });

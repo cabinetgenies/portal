@@ -16,7 +16,6 @@ import {
   jobCostRateDefaults,
   settingsSnapshot,
 } from "@/lib/commission/event-queries";
-import { toNumber } from "@/lib/commission/financials";
 import { tierWindowsFromRows } from "@/lib/commission/job-entry";
 import { buildLiveCalculation } from "@/lib/commission/live-calculation";
 import {
@@ -80,7 +79,9 @@ async function livePictureForJob(jobId: string): Promise<JobLivePicture | null> 
     },
     adjustments: adjustmentInputsFromRows(context.detail.adjustments),
     tiers: tierWindowsFromRows(context.detail.planVersionTiers),
-    minimumGpStandard: toNumber(context.detail.category?.minimum_gp_standard),
+    // Rates come from the plan version's fixed GP bands. Project categories are no
+    // longer part of the commission system, so no category minimum GP is consulted.
+    minimumGpStandard: 0,
     settings: settingsSnapshot(settings),
     onDraw: context.onDraw,
     previouslyRecognized: context.previouslyRecognized,

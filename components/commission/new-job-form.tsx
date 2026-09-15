@@ -29,7 +29,6 @@ import {
   JOB_STATUS_LABELS,
   type JobStatus,
 } from "@/lib/commission/types";
-import type { ProjectCategoryRow } from "@/lib/supabase/database.types";
 import { fromDecimalPercent } from "@/lib/utils/percent";
 
 type ChangeOrderDraft = {
@@ -51,10 +50,8 @@ type ChangeOrderDraft = {
  * every keystroke, so what the office sees is what gets stored.
  */
 export function NewJobForm({
-  categories,
   options,
 }: {
-  categories: ProjectCategoryRow[];
   options: JobEntryOptions;
 }) {
   const [state, formAction] = useActionState(createJob, undefined);
@@ -66,13 +63,11 @@ export function NewJobForm({
     ),
   }));
   const [changeOrders, setChangeOrders] = useState<ChangeOrderDraft[]>([]);
-  const [categoryId, setCategoryId] = useState("");
   const [designerId, setDesignerId] = useState("");
   const [planId, setPlanId] = useState("");
   const [versionId, setVersionId] = useState("");
 
   const designer = options.designers.find((candidate) => candidate.id === designerId);
-  const category = categories.find((candidate) => candidate.id === categoryId);
   const plan = options.plans.find((candidate) => candidate.id === planId);
   const versions = plan?.versions ?? [];
   const version = versions.find((candidate) => candidate.id === versionId);
@@ -85,7 +80,8 @@ export function NewJobForm({
       cost: toNumber(row.cost),
     })),
     tiers: version?.tiers ?? [],
-    minimumGpStandard: toNumber(category?.minimum_gp_standard),
+    // Rates come from the plan version's fixed GP bands only.
+    minimumGpStandard: 0,
     settings: options.settings,
     onDraw: designer?.onDraw ?? false,
   });
@@ -165,30 +161,6 @@ export function NewJobForm({
                 error={fieldError(state, "customerName")}
               >
                 <TextInput id="customer-name" name="customerName" placeholder="Customer name" />
-              </Field>
-              <Field
-                label="Project category"
-                htmlFor="project-category"
-                hint="Each category carries its own minimum GP standard."
-                error={fieldError(state, "projectCategoryId")}
-              >
-                <Select
-                  id="project-category"
-                  name="projectCategoryId"
-                  value={categoryId}
-                  onChange={(event) => setCategoryId(event.target.value)}
-                  required
-                  invalid={Boolean(fieldError(state, "projectCategoryId"))}
-                >
-                  <option value="" disabled>
-                    Select a category
-                  </option>
-                  {categories.map((option) => (
-                    <option key={option.id} value={option.id}>
-                      {option.name} ({option.code})
-                    </option>
-                  ))}
-                </Select>
               </Field>
               <Field
                 label="Sales designer"

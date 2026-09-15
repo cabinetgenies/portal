@@ -57,16 +57,18 @@ test("tier rates and fixed bounds are validated as percentages", () => {
   assert.equal(compensationTierSchema.safeParse(tier({ lowerValue: "-5" })).success, false);
 });
 
-test("a project minimum threshold accepts an offset, not a full percentage", () => {
+test("category-relative band bounds can no longer be created", () => {
+  // Project categories were removed from the commission system, so a new tier must
+  // use fixed GP percentages. Tiers that already carry project_minimum still resolve.
   assert.equal(
     compensationTierSchema.safeParse(
       tier({ upperThresholdType: "project_minimum", upperValue: "0" }),
     ).success,
-    true,
+    false,
   );
   assert.equal(
     compensationTierSchema.safeParse(
-      tier({ upperThresholdType: "project_minimum", upperValue: "75" }),
+      tier({ lowerThresholdType: "project_minimum", lowerValue: "-5" }),
     ).success,
     false,
   );

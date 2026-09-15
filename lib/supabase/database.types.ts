@@ -61,30 +61,6 @@ export type ProfileInsert = {
 
 export type ProfileUpdate = Partial<ProfileInsert>;
 
-export type ProjectCategoryRow = {
-  id: string;
-  name: string;
-  code: string;
-  active: boolean;
-  minimum_gp_standard: number;
-  sort_order: number;
-  created_at: string;
-  updated_at: string;
-};
-
-export type ProjectCategoryInsert = {
-  id?: string;
-  name: string;
-  code: string;
-  active?: boolean;
-  minimum_gp_standard?: number;
-  sort_order?: number;
-  created_at?: string;
-  updated_at?: string;
-};
-
-export type ProjectCategoryUpdate = Partial<ProjectCategoryInsert>;
-
 /** Who a compensation plan compensates. `sales_manager` is reserved. */
 export type ParticipantKind = "sales_designer" | "sales_manager";
 
@@ -247,7 +223,8 @@ export type JobRow = {
   job_number: string | null;
   job_name: string;
   customer_name: string | null;
-  project_category_id: string;
+  /** DORMANT since Phase 4.1: project categories are no longer part of commissions. */
+  project_category_id: string | null;
   status: string;
   sales_designer_id: string | null;
   sold_date: string | null;
@@ -290,7 +267,7 @@ export type JobInsert = {
   job_number?: string | null;
   job_name: string;
   customer_name?: string | null;
-  project_category_id: string;
+  project_category_id?: string | null;
   status?: string;
   sales_designer_id?: string | null;
   sold_date?: string | null;
@@ -652,12 +629,6 @@ export type Database = {
           },
         ];
       };
-      project_categories: {
-        Row: ProjectCategoryRow;
-        Insert: ProjectCategoryInsert;
-        Update: ProjectCategoryUpdate;
-        Relationships: [];
-      };
       compensation_plans: {
         Row: CompensationPlanRow;
         Insert: CompensationPlanInsert;
@@ -753,13 +724,6 @@ export type Database = {
         Insert: JobInsert;
         Update: JobUpdate;
         Relationships: [
-          {
-            foreignKeyName: "jobs_project_category_id_fkey";
-            columns: ["project_category_id"];
-            isOneToOne: false;
-            referencedRelation: "project_categories";
-            referencedColumns: ["id"];
-          },
           {
             foreignKeyName: "jobs_sales_designer_id_fkey";
             columns: ["sales_designer_id"];

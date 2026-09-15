@@ -3,7 +3,6 @@ import { z } from "zod";
 import {
   COMPENSATION_PLAN_TYPES,
   PARTICIPANT_KINDS,
-  THRESHOLD_TYPES,
 } from "@/lib/compensation/types";
 
 /**
@@ -88,31 +87,6 @@ function validateDateRange(
 // ---------------------------------------------------------------------------
 
 /**
- * Project categories are reference data for jobs, and each carries the minimum
- * GP standard that a compensation tier can reference as a threshold.
- */
-export const projectCategorySchema = z.object({
-  id: z.preprocess(
-    (value) => (value === "" || value === null || value === undefined ? undefined : value),
-    z.string().trim().optional(),
-  ),
-  name: requiredText("Category name", 80),
-  code: requiredText("Category code", 24),
-  minimumGpStandardPercent: z.coerce
-    .number({ error: "Minimum GP standard must be a number." })
-    .min(0, "Minimum GP standard must be between 0% and 100%.")
-    .max(100, "Minimum GP standard must be between 0% and 100%."),
-  sortOrder: z.coerce
-    .number({ error: "Sort order must be a number." })
-    .int("Sort order must be a whole number.")
-    .min(0, "Sort order cannot be negative.")
-    .max(9999, "Sort order is too large."),
-  active: booleanField("Active"),
-});
-
-export type ProjectCategoryInput = z.infer<typeof projectCategorySchema>;
-
-/**
  * Commission engine settings. Values are entered as percent points (50 for 50%,
  * 5 for five percentage points) and stored as decimals.
  */
@@ -175,6 +149,20 @@ export type CompensationPlanVersionInput = z.infer<
   typeof compensationPlanVersionSchema
 >;
 
+/**
+ * Band bounds are fixed GP percentages.
+ *
+ * `project_minimum` (a bound expressed as an offset from a project category's
+ * minimum GP standard) is no longer offerable: project categories were removed from
+ * the commission system in Phase 4.1. Historical tiers that already carry the type
+ * still load and resolve — `resolveTierBound` keeps that support — but no new
+ * category-relative band can be created.
+ */
+const fixedThresholdField = z.enum(["fixed"] as const, {
+  error:
+    "Bands use fixed GP percentages. Category-relative thresholds were removed with project categories.",
+});
+
 export const compensationTierSchema = z
   .object({
     compensationPlanVersionId: uuidField("Plan version"),
@@ -183,13 +171,9 @@ export const compensationTierSchema = z
       .int("Evaluation order must be a whole number.")
       .min(1, "Evaluation order starts at 1.")
       .max(99, "Evaluation order is too large."),
-    lowerThresholdType: z.enum(THRESHOLD_TYPES, {
-      error: "Choose a lower threshold type.",
-    }),
+    lowerThresholdType: fixedThresholdField,
     lowerValue: optionalPercentPoints("Lower bound"),
-    upperThresholdType: z.enum(THRESHOLD_TYPES, {
-      error: "Choose an upper threshold type.",
-    }),
+    upperThresholdType: fixedThresholdField,
     upperValue: optionalPercentPoints("Upper bound"),
     ratePercent: z.coerce
       .number({ error: "Rate must be a number." })
@@ -200,7 +184,6 @@ export const compensationTierSchema = z
   .superRefine((value, ctx) => {
     const validateBound = (
       boundValue: number | null,
-      thresholdType: (typeof THRESHOLD_TYPES)[number],
       path: "lowerValue" | "upperValue",
       label: string,
     ) => {
@@ -208,25 +191,15 @@ export const compensationTierSchema = z
         return;
       }
 
-      if (thresholdType === "fixed" && (boundValue < 0 || boundValue > 100)) {
+      if (boundValue < 0 || boundValue > 100) {
         addIssue(ctx, path, `${label} must be between 0% and 100% when it is a fixed percentage.`);
-      }
-
-      if (thresholdType === "project_minimum" && (boundValue < -50 || boundValue > 50)) {
-        addIssue(
-          ctx,
-          path,
-          `${label} must be an offset between -50 and +50 percentage points from the project minimum.`,
-        );
       }
     };
 
-    validateBound(value.lowerValue, value.lowerThresholdType, "lowerValue", "Lower bound");
-    validateBound(value.upperValue, value.upperThresholdType, "upperValue", "Upper bound");
+    validateBound(value.lowerValue, "lowerValue", "Lower bound");
+    validateBound(value.upperValue, "upperValue", "Upper bound");
 
     if (
-      value.lowerThresholdType === "fixed" &&
-      value.upperThresholdType === "fixed" &&
       value.lowerValue !== null &&
       value.upperValue !== null &&
       value.lowerValue >= value.upperValue

@@ -1,6 +1,5 @@
 import { cache } from "react";
 
-import { displayNameFor } from "@/lib/auth/identity";
 import {
   computeJobFinancials,
   jobFinancialInputsFromRow,
@@ -18,7 +17,6 @@ import type {
   JobFinancialAdjustmentRow,
   JobRow,
   ProfileRow,
-  ProjectCategoryRow,
 } from "@/lib/supabase/database.types";
 import { requireRow, unwrap } from "@/lib/supabase/results";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -31,78 +29,8 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
  * through lib/compensation/queries.ts.
  */
 
-type ProfileNameFields = {
-  display_name: string | null;
-  first_name: string | null;
-  last_name: string | null;
-  email?: string | null;
-};
-
-function nameFromProfile(profile: ProfileNameFields | null | undefined) {
-  if (!profile) return null;
-
-  return displayNameFor(
-    {
-      display_name: profile.display_name,
-      first_name: profile.first_name,
-      last_name: profile.last_name,
-      email: profile.email ?? null,
-    } as ProfileRow,
-    profile.email ?? null,
-  );
-}
-
-export type JobListItem = {
-  id: string;
-  jobNumber: string | null;
-  jobName: string;
-  customerName: string | null;
-  status: string;
-  categoryName: string | null;
-  categoryCode: string | null;
-  salesDesignerName: string | null;
-  actualTotalRevenue: number;
-  jobGrossProfit: number;
-  jobGpPercent: number;
-  commissionableGrossProfit: number;
-  commissionableGpPercent: number;
-};
-
-export const listJobs = cache(async function listJobs() {
-  const supabase = await createSupabaseServerClient();
-
-  const { data, error } = await supabase
-    .from("jobs")
-    .select(
-      "id, job_number, job_name, customer_name, status, actual_total_revenue, job_gross_profit, job_gp_percent, commissionable_gross_profit, commissionable_gp_percent, created_at, project_categories ( name, code ), sales_designer:profiles!jobs_sales_designer_id_fkey ( display_name, first_name, last_name, email )",
-    )
-    .order("created_at", { ascending: false });
-
-  if (error) {
-    console.error("Query failed (jobs):", error.message);
-    throw new Error("Could not load jobs.");
-  }
-
-  return (data ?? []).map<JobListItem>((row) => ({
-    id: row.id,
-    jobNumber: row.job_number,
-    jobName: row.job_name,
-    customerName: row.customer_name,
-    status: row.status,
-    categoryName: row.project_categories?.name ?? null,
-    categoryCode: row.project_categories?.code ?? null,
-    salesDesignerName: nameFromProfile(row.sales_designer),
-    actualTotalRevenue: toNumber(row.actual_total_revenue),
-    jobGrossProfit: toNumber(row.job_gross_profit),
-    jobGpPercent: toNumber(row.job_gp_percent),
-    commissionableGrossProfit: toNumber(row.commissionable_gross_profit),
-    commissionableGpPercent: toNumber(row.commissionable_gp_percent),
-  }));
-});
-
 export type JobDetail = {
   job: JobRow;
-  category: ProjectCategoryRow | null;
   designer: ProfileRow | null;
   adjustments: JobFinancialAdjustmentRow[];
   changeOrders: JobChangeOrderRow[];
@@ -128,7 +56,6 @@ export const getJobDetail = cache(async function getJobDetail(jobId: string) {
   }
 
   const [
-    category,
     designer,
     adjustments,
     changeOrders,
@@ -137,11 +64,6 @@ export const getJobDetail = cache(async function getJobDetail(jobId: string) {
     planVersion,
     planVersionTiers,
   ] = await Promise.all([
-      supabase
-        .from("project_categories")
-        .select("*")
-        .eq("id", job.project_category_id)
-        .maybeSingle(),
       job.sales_designer_id
         ? supabase.from("profiles").select("*").eq("id", job.sales_designer_id).maybeSingle()
         : Promise.resolve({ data: null, error: null }),
@@ -187,7 +109,6 @@ export const getJobDetail = cache(async function getJobDetail(jobId: string) {
 
   return {
     job,
-    category: requireRow<ProjectCategoryRow>(category, "project category"),
     designer: requireRow<ProfileRow>(designer, "sales designer"),
     adjustments: unwrap<JobFinancialAdjustmentRow[]>(adjustments, "job adjustments"),
     changeOrders: unwrap<JobChangeOrderRow[]>(changeOrders, "change orders"),

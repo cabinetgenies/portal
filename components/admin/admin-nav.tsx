@@ -3,7 +3,6 @@ import { ModuleTabs } from "@/components/ui/module-tabs";
 const TABS = [
   { label: "Overview", href: "/admin" },
   { label: "Users", href: "/admin/users" },
-  { label: "Project categories", href: "/admin/project-categories" },
   { label: "Compensation plans", href: "/admin/compensation-plans" },
   { label: "Commission settings", href: "/admin/commission-settings" },
 ];

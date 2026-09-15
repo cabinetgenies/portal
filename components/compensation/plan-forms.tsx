@@ -281,7 +281,6 @@ export function CompensationPlanTierForm({
               defaultValue="fixed"
             >
               <option value="fixed">Fixed percentage</option>
-              <option value="project_minimum">Project minimum GP standard</option>
             </Select>
           </Field>
           <Field
@@ -310,7 +309,6 @@ export function CompensationPlanTierForm({
               defaultValue="fixed"
             >
               <option value="fixed">Fixed percentage</option>
-              <option value="project_minimum">Project minimum GP standard</option>
             </Select>
           </Field>
           <Field

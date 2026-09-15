@@ -12,7 +12,6 @@ import type {
   EmployeeCompensationAssignmentRow,
   EmployeeCompensationSettingsRow,
   ProfileRow,
-  ProjectCategoryRow,
 } from "@/lib/supabase/database.types";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { unwrap } from "@/lib/supabase/results";
@@ -28,30 +27,6 @@ import { unwrap } from "@/lib/supabase/results";
 export function todayIso() {
   return new Date().toISOString().slice(0, 10);
 }
-
-// ---------------------------------------------------------------------------
-// Project categories
-//
-// Categories are reference data for jobs, and each carries the minimum GP
-// standard that compensation tiers can reference as a threshold.
-// ---------------------------------------------------------------------------
-
-export const listProjectCategories = cache(async function listProjectCategories(
-  options: { includeInactive?: boolean } = {},
-) {
-  const supabase = await createSupabaseServerClient();
-  let query = supabase
-    .from("project_categories")
-    .select("*")
-    .order("sort_order", { ascending: true })
-    .order("name", { ascending: true });
-
-  if (!options.includeInactive) {
-    query = query.eq("active", true);
-  }
-
-  return unwrap<ProjectCategoryRow[]>(await query, "project categories");
-});
 
 // ---------------------------------------------------------------------------
 // Compensation plans, effective-dated versions and tiers

@@ -183,7 +183,7 @@ test("projected commission and the deposit use the new band rate", () => {
     rateValues: { burdenPercent: "0", warrantyContingencyPercent: "0" },
     changeOrders: [],
     tiers: V2_TIERS,
-    minimumGpStandard: 0.36,
+    minimumGpStandard: 0,
     settings: SETTINGS,
     onDraw: false,
   });
@@ -204,7 +204,7 @@ test("a job under 30% GP projects no commission and no deposit", () => {
     rateValues: { burdenPercent: "0", warrantyContingencyPercent: "0" },
     changeOrders: [],
     tiers: V2_TIERS,
-    minimumGpStandard: 0.36,
+    minimumGpStandard: 0,
     settings: SETTINGS,
     onDraw: false,
   });
@@ -222,7 +222,7 @@ test("the final audit snapshots the new band, rate and true-up", () => {
     rateValues: { burdenPercent: "0", warrantyContingencyPercent: "0" },
     changeOrders: [],
     tiers: V2_TIERS,
-    minimumGpStandard: 0.36,
+    minimumGpStandard: 0,
     settings: SETTINGS,
     onDraw: false,
     previouslyRecognized: 5000,
@@ -272,7 +272,7 @@ test("an existing commission event keeps the rate it was calculated with", () =>
     rateValues: { burdenPercent: "0", warrantyContingencyPercent: "0" },
     changeOrders: [],
     tiers: V2_TIERS,
-    minimumGpStandard: 0.36,
+    minimumGpStandard: 0,
     settings: SETTINGS,
     onDraw: false,
   });

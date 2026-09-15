@@ -87,7 +87,7 @@ function preview(
     rateValues: options.rateValues ?? ZERO_RATES,
     changeOrders: options.changeOrders ?? [],
     tiers: options.tiers ?? PRODUCTION_TIERS,
-    minimumGpStandard: 0.35,
+    minimumGpStandard: 0,
     settings: options.settings ?? SETTINGS,
     onDraw: options.onDraw ?? false,
     previouslyRecognized: options.previouslyRecognized ?? 0,

@@ -148,7 +148,6 @@ export const jobOverviewSchema = z.object({
   jobNumber: optionalText(40),
   jobName: requiredText("Job name", 160),
   customerName: optionalText(160),
-  projectCategoryId: uuidField("Project category"),
   status: z.enum(JOB_STATUSES, { error: "Choose a job status." }),
   salesDesignerId: optionalUuid,
   soldDate: dateField("Sold date"),

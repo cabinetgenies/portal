@@ -49,6 +49,12 @@ Internal operations portal for Cabinet Genies.
   gross-profit bands (0% below 30% GP, then 5/10/15/20/25/30% from 30/35/40/45/47/49%),
   seeded as a new effective-dated version of the production plan with a rate card on
   the commission rules page. No interpolation, and no band rate in code.
+- **Phase 4.1 (done):** project categories were removed from the commission system.
+  A commission job no longer belongs to a category, no rate resolution or audit reads
+  a category minimum GP, `/admin/project-categories` is gone from the navigation and
+  the routes, and category-relative band bounds can no longer be created. The dormant
+  `project_categories` table and `jobs.project_category_id` column are retained for
+  historical reference only (see supabase/README.md).
 
 Sales manager bonus calculation and payout, support designer bonuses, split
 commissions, production performance bonuses, payroll batching, Buildertrend
@@ -117,7 +123,6 @@ first administrator, are in [`supabase/README.md`](supabase/README.md).
 | `/commissions/rules` | accounting+ | Read-only plan tiers plus the current rule inputs |
 | `/sales`, `/projects`, `/production`, `/reports` | authenticated | Placeholder module screens |
 | `/admin`, `/admin/users` | admin / CEO | Administration shell, current profile, role model |
-| `/admin/project-categories` | admin / CEO | Manage project categories and minimum GP standards |
 | `/admin/compensation-plans` | admin / CEO | Manage compensation plans, versions and tiers (sales designer plans today; manager plans reserved) |
 | `/admin/commission-settings` | admin / CEO | Deposit payout %, draw rate reduction, draw system on/off, effective-dated history |
 | `/` | public | Redirects to `/home` or `/login` based on session |
@@ -132,7 +137,7 @@ app/
 components/
   app-shell/             Sidebar, mobile drawer, user panel, nav list
   commission/            Job, commission engine, draw and ledger form components
-  compensation/          Plan, category and settings form components
+  compensation/          Plan and settings form components
   commissions/, admin/   Module-specific navigation
   page-header/, metric-card/, empty-state/, module-card/, configuration-notice/
   ui/                    Small shared primitives (form fields, tables, panels, badges)
@@ -170,5 +175,7 @@ npm test         # unit tests for the pure commission domain functions
 The tests cover the financial domain (revenue, credits, cost, gross profit, gross
 profit percentage, zero-revenue behaviour, commissionable gross profit and
 adjustments) and effective-dated plan resolution (version windows, sale
-snapshots, tier thresholds relative to a project category's minimum GP standard).
+snapshots). Band thresholds measured relative to a project category's minimum GP
+standard remain supported for tiers that already carry that type, but no new tier can
+be configured that way — project categories were removed from the commission system.
 They need no database and no Supabase instance.
