@@ -88,8 +88,6 @@ set role = 'supervisor',
 where id = (select id from fixture_ids where kind = 'leader');
 
 alter table public.profiles enable trigger profiles_protect_privileged_columns;
-business_role_id = (select id from public.business_roles where key = 'sales_leader')
-  where id = (select id from fixture_ids where kind = 'leader');
 
 insert into public.departments (slug, name, display_order)
 values ('test-dept', 'Test Department', 500)
