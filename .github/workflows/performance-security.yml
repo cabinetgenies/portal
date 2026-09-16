@@ -20,7 +20,7 @@ jobs:
       - name: Set up Supabase CLI
         uses: supabase/setup-cli@v1
         with:
-          version: 2.6.8
+          version: 2.20.3
 
       - name: Start isolated Supabase database
         run: supabase start
@@ -30,4 +30,3 @@ jobs:
 
       - name: Run performance database tests
         run: supabase test db
-
