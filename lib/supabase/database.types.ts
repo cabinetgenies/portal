@@ -2564,6 +2564,17 @@ export type Database = {
         Args: { target_meeting_id: string };
         Returns: boolean;
       };
+      save_manager_review: {
+        Args: {
+          p_review_id: string;
+          p_status: string;
+          p_manager_notes: string | null;
+          p_overall_summary: string | null;
+          p_development_actions: string | null;
+          p_snapshot_data: Json | null;
+        };
+        Returns: boolean;
+      };
     };
     Enums: { [_ in never]: never };
     CompositeTypes: { [_ in never]: never };

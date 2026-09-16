@@ -5,6 +5,7 @@ import {
   isOverdue,
   measurableStatusLabel,
   performanceAccessLevel,
+  priorityInReviewPeriod,
   priorityStatusLabel,
   quarterLabel,
 } from "@/lib/performance/model";
@@ -39,6 +40,34 @@ test("overdue actions are open and past their due date", () => {
   );
 });
 
+test("review evidence priorities follow the review period", () => {
+  const inPeriod = priorityInReviewPeriod(
+    { due_date: "2026-06-15", completed_at: null },
+    "2026-06-01",
+    "2026-06-30",
+  );
+  const completedInPeriod = priorityInReviewPeriod(
+    { due_date: null, completed_at: "2026-06-20T00:00:00Z" },
+    "2026-06-01",
+    "2026-06-30",
+  );
+  const outsidePeriod = priorityInReviewPeriod(
+    { due_date: "2026-07-15", completed_at: null },
+    "2026-06-01",
+    "2026-06-30",
+  );
+  const noPeriod = priorityInReviewPeriod(
+    { due_date: "2026-07-15", completed_at: null },
+    null,
+    null,
+  );
+
+  assert.equal(inPeriod, true);
+  assert.equal(completedInPeriod, true);
+  assert.equal(outsidePeriod, false);
+  assert.equal(noPeriod, true);
+});
+
 test("performance access level maps capabilities fail-closed", () => {
   assert.equal(performanceAccessLevel([]), "none");
   assert.equal(performanceAccessLevel(["view:performance-own"]), "own");
@@ -49,4 +78,3 @@ test("performance access level maps capabilities fail-closed", () => {
   assert.equal(performanceAccessLevel(["view:performance-all"]), "all");
   assert.equal(performanceAccessLevel(["manage:performance"]), "all");
 });
-

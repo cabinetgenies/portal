@@ -33,6 +33,7 @@ import {
   employeeReviewTransitionAllowed,
   reviewActorFor,
 } from "@/lib/performance/review-authorization";
+import { priorityInReviewPeriod } from "@/lib/performance/model";
 import type { Json, PerformanceReviewRow } from "@/lib/supabase/database.types";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
@@ -711,49 +712,28 @@ export async function updateReview(
   }
 
   const supabase = await createSupabaseServerClient();
-  const now = new Date().toISOString();
   const finalizing = parsed.data.status === "complete";
-  const snapshotData = finalizing
-    ? await buildReviewSnapshot(supabase, review, session.userId, now)
-    : review.snapshot_data;
+  let snapshotData: Json | null = review.snapshot_data;
 
-  const { data, error } = await supabase
-    .from("performance_reviews")
-    .update({
-      status: parsed.data.status,
-      overall_summary: parsed.data.overallSummary,
-      development_actions: parsed.data.developmentActions,
-      completed_date: finalizing ? now : null,
-      finalized_by: finalizing ? session.userId : null,
-      finalized_at: finalizing ? now : null,
-      snapshot_data: snapshotData,
-    })
-    .eq("id", parsed.data.reviewId)
-    .select("id");
+  if (finalizing) {
+    const snapshot = await buildReviewSnapshot(supabase, review, session.userId);
+    if (!snapshot.ok) {
+      return failureState(snapshot.error);
+    }
+    snapshotData = snapshot.data;
+  }
+
+  const { data: saved, error } = await supabase.rpc("save_manager_review", {
+    p_review_id: parsed.data.reviewId,
+    p_status: parsed.data.status,
+    p_manager_notes: parsed.data.managerNotes,
+    p_overall_summary: parsed.data.overallSummary,
+    p_development_actions: parsed.data.developmentActions,
+    p_snapshot_data: snapshotData,
+  });
 
   if (error) return mutationErrorState(error, "performance");
-  if ((data ?? []).length === 0) {
-    return failureState("Review not found or you are not allowed to update it.");
-  }
-
-  if (parsed.data.managerNotes !== null) {
-    const { error: noteError } = await supabase
-      .from("performance_review_manager_notes")
-      .upsert({
-        review_id: parsed.data.reviewId,
-        body: parsed.data.managerNotes,
-        updated_by: session.userId,
-      });
-
-    if (noteError) return mutationErrorState(noteError, "performance");
-  } else {
-    const { error: noteError } = await supabase
-      .from("performance_review_manager_notes")
-      .delete()
-      .eq("review_id", parsed.data.reviewId);
-
-    if (noteError) return mutationErrorState(noteError, "performance");
-  }
+  if (!saved) return failureState("Review not found or you are not allowed to update it.");
 
   revalidatePerformance();
   return successState(finalizing ? "Review finalized." : "Manager review updated.");
@@ -763,8 +743,7 @@ async function buildReviewSnapshot(
   supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
   review: PerformanceReviewRow,
   finalizedBy: string,
-  finalizedAt: string,
-) {
+): Promise<{ ok: true; data: Json } | { ok: false; error: string }> {
   const [employeeResult, measurablesResult, prioritiesResult] = await Promise.all([
     supabase
       .from("profiles")
@@ -784,46 +763,113 @@ async function buildReviewSnapshot(
       .order("quarter", { ascending: false }),
   ]);
 
+  if (employeeResult.error) {
+    return { ok: false, error: "Could not load the employee's role evidence." };
+  }
+  if (measurablesResult.error) {
+    return { ok: false, error: "Could not load scorecard evidence." };
+  }
+  if (prioritiesResult.error) {
+    return { ok: false, error: "Could not load priority evidence." };
+  }
+
   const businessRoleId = employeeResult.data?.business_role_id ?? null;
   const roleExpectations = businessRoleId
     ? await supabase
         .from("knowledge_items")
-        .select("id, title, slug, updated_at")
+        .select("id, title, slug, body, updated_at")
         .eq("type", "role_expectation")
         .eq("business_role_id", businessRoleId)
         .eq("status", "published")
     : { data: [], error: null };
 
+  if (roleExpectations.error) {
+    return { ok: false, error: "Could not load role expectation evidence." };
+  }
+
   const measurableIds = (measurablesResult.data ?? []).map((measurable) => measurable.id);
+  let entriesQuery = supabase
+    .from("performance_scorecard_entries")
+    .select("id, measurable_id, period_start, period_end, target_snapshot, actual_value, status")
+    .in("measurable_id", measurableIds);
+
+  const hasReviewPeriod = Boolean(review.period_start && review.period_end);
+  if (hasReviewPeriod && review.period_start && review.period_end) {
+    entriesQuery = entriesQuery
+      .lte("period_start", review.period_end)
+      .gte("period_end", review.period_start);
+  }
+  entriesQuery = entriesQuery.order("period_start", { ascending: false });
+
   const entries = measurableIds.length > 0
-    ? await supabase
-        .from("performance_scorecard_entries")
-        .select("id, measurable_id, period_start, period_end, target_snapshot, actual_value, status")
-        .in("measurable_id", measurableIds)
-        .order("period_start", { ascending: false })
+    ? await entriesQuery
     : { data: [], error: null };
 
-  const latestEntries = new Map<string, unknown>();
+  if (entries.error) {
+    return { ok: false, error: "Could not load scorecard entry evidence." };
+  }
+
+  const entriesByMeasurable = new Map<string, typeof entries.data>();
   for (const entry of entries.data ?? []) {
-    if (!latestEntries.has(entry.measurable_id)) {
-      latestEntries.set(entry.measurable_id, entry);
+    const list = entriesByMeasurable.get(entry.measurable_id) ?? [];
+    list.push(entry);
+    entriesByMeasurable.set(entry.measurable_id, list);
+  }
+
+  const selectedPriorities = (prioritiesResult.data ?? [])
+    .filter((priority) =>
+      priorityInReviewPeriod(
+        priority,
+        review.period_start,
+        review.period_end,
+      ),
+    )
+    .map((priority) => ({
+      ...priority,
+      selection_context: hasReviewPeriod ? "in_review_period" : "no_review_period",
+    }));
+
+  const evidence = {
+    role_expectations: roleExpectations.data ?? [],
+    measurables: (measurablesResult.data ?? []).map((measurable) => {
+      const measurableEntries = entriesByMeasurable.get(measurable.id) ?? [];
+      return {
+        id: measurable.id,
+        name: measurable.name,
+        target: measurable.target,
+        unit: measurable.unit,
+        status: measurable.status,
+        entries: measurableEntries,
+        context: hasReviewPeriod ? "in_review_period" : "latest_available",
+        absent: measurableEntries.length === 0,
+      };
+    }),
+    priorities: selectedPriorities,
+    period: {
+      start: review.period_start,
+      end: review.period_end,
+      stated: hasReviewPeriod,
+    },
+  };
+
+  if (!hasReviewPeriod && measurableIds.length > 0) {
+    // Keep only the latest entry per measurable when no period was provided, and
+    // label it explicitly as outside-period context rather than pretending it
+    // belongs to a period that was never set.
+    for (const measurable of evidence.measurables) {
+      measurable.entries = measurable.entries.slice(0, 1);
+      measurable.context = "latest_available_outside_review_period";
     }
   }
 
   return {
-    finalized_at: finalizedAt,
-    finalized_by: finalizedBy,
-    employee_id: review.employee_id,
-    manager_id: review.manager_id,
-    role_expectations: roleExpectations.data ?? [],
-    measurables: (measurablesResult.data ?? []).map((measurable) => ({
-      id: measurable.id,
-      name: measurable.name,
-      target: measurable.target,
-      unit: measurable.unit,
-      status: measurable.status,
-      latest_entry: latestEntries.get(measurable.id) ?? null,
-    })),
-    priorities: prioritiesResult.data ?? [],
-  } as unknown as Json;
+    ok: true,
+    data: {
+      finalized_at: new Date().toISOString(),
+      finalized_by: finalizedBy,
+      employee_id: review.employee_id,
+      manager_id: review.manager_id,
+      evidence,
+    } as unknown as Json,
+  };
 }
