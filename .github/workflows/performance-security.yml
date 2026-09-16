@@ -1,0 +1,32 @@
+name: Performance security database tests
+
+on:
+  push:
+    branches:
+      - codex/performance-acceptance-security-fixes
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  database-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: 2.20.3
+
+      - name: Start isolated Supabase database
+        run: supabase start
+
+      - name: Apply migrations
+        run: supabase db reset
+
+      - name: Run performance database tests
+        run: supabase test db

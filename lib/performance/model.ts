@@ -222,6 +222,27 @@ export function isOverdue({
   return due.getTime() < today.getTime();
 }
 
+type PriorityEvidence = {
+  due_date: string | null;
+  completed_at?: string | null;
+};
+
+export function priorityInReviewPeriod(
+  priority: PriorityEvidence,
+  periodStart: string | null | undefined,
+  periodEnd: string | null | undefined,
+) {
+  if (!periodStart || !periodEnd) return true;
+
+  const inWindow = (value: string | null | undefined) => {
+    if (!value) return false;
+    const date = value.length <= 10 ? value : value.slice(0, 10);
+    return date >= periodStart && date <= periodEnd;
+  };
+
+  return inWindow(priority.due_date) || inWindow(priority.completed_at);
+}
+
 export type PerformanceAccessLevel = "none" | "own" | "team" | "all";
 
 export function performanceAccessLevel(
@@ -238,4 +259,3 @@ export function performanceAccessLevel(
   }
   return "none";
 }
-

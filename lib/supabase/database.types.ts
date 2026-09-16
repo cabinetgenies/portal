@@ -669,6 +669,24 @@ export type DepartmentInsert = {
 
 export type DepartmentUpdate = Partial<DepartmentInsert>;
 
+export type DepartmentLeaderRow = {
+  id: string;
+  department_id: string;
+  profile_id: string;
+  created_by: string | null;
+  created_at: string;
+};
+
+export type DepartmentLeaderInsert = {
+  id?: string;
+  department_id: string;
+  profile_id: string;
+  created_by?: string | null;
+  created_at?: string;
+};
+
+export type DepartmentLeaderUpdate = Partial<DepartmentLeaderInsert>;
+
 export type BusinessRoleRow = {
   id: string;
   key: string;
@@ -1342,13 +1360,15 @@ export type PerformanceReviewRow = {
   status: string;
   scheduled_date: string | null;
   completed_date: string | null;
-  manager_notes: string | null;
   employee_notes: string | null;
   overall_summary: string | null;
   development_actions: string | null;
   measurable_snapshot_ids: string[];
   priority_snapshot_ids: string[];
   knowledge_item_snapshot_ids: string[];
+  snapshot_data: Json | null;
+  finalized_by: string | null;
+  finalized_at: string | null;
   created_by: string | null;
   created_at: string;
   updated_at: string;
@@ -1363,19 +1383,236 @@ export type PerformanceReviewInsert = {
   status?: string;
   scheduled_date?: string | null;
   completed_date?: string | null;
-  manager_notes?: string | null;
   employee_notes?: string | null;
   overall_summary?: string | null;
   development_actions?: string | null;
   measurable_snapshot_ids?: string[];
   priority_snapshot_ids?: string[];
   knowledge_item_snapshot_ids?: string[];
+  snapshot_data?: Json | null;
+  finalized_by?: string | null;
+  finalized_at?: string | null;
   created_by?: string | null;
   created_at?: string;
   updated_at?: string;
 };
 
 export type PerformanceReviewUpdate = Partial<PerformanceReviewInsert>;
+
+export type PerformanceReviewManagerNoteRow = {
+  id: string;
+  review_id: string;
+  body: string;
+  updated_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type PerformanceReviewManagerNoteInsert = {
+  id?: string;
+  review_id: string;
+  body: string;
+  updated_by?: string | null;
+  created_at?: string;
+  updated_at?: string;
+};
+
+export type PerformanceReviewManagerNoteUpdate =
+  Partial<PerformanceReviewManagerNoteInsert>;
+
+export type AiAgentConfigRow = {
+  id: string;
+  agent_id: string;
+  enabled: boolean;
+  model_alias: string;
+  allowed_tools: string[];
+  tool_limits: Json;
+  kill_switch: boolean;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type AiAgentConfigInsert = {
+  id?: string;
+  agent_id: string;
+  enabled?: boolean;
+  model_alias?: string;
+  allowed_tools?: string[];
+  tool_limits?: Json;
+  kill_switch?: boolean;
+  notes?: string | null;
+  created_at?: string;
+  updated_at?: string;
+};
+
+export type AiAgentConfigUpdate = Partial<AiAgentConfigInsert>;
+
+export type AiRoleAgentRow = {
+  id: string;
+  business_role_id: string;
+  agent_id: string;
+  enabled: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type AiRoleAgentInsert = {
+  id?: string;
+  business_role_id: string;
+  agent_id: string;
+  enabled?: boolean;
+  created_at?: string;
+  updated_at?: string;
+};
+
+export type AiRoleAgentUpdate = Partial<AiRoleAgentInsert>;
+
+export type AiConversationRow = {
+  id: string;
+  user_id: string;
+  title: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type AiConversationInsert = {
+  id?: string;
+  user_id: string;
+  title?: string | null;
+  created_at?: string;
+  updated_at?: string;
+};
+
+export type AiConversationUpdate = Partial<AiConversationInsert>;
+
+export type AiMessageRow = {
+  id: string;
+  conversation_id: string;
+  role: string;
+  content: string;
+  payload: Json;
+  created_at: string;
+};
+
+export type AiMessageInsert = {
+  id?: string;
+  conversation_id: string;
+  role: string;
+  content: string;
+  payload?: Json;
+  created_at?: string;
+};
+
+export type AiMessageUpdate = Partial<AiMessageInsert>;
+
+export type AiRunRow = {
+  id: string;
+  conversation_id: string;
+  user_id: string;
+  agent_id: string;
+  status: string;
+  model: string | null;
+  input_tokens: number;
+  output_tokens: number;
+  total_tokens: number;
+  model_calls: number;
+  tool_calls: number;
+  error_message: string | null;
+  started_at: string;
+  completed_at: string | null;
+  created_at: string;
+};
+
+export type AiRunInsert = {
+  id?: string;
+  conversation_id: string;
+  user_id: string;
+  agent_id: string;
+  status?: string;
+  model?: string | null;
+  input_tokens?: number;
+  output_tokens?: number;
+  total_tokens?: number;
+  model_calls?: number;
+  tool_calls?: number;
+  error_message?: string | null;
+  started_at?: string;
+  completed_at?: string | null;
+  created_at?: string;
+};
+
+export type AiRunUpdate = Partial<AiRunInsert>;
+
+export type AiRunStepRow = {
+  id: string;
+  run_id: string;
+  user_id: string;
+  sequence: number;
+  agent_id: string | null;
+  kind: string;
+  input: Json | null;
+  output: Json | null;
+  status: string;
+  error_message: string | null;
+  started_at: string;
+  completed_at: string | null;
+  created_at: string;
+};
+
+export type AiRunStepInsert = {
+  id?: string;
+  run_id: string;
+  user_id: string;
+  sequence: number;
+  agent_id?: string | null;
+  kind: string;
+  input?: Json | null;
+  output?: Json | null;
+  status?: string;
+  error_message?: string | null;
+  started_at?: string;
+  completed_at?: string | null;
+  created_at?: string;
+};
+
+export type AiRunStepUpdate = Partial<AiRunStepInsert>;
+
+export type AiArtifactRow = {
+  id: string;
+  user_id: string;
+  conversation_id: string | null;
+  run_id: string | null;
+  kind: string;
+  title: string;
+  content: Json;
+  status: string;
+  version: number;
+  payload_hash: string;
+  unique_execution_key: string | null;
+  expires_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type AiArtifactInsert = {
+  id?: string;
+  user_id: string;
+  conversation_id?: string | null;
+  run_id?: string | null;
+  kind: string;
+  title: string;
+  content: Json;
+  status?: string;
+  version?: number;
+  payload_hash: string;
+  unique_execution_key?: string | null;
+  expires_at?: string | null;
+  created_at?: string;
+  updated_at?: string;
+};
+
+export type AiArtifactUpdate = Partial<AiArtifactInsert>;
 
 export type Database = {
   public: {
@@ -1737,6 +1974,27 @@ export type Database = {
           {
             foreignKeyName: "departments_owner_profile_id_fkey";
             columns: ["owner_profile_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      department_leaders: {
+        Row: DepartmentLeaderRow;
+        Insert: DepartmentLeaderInsert;
+        Update: DepartmentLeaderUpdate;
+        Relationships: [
+          {
+            foreignKeyName: "department_leaders_department_id_fkey";
+            columns: ["department_id"];
+            isOneToOne: false;
+            referencedRelation: "departments";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "department_leaders_profile_id_fkey";
+            columns: ["profile_id"];
             isOneToOne: false;
             referencedRelation: "profiles";
             referencedColumns: ["id"];
@@ -2188,9 +2446,136 @@ export type Database = {
           },
         ];
       };
+      performance_review_manager_notes: {
+        Row: PerformanceReviewManagerNoteRow;
+        Insert: PerformanceReviewManagerNoteInsert;
+        Update: PerformanceReviewManagerNoteUpdate;
+        Relationships: [
+          {
+            foreignKeyName: "performance_review_manager_notes_review_id_fkey";
+            columns: ["review_id"];
+            isOneToOne: false;
+            referencedRelation: "performance_reviews";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      ai_agent_configs: {
+        Row: AiAgentConfigRow;
+        Insert: AiAgentConfigInsert;
+        Update: AiAgentConfigUpdate;
+        Relationships: [];
+      };
+      ai_role_agents: {
+        Row: AiRoleAgentRow;
+        Insert: AiRoleAgentInsert;
+        Update: AiRoleAgentUpdate;
+        Relationships: [
+          {
+            foreignKeyName: "ai_role_agents_business_role_id_fkey";
+            columns: ["business_role_id"];
+            isOneToOne: false;
+            referencedRelation: "business_roles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      ai_conversations: {
+        Row: AiConversationRow;
+        Insert: AiConversationInsert;
+        Update: AiConversationUpdate;
+        Relationships: [];
+      };
+      ai_messages: {
+        Row: AiMessageRow;
+        Insert: AiMessageInsert;
+        Update: AiMessageUpdate;
+        Relationships: [
+          {
+            foreignKeyName: "ai_messages_conversation_id_fkey";
+            columns: ["conversation_id"];
+            isOneToOne: false;
+            referencedRelation: "ai_conversations";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      ai_runs: {
+        Row: AiRunRow;
+        Insert: AiRunInsert;
+        Update: AiRunUpdate;
+        Relationships: [
+          {
+            foreignKeyName: "ai_runs_conversation_id_fkey";
+            columns: ["conversation_id"];
+            isOneToOne: false;
+            referencedRelation: "ai_conversations";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      ai_run_steps: {
+        Row: AiRunStepRow;
+        Insert: AiRunStepInsert;
+        Update: AiRunStepUpdate;
+        Relationships: [
+          {
+            foreignKeyName: "ai_run_steps_run_id_fkey";
+            columns: ["run_id"];
+            isOneToOne: false;
+            referencedRelation: "ai_runs";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      ai_artifacts: {
+        Row: AiArtifactRow;
+        Insert: AiArtifactInsert;
+        Update: AiArtifactUpdate;
+        Relationships: [
+          {
+            foreignKeyName: "ai_artifacts_conversation_id_fkey";
+            columns: ["conversation_id"];
+            isOneToOne: false;
+            referencedRelation: "ai_conversations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "ai_artifacts_run_id_fkey";
+            columns: ["run_id"];
+            isOneToOne: false;
+            referencedRelation: "ai_runs";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
     };
     Views: { [_ in never]: never };
-    Functions: { [_ in never]: never };
+    Functions: {
+      can_manage_meeting: {
+        Args: { target_meeting_id: string };
+        Returns: boolean;
+      };
+      can_view_meeting: {
+        Args: { target_meeting_id: string };
+        Returns: boolean;
+      };
+      is_meeting_participant: {
+        Args: { target_meeting_id: string };
+        Returns: boolean;
+      };
+      save_manager_review: {
+        Args: {
+          p_review_id: string;
+          p_status: string;
+          p_manager_notes: string | null;
+          p_overall_summary: string | null;
+          p_development_actions: string | null;
+          p_snapshot_data: Json | null;
+        };
+        Returns: boolean;
+      };
+    };
     Enums: { [_ in never]: never };
     CompositeTypes: { [_ in never]: never };
   };
