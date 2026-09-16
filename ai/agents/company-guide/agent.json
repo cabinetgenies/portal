@@ -1,0 +1,11 @@
+{
+  "id": "company-guide",
+  "name": "Company Guide",
+  "version": "7a.1",
+  "modelAlias": "default",
+  "skillIds": ["find-approved-procedure"],
+  "allowedToolIds": ["searchApprovedKnowledge", "readApprovedKnowledgeItem"],
+  "toolLimits": { "searchApprovedKnowledge": 4, "readApprovedKnowledgeItem": 6 },
+  "disabledReason": null
+}
+

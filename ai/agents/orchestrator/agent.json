@@ -1,0 +1,11 @@
+{
+  "id": "orchestrator",
+  "name": "Company Orchestrator",
+  "version": "7a.1",
+  "modelAlias": "default",
+  "skillIds": [],
+  "allowedToolIds": ["searchApprovedKnowledge"],
+  "toolLimits": { "searchApprovedKnowledge": 2 },
+  "disabledReason": null
+}
+

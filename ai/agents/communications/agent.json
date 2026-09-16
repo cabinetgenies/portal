@@ -1,0 +1,11 @@
+{
+  "id": "communications",
+  "name": "Communications",
+  "version": "7a.1",
+  "modelAlias": "default",
+  "skillIds": ["draft-customer-update"],
+  "allowedToolIds": [],
+  "toolLimits": {},
+  "disabledReason": null
+}
+

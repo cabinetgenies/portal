@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { Brand } from "@/components/app-shell/brand";
 import { NavList } from "@/components/app-shell/nav-list";
 import { UserPanel, type SessionUser } from "@/components/app-shell/user-panel";
+import { AssistantLaunchLink } from "@/components/assistant/assistant-launch-link";
 import { CloseIcon, MenuIcon } from "@/components/icons";
 import type { NavSection } from "@/lib/permissions/navigation";
 
@@ -87,6 +88,7 @@ export function MobileNav({
               variant="drawer"
               onNavigate={() => setOpen(false)}
             />
+            <AssistantLaunchLink variant="drawer" />
             <div className="mt-auto">
               <UserPanel user={user} tone="light" />
             </div>
