@@ -369,6 +369,7 @@ select throws_ok(
     )
   $$,
   '42501',
+  null,
   'manager cannot create a review for a non-report'
 );
 
@@ -396,6 +397,7 @@ select throws_ok(
     )
   $$,
   '42501',
+  null,
   'employee cannot finalize'
 );
 
@@ -417,6 +419,7 @@ select throws_ok(
     )
   $$,
   '22023',
+  null,
   'incomplete finalization snapshot is rejected'
 );
 
@@ -500,6 +503,7 @@ select throws_ok(
     where id = '88888888-8888-4888-8888-888888888888'
   $$,
   '42501',
+  null,
   'completed review cannot be edited'
 );
 
@@ -511,6 +515,7 @@ select throws_ok(
     where review_id = '88888888-8888-4888-8888-888888888888'
   $$,
   '42501',
+  null,
   'completed manager notes cannot be updated'
 );
 
@@ -521,6 +526,7 @@ select throws_ok(
     where review_id = '88888888-8888-4888-8888-888888888888'
   $$,
   '42501',
+  null,
   'completed manager notes cannot be deleted'
 );
 
@@ -647,6 +653,7 @@ select throws_ok(
     where id = '88888888-8888-4888-8888-888888888888'
   $$,
   '42501',
+  null,
   'anonymous access is denied'
 );
 
