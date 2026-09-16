@@ -1,22 +1,11 @@
 begin;
 
-select plan(21);
+select plan(26);
 
-create temp table fixture_ids (
-  kind text primary key,
-  id uuid not null
-);
-
-insert into fixture_ids (kind, id) values
-  ('admin', '11111111-1111-4111-8111-111111111111'),
-  ('manager', '22222222-2222-4222-8222-222222222222'),
-  ('employee', '33333333-3333-4333-8333-333333333333'),
-  ('other', '44444444-4444-4444-8444-444444444444'),
-  ('accounting', '55555555-5555-4555-8555-555555555555'),
-  ('inactive', '66666666-6666-4666-8666-666666666666'),
-  ('leader', '77777777-7777-4777-8777-777777777777'),
-  ('review', '88888888-8888-4888-8888-888888888888'),
-  ('meeting', '99999999-9999-4999-8999-999999999999');
+-- ---------------------------------------------------------------------------
+-- Fixed fixtures. The test never reads a temporary helper table after switching
+-- into `authenticated` or `anon`; every authorization assertion uses literals.
+-- ---------------------------------------------------------------------------
 
 insert into auth.users (
   instance_id,
@@ -31,93 +20,135 @@ insert into auth.users (
   created_at,
   updated_at
 )
-select
-  '00000000-0000-0000-0000-000000000000',
-  id,
-  'authenticated',
-  'authenticated',
-  kind || '@example.test',
-  'not-a-real-password',
-  now(),
-  '{}'::jsonb,
-  '{}'::jsonb,
-  now(),
-  now()
-from fixture_ids
-where kind in (
-  'admin',
-  'manager',
-  'employee',
-  'other',
-  'accounting',
-  'inactive',
-  'leader'
-);
+values
+  (
+    '00000000-0000-0000-0000-000000000000',
+    '11111111-1111-4111-8111-111111111111',
+    'authenticated',
+    'authenticated',
+    'admin@example.test',
+    'not-a-real-password',
+    now(),
+    '{}'::jsonb,
+    '{}'::jsonb,
+    now(),
+    now()
+  ),
+  (
+    '00000000-0000-0000-0000-000000000000',
+    '22222222-2222-4222-8222-222222222222',
+    'authenticated',
+    'authenticated',
+    'manager@example.test',
+    'not-a-real-password',
+    now(),
+    '{}'::jsonb,
+    '{}'::jsonb,
+    now(),
+    now()
+  ),
+  (
+    '00000000-0000-0000-0000-000000000000',
+    '33333333-3333-4333-8333-333333333333',
+    'authenticated',
+    'authenticated',
+    'employee@example.test',
+    'not-a-real-password',
+    now(),
+    '{}'::jsonb,
+    '{}'::jsonb,
+    now(),
+    now()
+  ),
+  (
+    '00000000-0000-0000-0000-000000000000',
+    '44444444-4444-4444-8444-444444444444',
+    'authenticated',
+    'authenticated',
+    'other@example.test',
+    'not-a-real-password',
+    now(),
+    '{}'::jsonb,
+    '{}'::jsonb,
+    now(),
+    now()
+  ),
+  (
+    '00000000-0000-0000-0000-000000000000',
+    '55555555-5555-4555-8555-555555555555',
+    'authenticated',
+    'authenticated',
+    'accounting@example.test',
+    'not-a-real-password',
+    now(),
+    '{}'::jsonb,
+    '{}'::jsonb,
+    now(),
+    now()
+  ),
+  (
+    '00000000-0000-0000-0000-000000000000',
+    '66666666-6666-4666-8666-666666666666',
+    'authenticated',
+    'authenticated',
+    'inactive@example.test',
+    'not-a-real-password',
+    now(),
+    '{}'::jsonb,
+    '{}'::jsonb,
+    now(),
+    now()
+  ),
+  (
+    '00000000-0000-0000-0000-000000000000',
+    '77777777-7777-4777-8777-777777777777',
+    'authenticated',
+    'authenticated',
+    'leader@example.test',
+    'not-a-real-password',
+    now(),
+    '{}'::jsonb,
+    '{}'::jsonb,
+    now(),
+    now()
+  );
 
--- Fixture setup only: temporarily disable the profile privilege guard so the
--- test can establish users with different authorization states. The trigger is
--- immediately restored before any security assertions run.
+-- Fixture setup only: the profile privilege guard is temporarily disabled so the
+-- test can establish roles, reporting lines and active states. It is re-enabled
+-- before any authorization assertion runs.
 alter table public.profiles
 disable trigger profiles_protect_privileged_columns;
 
 update public.profiles
 set role = 'admin',
     active = true
-where id = (
-  select id
-  from fixture_ids
-  where kind = 'admin'
-);
+where id = '11111111-1111-4111-8111-111111111111';
 
 update public.profiles
 set role = 'supervisor',
     active = true
-where id = (
-  select id
-  from fixture_ids
-  where kind = 'manager'
-);
+where id = '22222222-2222-4222-8222-222222222222';
 
 update public.profiles
 set role = 'employee',
     active = true,
-    manager_id = (
-      select id
-      from fixture_ids
-      where kind = 'manager'
-    )
-where id = (
-  select id
-  from fixture_ids
-  where kind = 'employee'
-);
+    manager_id = '22222222-2222-4222-8222-222222222222'
+where id = '33333333-3333-4333-8333-333333333333';
 
 update public.profiles
 set role = 'employee',
     active = true
-where id = (
-  select id
-  from fixture_ids
-  where kind = 'other'
-);
+where id = '44444444-4444-4444-8444-444444444444';
 
 update public.profiles
 set role = 'accounting',
     active = true
-where id = (
-  select id
-  from fixture_ids
-  where kind = 'accounting'
-);
+where id = '55555555-5555-4555-8555-555555555555';
 
 update public.profiles
-set role = 'employee',
+set role = 'admin',
     active = false
-where id = (
-  select id
-  from fixture_ids
-  where kind = 'inactive'
-);
+where id = '66666666-6666-4666-8666-666666666666';
 
 update public.profiles
 set role = 'supervisor',
@@ -127,26 +158,40 @@ set role = 'supervisor',
       from public.business_roles
       where key = 'sales_leader'
     )
-where id = (
-  select id
-  from fixture_ids
-  where kind = 'leader'
-);
+where id = '77777777-7777-4777-8777-777777777777';
 
 alter table public.profiles
 enable trigger profiles_protect_privileged_columns;
 
 insert into public.departments (
+  id,
   slug,
   name,
   display_order
 )
 values (
+  'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
   'test-dept',
   'Test Department',
   500
+);
+
+insert into public.performance_measurables (
+  name,
+  scope,
+  department_id,
+  target,
+  status,
+  created_by
 )
-on conflict (slug) do nothing;
+values (
+  'Department measurable',
+  'department',
+  'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+  10,
+  'on_track',
+  '11111111-1111-4111-8111-111111111111'
+);
 
 insert into public.performance_reviews (
   id,
@@ -158,39 +203,27 @@ insert into public.performance_reviews (
   scheduled_date,
   created_by
 )
-select
-  fixture_ids.id,
-  employee.id,
-  manager.id,
+values (
+  '88888888-8888-4888-8888-888888888888',
+  '33333333-3333-4333-8333-333333333333',
+  '22222222-2222-4222-8222-222222222222',
   '2026-06-01',
   '2026-06-30',
   'in_progress',
   '2026-06-30',
-  manager.id
-from fixture_ids
-cross join fixture_ids employee
-cross join fixture_ids manager
-where fixture_ids.kind = 'review'
-  and employee.kind = 'employee'
-  and manager.kind = 'manager';
+  '22222222-2222-4222-8222-222222222222'
+);
 
 insert into public.performance_review_manager_notes (
   review_id,
   body,
   updated_by
 )
-select
-  (
-    select id
-    from fixture_ids
-    where kind = 'review'
-  ),
+values (
+  '88888888-8888-4888-8888-888888888888',
   'SECRET_MANAGER_DRAFT',
-  (
-    select id
-    from fixture_ids
-    where kind = 'manager'
-  );
+  '22222222-2222-4222-8222-222222222222'
+);
 
 insert into public.meetings (
   id,
@@ -198,17 +231,12 @@ insert into public.meetings (
   meeting_date,
   created_by
 )
-select
-  id,
+values (
+  '99999999-9999-4999-8999-999999999999',
   'leadership',
   '2026-06-15',
-  (
-    select id
-    from fixture_ids
-    where kind = 'manager'
-  )
-from fixture_ids
-where kind = 'meeting';
+  '22222222-2222-4222-8222-222222222222'
+);
 
 create or replace function public.set_test_profile(profile_id uuid)
 returns void
@@ -225,63 +253,44 @@ begin
 end;
 $$;
 
--- 1. fixtures exist
+-- 1. Fixture profiles exist.
 select ok(
   (
     select count(*) = 7
     from public.profiles
     where id in (
-      select id
-      from fixture_ids
-      where kind in (
-        'admin',
-        'manager',
-        'employee',
-        'other',
-        'accounting',
-        'inactive',
-        'leader'
-      )
+      '11111111-1111-4111-8111-111111111111',
+      '22222222-2222-4222-8222-222222222222',
+      '33333333-3333-4333-8333-333333333333',
+      '44444444-4444-4444-8444-444444444444',
+      '55555555-5555-4555-8555-555555555555',
+      '66666666-6666-4666-8666-666666666666',
+      '77777777-7777-4777-8777-777777777777'
     )
   ),
-  'fixtures exist'
+  'fixture profiles exist'
 );
 
--- 2. employee sees shared review
-select public.set_test_profile(
-  (
-    select id
-    from fixture_ids
-    where kind = 'employee'
-  )
-);
-
+-- 2. Employee can read their own review.
+select public.set_test_profile('33333333-3333-4333-8333-333333333333');
 set local role authenticated;
 
 select is(
   (
     select count(*)
     from public.performance_reviews
-    where id = (
-      select id
-      from fixture_ids
-      where kind = 'review'
-    )
+    where id = '88888888-8888-4888-8888-888888888888'
   ),
   1::bigint,
-  'employee can read the permitted review'
+  'employee can read their own review'
 );
 
--- 3. employee cannot read private manager notes
+-- 3. Employee cannot read private manager notes.
 select is(
   (
     select count(*)
     from public.performance_review_manager_notes
-    where review_id = (
-      select id
-      from fixture_ids
-      where kind = 'review'
-    )
+    where review_id = '88888888-8888-4888-8888-888888888888'
   ),
   0::bigint,
   'employee cannot read private manager notes'
@@ -289,84 +298,61 @@ select is(
 
 reset role;
 
--- 4. manager sees private notes
-select public.set_test_profile(
-  (
-    select id
-    from fixture_ids
-    where kind = 'manager'
-  )
+-- 4. auth.uid resolves to the intended profile after role switch.
+select public.set_test_profile('22222222-2222-4222-8222-222222222222');
+set local role authenticated;
+
+select ok(
+  auth.uid() = '22222222-2222-4222-8222-222222222222'::uuid,
+  'auth.uid resolves to the intended authenticated profile'
 );
 
+-- 5. Assigned manager can read manager notes.
+select is(
+  (
+    select count(*)
+    from public.performance_review_manager_notes
+    where review_id = '88888888-8888-4888-8888-888888888888'
+  ),
+  1::bigint,
+  'assigned manager can read manager notes'
+);
+
+reset role;
+
+-- 6. Unrelated employee cannot read the review.
+select public.set_test_profile('44444444-4444-4444-8444-444444444444');
 set local role authenticated;
 
 select is(
   (
     select count(*)
-    from public.performance_review_manager_notes
-    where review_id = (
-      select id
-      from fixture_ids
-      where kind = 'review'
-    )
-  ),
-  1::bigint,
-  'manager can read private notes'
-);
-
--- 5. unrelated employee cannot see review
-select public.set_test_profile(
-  (
-    select id
-    from fixture_ids
-    where kind = 'other'
-  )
-);
-
-select is(
-  (
-    select count(*)
     from public.performance_reviews
-    where id = (
-      select id
-      from fixture_ids
-      where kind = 'review'
-    )
+    where id = '88888888-8888-4888-8888-888888888888'
   ),
   0::bigint,
-  'unrelated employee cannot read review'
+  'unrelated employee cannot read the review'
 );
 
--- 6. accounting cannot recover private text from audit log
-select public.set_test_profile(
-  (
-    select id
-    from fixture_ids
-    where kind = 'accounting'
-  )
-);
+reset role;
+
+-- 7. Private manager-note text is not present in audit metadata.
+select public.set_test_profile('55555555-5555-4555-8555-555555555555');
+set local role authenticated;
 
 select ok(
   not exists (
     select 1
     from public.audit_events
-    where entity_type = 'performance_review_manager_note'
-      and metadata::text like '%SECRET_MANAGER_DRAFT%'
+    where metadata::text like '%SECRET_MANAGER_DRAFT%'
   ),
-  'private manager note text is redacted from audit log'
+  'private manager-note text is redacted from audit metadata'
 );
 
 reset role;
 
--- 7. manager cannot create review for non-report
-select public.set_test_profile(
-  (
-    select id
-    from fixture_ids
-    where kind = 'manager'
-  )
-);
-
+-- 8. Manager cannot create a review for a non-report.
+select public.set_test_profile('22222222-2222-4222-8222-222222222222');
 set local role authenticated;
 
 select throws_ok(
@@ -377,40 +363,25 @@ select throws_ok(
       status
     )
     values (
-      (
-        select id
-        from fixture_ids
-        where kind = 'other'
-      ),
-      (
-        select id
-        from fixture_ids
-        where kind = 'manager'
-      ),
+      '44444444-4444-4444-8444-444444444444',
+      '22222222-2222-4222-8222-222222222222',
       'not_started'
     )
   $$,
   '42501',
-  'manager cannot create review for a non-report'
+  'manager cannot create a review for a non-report'
 );
 
--- 8. employee cannot finalize
-select public.set_test_profile(
-  (
-    select id
-    from fixture_ids
-    where kind = 'employee'
-  )
-);
+reset role;
+
+-- 9. Employee cannot finalize.
+select public.set_test_profile('33333333-3333-4333-8333-333333333333');
+set local role authenticated;
 
 select throws_ok(
   $$
     select public.save_manager_review(
-      (
-        select id
-        from fixture_ids
-        where kind = 'review'
-      ),
+      '88888888-8888-4888-8888-888888888888',
       'complete',
       null,
       null,
@@ -430,25 +401,14 @@ select throws_ok(
 
 reset role;
 
--- 9. failed finalization leaves no partial state
-select public.set_test_profile(
-  (
-    select id
-    from fixture_ids
-    where kind = 'manager'
-  )
-);
-
+-- 10. Invalid/incomplete finalization snapshot is rejected.
+select public.set_test_profile('22222222-2222-4222-8222-222222222222');
 set local role authenticated;
 
 select throws_ok(
   $$
     select public.save_manager_review(
-      (
-        select id
-        from fixture_ids
-        where kind = 'review'
-      ),
+      '88888888-8888-4888-8888-888888888888',
       'complete',
       null,
       null,
@@ -457,44 +417,30 @@ select throws_ok(
     )
   $$,
   '22023',
-  'incomplete snapshot is rejected'
+  'incomplete finalization snapshot is rejected'
 );
 
+-- 11. Failed finalization leaves the review unchanged.
 select is(
   (
     select status
     from public.performance_reviews
-    where id = (
-      select id
-      from fixture_ids
-      where kind = 'review'
-    )
+    where id = '88888888-8888-4888-8888-888888888888'
   ),
   'in_progress',
-  'failed finalization did not change review status'
+  'failed finalization leaves review unchanged'
 );
 
 reset role;
 
--- 10. successful finalization and immutable completion
-select public.set_test_profile(
-  (
-    select id
-    from fixture_ids
-    where kind = 'manager'
-  )
-);
-
+-- 12. Assigned manager can successfully finalize with manager notes.
+select public.set_test_profile('22222222-2222-4222-8222-222222222222');
 set local role authenticated;
 
 select lives_ok(
   $$
     select public.save_manager_review(
-      (
-        select id
-        from fixture_ids
-        where kind = 'review'
-      ),
+      '88888888-8888-4888-8888-888888888888',
       'complete',
       'MANAGER_FINAL_NOTE',
       'Reviewed.',
@@ -512,33 +458,76 @@ select lives_ok(
       }'::jsonb
     )
   $$,
-  'manager can finalize with valid evidence'
+  'assigned manager can finalize with manager notes'
 );
 
-select throws_ok(
-  $$
-    delete from public.performance_review_manager_notes
-    where review_id = (
-      select id
-      from fixture_ids
-      where kind = 'review'
-    )
-  $$,
-  '42501',
-  'completed review notes are immutable'
+-- 13. Finalized review is complete.
+select is(
+  (
+    select status
+    from public.performance_reviews
+    where id = '88888888-8888-4888-8888-888888888888'
+  ),
+  'complete',
+  'finalized review is complete'
+);
+
+-- 14. Finalized evidence snapshot exists.
+select ok(
+  (
+    select jsonb_typeof(snapshot_data) = 'object'
+      and snapshot_data ? 'finalized_by'
+      and snapshot_data ? 'finalized_at'
+      and snapshot_data ? 'employee_id'
+      and snapshot_data ? 'manager_id'
+      and snapshot_data ? 'evidence'
+    from public.performance_reviews
+    where id = '88888888-8888-4888-8888-888888888888'
+  ),
+  'finalized evidence snapshot exists'
 );
 
 reset role;
 
--- 11. participant can read meeting; unrelated cannot
-select public.set_test_profile(
-  (
-    select id
-    from fixture_ids
-    where kind = 'manager'
-  )
+-- 15. Completed review cannot be edited.
+select public.set_test_profile('22222222-2222-4222-8222-222222222222');
+set local role authenticated;
+
+select throws_ok(
+  $$
+    update public.performance_reviews
+    set status = 'in_progress'
+    where id = '88888888-8888-4888-8888-888888888888'
+  $$,
+  '42501',
+  'completed review cannot be edited'
 );
 
+-- 16. Completed manager notes cannot be updated.
+select throws_ok(
+  $$
+    update public.performance_review_manager_notes
+    set body = 'CHANGED'
+    where review_id = '88888888-8888-4888-8888-888888888888'
+  $$,
+  '42501',
+  'completed manager notes cannot be updated'
+);
+
+-- 17. Completed manager notes cannot be deleted.
+select throws_ok(
+  $$
+    delete from public.performance_review_manager_notes
+    where review_id = '88888888-8888-4888-8888-888888888888'
+  $$,
+  '42501',
+  'completed manager notes cannot be deleted'
+);
+
+reset role;
+
+-- 18. Meeting organizer can add a participant.
+select public.set_test_profile('22222222-2222-4222-8222-222222222222');
 set local role authenticated;
 
 select lives_ok(
@@ -548,168 +537,84 @@ select lives_ok(
       profile_id
     )
     values (
-      (
-        select id
-        from fixture_ids
-        where kind = 'meeting'
-      ),
-      (
-        select id
-        from fixture_ids
-        where kind = 'employee'
-      )
+      '99999999-9999-4999-8999-999999999999',
+      '33333333-3333-4333-8333-333333333333'
     )
   $$,
-  'organizer can add participant'
+  'meeting organizer can add a participant'
 );
 
 reset role;
 
-select public.set_test_profile(
-  (
-    select id
-    from fixture_ids
-    where kind = 'employee'
-  )
-);
-
+-- 19. Participant can view the meeting.
+select public.set_test_profile('33333333-3333-4333-8333-333333333333');
 set local role authenticated;
 
 select is(
   (
     select count(*)
     from public.meetings
-    where id = (
-      select id
-      from fixture_ids
-      where kind = 'meeting'
-    )
+    where id = '99999999-9999-4999-8999-999999999999'
   ),
   1::bigint,
-  'participant can read their meeting'
+  'participant can view the meeting'
 );
 
 reset role;
 
-select public.set_test_profile(
-  (
-    select id
-    from fixture_ids
-    where kind = 'other'
-  )
-);
-
+-- 20. Unrelated employee cannot view the meeting.
+select public.set_test_profile('44444444-4444-4444-8444-444444444444');
 set local role authenticated;
 
 select is(
   (
     select count(*)
     from public.meetings
-    where id = (
-      select id
-      from fixture_ids
-      where kind = 'meeting'
-    )
+    where id = '99999999-9999-4999-8999-999999999999'
   ),
   0::bigint,
-  'unrelated employee cannot read meeting'
+  'unrelated employee cannot view the meeting'
 );
 
 reset role;
 
--- 12. business role alone grants no department access
-select public.set_test_profile(
-  (
-    select id
-    from fixture_ids
-    where kind = 'leader'
-  )
-);
-
+-- 21. Business role alone grants no department data access.
+select public.set_test_profile('77777777-7777-4777-8777-777777777777');
 set local role authenticated;
 
 select is(
   (
     select count(*)
     from public.performance_measurables
-    where department_id = (
-      select id
-      from public.departments
-      where slug = 'test-dept'
-    )
+    where department_id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
   ),
   0::bigint,
-  'business role alone grants no department data'
+  'business role alone grants no department data access'
 );
 
 reset role;
 
--- 13. explicit department leadership works
+-- Explicit department leadership is granted only by an administrator-managed row.
 insert into public.department_leaders (
   department_id,
   profile_id,
   created_by
 )
-select
-  (
-    select id
-    from public.departments
-    where slug = 'test-dept'
-  ),
-  (
-    select id
-    from fixture_ids
-    where kind = 'leader'
-  ),
-  (
-    select id
-    from fixture_ids
-    where kind = 'admin'
-  );
-
-insert into public.performance_measurables (
-  name,
-  scope,
-  department_id,
-  target,
-  status,
-  created_by
-)
-select
-  'Department measurable',
-  'department',
-  (
-    select id
-    from public.departments
-    where slug = 'test-dept'
-  ),
-  10,
-  'on_track',
-  (
-    select id
-    from fixture_ids
-    where kind = 'admin'
-  );
-
-select public.set_test_profile(
-  (
-    select id
-    from fixture_ids
-    where kind = 'leader'
-  )
+values (
+  'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+  '77777777-7777-4777-8777-777777777777',
+  '11111111-1111-4111-8111-111111111111'
 );
 
+-- 22. Explicit department leader can read department data.
+select public.set_test_profile('77777777-7777-4777-8777-777777777777');
 set local role authenticated;
 
 select is(
   (
     select count(*)
     from public.performance_measurables
-    where department_id = (
-      select id
-      from public.departments
-      where slug = 'test-dept'
-    )
+    where department_id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
   ),
   1::bigint,
   'explicit department leader can read department data'
@@ -717,26 +622,14 @@ select is(
 
 reset role;
 
--- 14. inactive user denied
-select public.set_test_profile(
-  (
-    select id
-    from fixture_ids
-    where kind = 'inactive'
-  )
-);
-
+-- 23. Inactive user is denied active-only access.
+select public.set_test_profile('66666666-6666-4666-8666-666666666666');
 set local role authenticated;
 
 select is(
   (
     select count(*)
-    from public.performance_reviews
-    where id = (
-      select id
-      from fixture_ids
-      where kind = 'review'
-    )
+    from public.audit_events
   ),
   0::bigint,
   'inactive user is denied'
@@ -744,18 +637,14 @@ select is(
 
 reset role;
 
--- 15. anonymous access denied
+-- 24. Anonymous access is denied.
 set local role anon;
 
 select throws_ok(
   $$
     select count(*)
     from public.performance_reviews
-    where id = (
-      select id
-      from fixture_ids
-      where kind = 'review'
-    )
+    where id = '88888888-8888-4888-8888-888888888888'
   $$,
   '42501',
   'anonymous access is denied'
@@ -763,55 +652,30 @@ select throws_ok(
 
 reset role;
 
--- 16. meeting participant removed loses access
-select public.set_test_profile(
-  (
-    select id
-    from fixture_ids
-    where kind = 'manager'
-  )
-);
-
+-- 25. Organizer can remove a meeting participant.
+select public.set_test_profile('22222222-2222-4222-8222-222222222222');
 set local role authenticated;
 
 select lives_ok(
   $$
     delete from public.meeting_participants
-    where meeting_id = (
-      select id
-      from fixture_ids
-      where kind = 'meeting'
-    )
-      and profile_id = (
-        select id
-        from fixture_ids
-        where kind = 'employee'
-      )
+    where meeting_id = '99999999-9999-4999-8999-999999999999'
+      and profile_id = '33333333-3333-4333-8333-333333333333'
   $$,
-  'organizer can remove participant'
+  'organizer can remove a meeting participant'
 );
 
 reset role;
 
-select public.set_test_profile(
-  (
-    select id
-    from fixture_ids
-    where kind = 'employee'
-  )
-);
-
+-- 26. Removed participant loses meeting access.
+select public.set_test_profile('33333333-3333-4333-8333-333333333333');
 set local role authenticated;
 
 select is(
   (
     select count(*)
     from public.meetings
-    where id = (
-      select id
-      from fixture_ids
-      where kind = 'meeting'
-    )
+    where id = '99999999-9999-4999-8999-999999999999'
   ),
   0::bigint,
   'removed participant loses meeting access'
