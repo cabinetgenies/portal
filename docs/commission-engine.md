@@ -150,9 +150,11 @@ final gross commission = final commissionable GP × final effective rate
 final true-up          = final gross commission − commission already recognized
 ```
 
-"Already recognized" is the sum of `net_payable` across the job's non-voided
-events, so a job can never pay more than it earned. The final event is also
-idempotent (`event_type = final_true_up`, one per job).
+"Already recognized" is the sum of `gross_commission` across the job's non-voided
+events, clipped at zero for negative true-ups. `gross_commission` is the amount
+credited before rollover/draw offsets are applied, so a deposit absorbed by draw
+is still recognized. This keeps a job from ever paying more than it earned. The
+final event is also idempotent (`event_type = final_true_up`, one per job).
 
 If the true-up is **negative**, no negative payment is created. The absolute
 amount becomes a **rollover obligation** instead, and the final event's

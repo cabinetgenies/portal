@@ -201,7 +201,7 @@ export function recognizedFromEvents(rows: readonly CommissionEventRow[]) {
       .map((row) => ({
         eventType: row.event_type as CommissionEventType,
         status: row.status,
-        netPayable: toNumber(row.net_payable),
+        grossCommission: toNumber(row.gross_commission),
       })),
   );
 }
