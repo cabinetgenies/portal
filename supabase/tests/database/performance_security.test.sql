@@ -46,14 +46,49 @@ select
 from fixture_ids
 where kind in ('admin', 'manager', 'employee', 'other', 'accounting', 'inactive', 'leader');
 
-update public.profiles set role = 'admin', active = true where id = (select id from fixture_ids where kind = 'admin');
-update public.profiles set role = 'supervisor', active = true where id = (select id from fixture_ids where kind = 'manager');
-update public.profiles set role = 'employee', active = true, manager_id = (select id from fixture_ids where kind = 'manager')
-  where id = (select id from fixture_ids where kind = 'employee');
-update public.profiles set role = 'employee', active = true where id = (select id from fixture_ids where kind = 'other');
-update public.profiles set role = 'accounting', active = true where id = (select id from fixture_ids where kind = 'accounting');
-update public.profiles set role = 'employee', active = false where id = (select id from fixture_ids where kind = 'inactive');
-update public.profiles set role = 'supervisor', active = true, business_role_id = (select id from public.business_roles where key = 'sales_leader')
+-- Fixture setup only: temporarily disable the profile privilege guard so the
+-- test can establish users with different authorization states. The trigger is
+-- immediately restored before any security assertions run.
+alter table public.profiles disable trigger profiles_protect_privileged_columns;
+
+update public.profiles
+set role = 'admin', active = true
+where id = (select id from fixture_ids where kind = 'admin');
+
+update public.profiles
+set role = 'supervisor', active = true
+where id = (select id from fixture_ids where kind = 'manager');
+
+update public.profiles
+set role = 'employee',
+    active = true,
+    manager_id = (select id from fixture_ids where kind = 'manager')
+where id = (select id from fixture_ids where kind = 'employee');
+
+update public.profiles
+set role = 'employee', active = true
+where id = (select id from fixture_ids where kind = 'other');
+
+update public.profiles
+set role = 'accounting', active = true
+where id = (select id from fixture_ids where kind = 'accounting');
+
+update public.profiles
+set role = 'employee', active = false
+where id = (select id from fixture_ids where kind = 'inactive');
+
+update public.profiles
+set role = 'supervisor',
+    active = true,
+    business_role_id = (
+      select id
+      from public.business_roles
+      where key = 'sales_leader'
+    )
+where id = (select id from fixture_ids where kind = 'leader');
+
+alter table public.profiles enable trigger profiles_protect_privileged_columns;
+business_role_id = (select id from public.business_roles where key = 'sales_leader')
   where id = (select id from fixture_ids where kind = 'leader');
 
 insert into public.departments (slug, name, display_order)
