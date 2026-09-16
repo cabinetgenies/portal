@@ -8,9 +8,11 @@ import {
   type IssueRow,
   type MeetingAgendaSectionRow,
   type MeetingHeadlineRow,
+  type MeetingParticipantRow,
   type MeetingRow,
   type MeetingTemplateRow,
   type PerformanceMeasurableRow,
+  type PerformanceReviewManagerNoteRow,
   type PerformanceReviewRow,
   type PerformanceScorecardEntryRow,
   type QuarterlyPriorityRow,
@@ -115,6 +117,13 @@ export const listMeetings = cache(async () =>
   }),
 );
 
+export const listMeetingParticipants = cache(async () =>
+  readTable<MeetingParticipantRow>("meeting_participants", "meeting participants", {
+    column: "created_at",
+    ascending: true,
+  }),
+);
+
 export const listMeetingHeadlines = cache(async () =>
   readTable<MeetingHeadlineRow>("meeting_headlines", "meeting headlines", {
     column: "created_at",
@@ -152,6 +161,14 @@ export const listReviews = cache(async () =>
     column: "created_at",
     ascending: false,
   }),
+);
+
+export const listReviewManagerNotes = cache(async () =>
+  readTable<PerformanceReviewManagerNoteRow>(
+    "performance_review_manager_notes",
+    "manager review notes",
+    { column: "updated_at", ascending: false },
+  ),
 );
 
 export async function getMeeting(id: string) {
