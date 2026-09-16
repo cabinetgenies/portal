@@ -8,11 +8,14 @@
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
-    "test": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/register-ts-alias.mjs --test \"lib/**/*.test.ts\""
+    "test": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/register-ts-alias.mjs --test \"lib/**/*.test.ts\"",
+    "eval:ai": "node scripts/eval-ai.mjs"
   },
   "dependencies": {
+    "@ai-sdk/openai": "^4.0.67",
     "@supabase/ssr": "^0.12.7",
     "@supabase/supabase-js": "^2.116.0",
+    "ai": "^7.0.102",
     "next": "16.3.5",
     "react": "19.2.8",
     "react-dom": "19.2.8",

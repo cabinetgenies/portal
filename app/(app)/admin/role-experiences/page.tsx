@@ -7,7 +7,10 @@ import { Panel } from "@/components/ui/panel";
 import { requireCapability } from "@/lib/auth/dal";
 import { rolePreviewFor, listRolePreviews } from "@/lib/experience/queries";
 import { moduleCapabilities, quickActionCapabilities } from "@/lib/permissions/module-capabilities";
-import { ROLES, ROLE_LABELS, securityRolesForCapability } from "@/lib/permissions/roles";
+import { ROLES, ROLE_LABELS, securityRolesForCapability, type Capability } from "@/lib/permissions/roles";
+import { AGENT_MANIFESTS, toolById } from "@/lib/ai/registry";
+import type { AiRoleAgentRow } from "@/lib/supabase/database.types";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { cn } from "@/lib/utils/cn";
 import { formatText } from "@/lib/utils/format";
 
@@ -36,6 +39,9 @@ export default async function RoleExperiencesPage({
   const { role: requestedRole } = await searchParams;
   const { catalog, previews } = await listRolePreviews();
   const preview = rolePreviewFor(previews, requestedRole ?? null);
+  const selectedRole =
+    catalog.businessRoles.find((role) => role.key === preview?.roleKey) ?? null;
+  const roleAgentRows = selectedRole ? await loadRoleAgents(selectedRole.id) : [];
 
   if (!preview) {
     return (
@@ -238,6 +244,63 @@ export default async function RoleExperiencesPage({
       </Panel>
 
       <Panel
+        id="preview-ai-agents"
+        title="Assigned AI agents"
+        description="Which reviewed assistant agents are enabled for this business role in the AI pilot, and the capabilities their tools require."
+      >
+        {!selectedRole ? (
+          <p className="text-sm text-ink-muted">No business role is selected.</p>
+        ) : (
+          <ul className="space-y-3">
+            {AGENT_MANIFESTS.map((agent) => {
+              const mapping = roleAgentRows.find((row) => row.agent_id === agent.id);
+              const enabled = mapping?.enabled === true;
+
+              return (
+                <li key={agent.id} className="rounded-lg border border-line bg-surface-muted p-4">
+                  <div className="flex flex-wrap items-baseline justify-between gap-2">
+                    <p className="text-sm font-medium text-ink">{agent.name}</p>
+                    <span
+                      className={cn(
+                        "rounded-full border px-2 py-0.5 text-xs font-medium",
+                        enabled
+                          ? "border-emerald-300 bg-emerald-50 text-emerald-700"
+                          : "border-line bg-surface text-ink-muted",
+                      )}
+                    >
+                      {enabled ? "Enabled" : "Disabled"}
+                    </span>
+                  </div>
+                  <p className="mt-1 text-xs text-ink-muted">{agent.description}</p>
+                  <ul className="mt-3 space-y-1.5">
+                    {agent.allowedToolIds.map((toolId) => {
+                      const tool = toolById(toolId);
+                      if (!tool) return null;
+                      const roles = tool.capabilities.length === 0
+                        ? ["every authenticated role"]
+                        : [...new Set(tool.capabilities.flatMap((cap) => securityRolesForCapability(cap as Capability)))];
+
+                      return (
+                        <li key={toolId} className="text-xs text-ink-subtle">
+                          <span className="font-mono">{toolId}</span> —{" "}
+                          {tool.capabilities.length === 0
+                            ? "no capability required"
+                            : tool.capabilities.join(" or ")}{" "}
+                          {roles[0] === "every authenticated role"
+                            ? ""
+                            : `(held by ${roles.map((role) => ROLE_LABELS[role as keyof typeof ROLE_LABELS]).join(", ")})`}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </Panel>
+
+      <Panel
         id="preview-permissions"
         title="Permission summary"
         description="Authorization comes from the security role on a profile, never from the business role. This is where the two meet."
@@ -246,6 +309,17 @@ export default async function RoleExperiencesPage({
       </Panel>
     </div>
   );
+}
+
+async function loadRoleAgents(businessRoleId: string): Promise<AiRoleAgentRow[]> {
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase
+    .from("ai_role_agents")
+    .select("*")
+    .eq("business_role_id", businessRoleId);
+
+  if (error) return [];
+  return (data ?? []) as AiRoleAgentRow[];
 }
 
 function SummaryItem({ label, value }: { label: string; value: string }) {

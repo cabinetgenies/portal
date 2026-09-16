@@ -1,0 +1,11 @@
+{
+  "id": "leadership",
+  "name": "Leadership",
+  "version": "7a.1",
+  "modelAlias": "default",
+  "skillIds": [],
+  "allowedToolIds": ["getLeadershipMeetingContext"],
+  "toolLimits": { "getLeadershipMeetingContext": 2 },
+  "disabledReason": "Requires verified Phase 6 leadership tool authorization before it can be enabled."
+}
+
