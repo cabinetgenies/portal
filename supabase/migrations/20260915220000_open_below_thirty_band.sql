@@ -53,6 +53,6 @@ begin
          label = 'Below 30% GP (no commission)'
    where id = v_tier_id;
 
-  raise notice 'Opened the Below 30%% band (%).', v_tier_id;
+  raise notice 'Opened the Below 30 percent band. Tier id: %', v_tier_id;
 end;
 $$;
