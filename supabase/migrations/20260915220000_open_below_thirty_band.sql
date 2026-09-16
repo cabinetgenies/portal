@@ -40,7 +40,7 @@ begin
     and rate = 0;
 
   if v_tier_id is null then
-    raise notice 'The Below 30% band is already open-ended (or missing). Nothing to change.';
+    raise notice 'The Below 30 percent band is already open-ended (or missing). Nothing to change.';
     return;
   end if;
 
