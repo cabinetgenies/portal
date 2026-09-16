@@ -268,7 +268,7 @@ select is(
       where kind = 'review'
     )
   ),
-  1,
+  1::bigint,
   'employee can read the permitted review'
 );
 
@@ -283,7 +283,7 @@ select is(
       where kind = 'review'
     )
   ),
-  0,
+  0::bigint,
   'employee cannot read private manager notes'
 );
 
@@ -310,7 +310,7 @@ select is(
       where kind = 'review'
     )
   ),
-  1,
+  1::bigint,
   'manager can read private notes'
 );
 
@@ -333,7 +333,7 @@ select is(
       where kind = 'review'
     )
   ),
-  0,
+  0::bigint,
   'unrelated employee cannot read review'
 );
 
@@ -585,7 +585,7 @@ select is(
       where kind = 'meeting'
     )
   ),
-  1,
+  1::bigint,
   'participant can read their meeting'
 );
 
@@ -611,7 +611,7 @@ select is(
       where kind = 'meeting'
     )
   ),
-  0,
+  0::bigint,
   'unrelated employee cannot read meeting'
 );
 
@@ -638,7 +638,7 @@ select is(
       where slug = 'test-dept'
     )
   ),
-  0,
+  0::bigint,
   'business role alone grants no department data'
 );
 
@@ -711,7 +711,7 @@ select is(
       where slug = 'test-dept'
     )
   ),
-  1,
+  1::bigint,
   'explicit department leader can read department data'
 );
 
@@ -738,7 +738,7 @@ select is(
       where kind = 'review'
     )
   ),
-  0,
+  0::bigint,
   'inactive user is denied'
 );
 
@@ -813,7 +813,7 @@ select is(
       where kind = 'meeting'
     )
   ),
-  0,
+  0::bigint,
   'removed participant loses meeting access'
 );
 
