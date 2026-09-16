@@ -465,12 +465,12 @@ test("previously recognized commission sums stored events and ignores voided one
   const events: {
     eventType: CommissionEventType;
     status: string;
-    netPayable: number;
+    grossCommission: number;
   }[] = [
-    { eventType: "deposit", status: "paid", netPayable: 5_000 },
-    { eventType: "manual_adjustment", status: "approved", netPayable: 500 },
-    { eventType: "manual_adjustment", status: "voided", netPayable: 9_999 },
-    { eventType: "final_true_up", status: "calculated", netPayable: 0 },
+    { eventType: "deposit", status: "paid", grossCommission: 5_000 },
+    { eventType: "manual_adjustment", status: "approved", grossCommission: 500 },
+    { eventType: "manual_adjustment", status: "voided", grossCommission: 9_999 },
+    { eventType: "final_true_up", status: "calculated", grossCommission: 0 },
   ];
 
   assert.equal(previouslyRecognizedCommission(events), 5_500);

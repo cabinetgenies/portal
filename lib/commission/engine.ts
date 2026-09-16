@@ -350,15 +350,24 @@ export function calculateCommissionEvent(
 }
 
 /**
- * Commission already recognized against a job: everything except voided events.
- * The final true-up is measured against this, so a job can never pay more than
- * the total it earned.
+ * Commission already recognized against a job.
+ *
+ * Recognized commission is the amount of valid commission credited against the
+ * employee's entitlement before settlement disposition, not merely the cash
+ * payable. For a positive prior event this is `gross_commission` — the amount
+ * credited before rollover/draw offsets are applied. Offsets are never added
+ * separately: they are already components of that same gross amount.
+ *
+ * Voided events count zero. A negative event (a negative final true-up) also
+ * counts zero here: it is a rollover obligation, not a reduction of prior
+ * positive recognized compensation. The final true-up is measured against this
+ * total, so a job can never pay more than the total it earned.
  */
 export function previouslyRecognizedCommission(
   events: readonly {
     eventType: CommissionEventType;
     status: string;
-    netPayable: number;
+    grossCommission: number;
   }[],
   options: { excludingEventType?: CommissionEventType } = {},
 ) {
@@ -366,7 +375,7 @@ export function previouslyRecognizedCommission(
     events
       .filter((event) => event.status !== "voided")
       .filter((event) => event.eventType !== options.excludingEventType)
-      .reduce((total, event) => total + Math.max(0, event.netPayable), 0),
+      .reduce((total, event) => total + Math.max(0, event.grossCommission), 0),
   );
 }
 
