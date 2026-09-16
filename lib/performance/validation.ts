@@ -115,6 +115,17 @@ export const meetingCreateSchema = z.object({
   notes: optionalText,
 });
 
+export const meetingParticipantSchema = z.object({
+  meetingId: z
+    .string({ error: "A meeting is required." })
+    .trim()
+    .regex(UUID_PATTERN, "A meeting is required."),
+  profileId: z
+    .string({ error: "A participant is required." })
+    .trim()
+    .regex(UUID_PATTERN, "A participant is required."),
+});
+
 export const headlineCreateSchema = z.object({
   meetingId: optionalUuid,
   title: z
@@ -204,14 +215,31 @@ export const reviewCreateSchema = z.object({
     .string({ error: "An employee is required." })
     .trim()
     .regex(UUID_PATTERN, "An employee is required."),
-  managerId: optionalUuid,
   periodStart: optionalDate,
   periodEnd: optionalDate,
-  status: z
-    .enum(["not_started", "in_progress", "employee_input", "manager_review", "complete"])
-    .default("not_started"),
   scheduledDate: optionalDate,
+});
+
+export const reviewInputSchema = z.object({
+  reviewId: z
+    .string({ error: "A review is required." })
+    .trim()
+    .regex(UUID_PATTERN, "A review is required."),
+  notes: z
+    .string({ error: "Review input is required." })
+    .trim()
+    .min(2, "Review input must be at least 2 characters."),
+});
+
+export const managerReviewSchema = z.object({
+  reviewId: z
+    .string({ error: "A review is required." })
+    .trim()
+    .regex(UUID_PATTERN, "A review is required."),
+  status: z.enum(["not_started", "in_progress", "employee_input", "manager_review", "complete"]),
   managerNotes: optionalText,
+  overallSummary: optionalText,
+  developmentActions: optionalText,
 });
 
 export type MeasurableCreateInput = z.infer<typeof measurableCreateSchema>;

@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { authorizeCapability } from "@/lib/auth/authorize";
-import { getSessionContext } from "@/lib/auth/dal";
+import { getSessionContext, type AuthorizedSession } from "@/lib/auth/dal";
 import {
   failureState,
   formDataToObject,
@@ -20,11 +20,20 @@ import {
   issueNoteCreateSchema,
   issueResolveSchema,
   measurableCreateSchema,
+  managerReviewSchema,
   meetingCreateSchema,
+  meetingParticipantSchema,
   priorityCreateSchema,
   reviewCreateSchema,
+  reviewInputSchema,
   scorecardEntrySchema,
 } from "@/lib/performance/validation";
+import {
+  canFinalizeReview,
+  employeeReviewTransitionAllowed,
+  reviewActorFor,
+} from "@/lib/performance/review-authorization";
+import type { Json, PerformanceReviewRow } from "@/lib/supabase/database.types";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 /**
@@ -70,6 +79,48 @@ async function requireAuthorizedUser(): Promise<
     };
   }
   return { userId: session.userId };
+}
+
+async function requireAuthorizedSession(): Promise<
+  { session: AuthorizedSession } | { denied: ActionState }
+> {
+  const session = await getSessionContext();
+  if (!session) {
+    return { denied: failureState("Your session has expired. Sign in again to continue.") };
+  }
+  if (session.status !== "authorized") {
+    return {
+      denied: failureState(
+        "Your account does not have access to the portal. Ask an administrator to activate your profile.",
+      ),
+    };
+  }
+  return { session };
+}
+
+function isPerformanceAdmin(session: AuthorizedSession) {
+  return (
+    session.capabilities.includes("manage:performance") ||
+    session.capabilities.includes("administer:portal")
+  );
+}
+
+async function getReview(
+  reviewId: string,
+): Promise<PerformanceReviewRow | null> {
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase
+    .from("performance_reviews")
+    .select("*")
+    .eq("id", reviewId)
+    .maybeSingle();
+
+  if (error) {
+    console.error("Could not load review:", error.message);
+    return null;
+  }
+
+  return data;
 }
 
 // ---------------------------------------------------------------------------
@@ -261,6 +312,69 @@ export async function completeMeeting(
 
   revalidateMeeting(meetingId);
   return successState("Meeting completed.");
+}
+
+export async function addMeetingParticipant(
+  _previousState: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const result = await requireAuthorizedSession();
+  if ("denied" in result) return result.denied;
+
+  const parsed = meetingParticipantSchema.safeParse(formDataToObject(formData));
+  if (!parsed.success) return validationErrorState(parsed.error);
+
+  const supabase = await createSupabaseServerClient();
+  const { data: canManage, error: canManageError } = await supabase.rpc(
+    "can_manage_meeting",
+    { target_meeting_id: parsed.data.meetingId },
+  );
+
+  if (canManageError || !canManage) {
+    return failureState("Only an authorized meeting organizer can manage participants.");
+  }
+
+  const { error } = await supabase.from("meeting_participants").insert({
+    meeting_id: parsed.data.meetingId,
+    profile_id: parsed.data.profileId,
+  });
+
+  if (error) return mutationErrorState(error, "performance");
+
+  revalidateMeeting(parsed.data.meetingId);
+  return successState("Participant added.");
+}
+
+export async function removeMeetingParticipant(
+  _previousState: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const result = await requireAuthorizedSession();
+  if ("denied" in result) return result.denied;
+
+  const parsed = meetingParticipantSchema.safeParse(formDataToObject(formData));
+  if (!parsed.success) return validationErrorState(parsed.error);
+
+  const supabase = await createSupabaseServerClient();
+  const { data: canManage, error: canManageError } = await supabase.rpc(
+    "can_manage_meeting",
+    { target_meeting_id: parsed.data.meetingId },
+  );
+
+  if (canManageError || !canManage) {
+    return failureState("Only an authorized meeting organizer can manage participants.");
+  }
+
+  const { error } = await supabase
+    .from("meeting_participants")
+    .delete()
+    .eq("meeting_id", parsed.data.meetingId)
+    .eq("profile_id", parsed.data.profileId);
+
+  if (error) return mutationErrorState(error, "performance");
+
+  revalidateMeeting(parsed.data.meetingId);
+  return successState("Participant removed.");
 }
 
 export async function createHeadline(
@@ -470,22 +584,42 @@ export async function createReview(
   _previousState: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  const auth = await authorizeCapability("view:performance-team");
-  if ("denied" in auth) return auth.denied;
+  const result = await requireAuthorizedSession();
+  if ("denied" in result) return result.denied;
+  const { session } = result;
+
+  if (!session.capabilities.includes("view:performance-team")) {
+    return failureState("Your role cannot create performance reviews.");
+  }
 
   const parsed = reviewCreateSchema.safeParse(formDataToObject(formData));
   if (!parsed.success) return validationErrorState(parsed.error);
 
   const supabase = await createSupabaseServerClient();
+  const employeeResult = await supabase
+    .from("profiles")
+    .select("id, manager_id, active")
+    .eq("id", parsed.data.employeeId)
+    .maybeSingle();
+
+  if (employeeResult.error || !employeeResult.data) {
+    return failureState("That employee does not exist.");
+  }
+
+  const isAdmin = isPerformanceAdmin(session);
+  if (!isAdmin && employeeResult.data.manager_id !== session.userId) {
+    return failureState("Only the employee's assigned manager or an administrator can create this review.");
+  }
+
+  const managerId = employeeResult.data.manager_id ?? session.userId;
   const { error } = await supabase.from("performance_reviews").insert({
     employee_id: parsed.data.employeeId,
-    manager_id: parsed.data.managerId ?? auth.userId,
+    manager_id: managerId,
     period_start: parsed.data.periodStart,
     period_end: parsed.data.periodEnd,
-    status: parsed.data.status,
+    status: "not_started",
     scheduled_date: parsed.data.scheduledDate,
-    manager_notes: parsed.data.managerNotes,
-    created_by: auth.userId,
+    created_by: session.userId,
   });
 
   if (error) return mutationErrorState(error, "performance");
@@ -494,42 +628,202 @@ export async function createReview(
   return successState("Review created.");
 }
 
+export async function submitReviewInput(
+  _previousState: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const result = await requireAuthorizedSession();
+  if ("denied" in result) return result.denied;
+  const { session } = result;
+
+  const parsed = reviewInputSchema.safeParse(formDataToObject(formData));
+  if (!parsed.success) return validationErrorState(parsed.error);
+
+  const review = await getReview(parsed.data.reviewId);
+  if (!review) return failureState("Review not found or no longer available.");
+
+  const actor = reviewActorFor({
+    userId: session.userId,
+    employeeId: review.employee_id,
+    managerId: review.manager_id,
+    isAdmin: isPerformanceAdmin(session),
+  });
+
+  if (!actor.isEmployee) {
+    return failureState("Only the review employee can submit employee input.");
+  }
+
+  if (!employeeReviewTransitionAllowed(review.status, "employee_input")) {
+    return failureState("This review is already complete or is not ready for employee input.");
+  }
+
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase
+    .from("performance_reviews")
+    .update({
+      employee_notes: parsed.data.notes,
+      status: "employee_input",
+    })
+    .eq("id", parsed.data.reviewId)
+    .eq("employee_id", session.userId)
+    .select("id");
+
+  if (error) return mutationErrorState(error, "performance");
+  if ((data ?? []).length === 0) {
+    return failureState("Review not found or you are not allowed to update it.");
+  }
+
+  revalidatePerformance();
+  return successState("Employee review input submitted.");
+}
+
 export async function updateReview(
   _previousState: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  const user = await requireAuthorizedUser();
-  if ("denied" in user) return user.denied;
+  const result = await requireAuthorizedSession();
+  if ("denied" in result) return result.denied;
+  const { session } = result;
 
-  const reviewId = String(formData.get("reviewId") ?? "").trim();
-  const status = String(formData.get("status") ?? "").trim();
-  const notesField = String(formData.get("notesField") ?? "manager_notes").trim();
-  const notes = String(formData.get("notes") ?? "").trim();
+  const parsed = managerReviewSchema.safeParse(formDataToObject(formData));
+  if (!parsed.success) return validationErrorState(parsed.error);
 
-  if (!reviewId) return failureState("A review is required.");
-  if (!["not_started", "in_progress", "employee_input", "manager_review", "complete"].includes(status)) {
-    return failureState("That review status is not valid.");
+  const review = await getReview(parsed.data.reviewId);
+  if (!review) return failureState("Review not found or no longer available.");
+
+  const actor = reviewActorFor({
+    userId: session.userId,
+    employeeId: review.employee_id,
+    managerId: review.manager_id,
+    isAdmin: isPerformanceAdmin(session),
+  });
+
+  if (!actor.canManage) {
+    return failureState("Only the assigned manager or an administrator can update manager review fields.");
   }
 
-  const payload: {
-    status: string;
-    employee_notes?: string | null;
-    manager_notes?: string | null;
-  } = { status };
-  if (notesField === "employee_notes") {
-    payload.employee_notes = notes.length > 0 ? notes : null;
-  } else {
-    payload.manager_notes = notes.length > 0 ? notes : null;
+  if (review.status === "complete") {
+    return failureState("A completed review cannot be changed.");
+  }
+
+  if (parsed.data.status === "complete" && !canFinalizeReview(actor, review.status)) {
+    return failureState("Only the assigned manager or an administrator can finalize this review.");
   }
 
   const supabase = await createSupabaseServerClient();
-  const { error } = await supabase
+  const now = new Date().toISOString();
+  const finalizing = parsed.data.status === "complete";
+  const snapshotData = finalizing
+    ? await buildReviewSnapshot(supabase, review, session.userId, now)
+    : review.snapshot_data;
+
+  const { data, error } = await supabase
     .from("performance_reviews")
-    .update(payload)
-    .eq("id", reviewId);
+    .update({
+      status: parsed.data.status,
+      overall_summary: parsed.data.overallSummary,
+      development_actions: parsed.data.developmentActions,
+      completed_date: finalizing ? now : null,
+      finalized_by: finalizing ? session.userId : null,
+      finalized_at: finalizing ? now : null,
+      snapshot_data: snapshotData,
+    })
+    .eq("id", parsed.data.reviewId)
+    .select("id");
 
   if (error) return mutationErrorState(error, "performance");
+  if ((data ?? []).length === 0) {
+    return failureState("Review not found or you are not allowed to update it.");
+  }
+
+  if (parsed.data.managerNotes !== null) {
+    const { error: noteError } = await supabase
+      .from("performance_review_manager_notes")
+      .upsert({
+        review_id: parsed.data.reviewId,
+        body: parsed.data.managerNotes,
+        updated_by: session.userId,
+      });
+
+    if (noteError) return mutationErrorState(noteError, "performance");
+  } else {
+    const { error: noteError } = await supabase
+      .from("performance_review_manager_notes")
+      .delete()
+      .eq("review_id", parsed.data.reviewId);
+
+    if (noteError) return mutationErrorState(noteError, "performance");
+  }
 
   revalidatePerformance();
-  return successState("Review updated.");
+  return successState(finalizing ? "Review finalized." : "Manager review updated.");
+}
+
+async function buildReviewSnapshot(
+  supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
+  review: PerformanceReviewRow,
+  finalizedBy: string,
+  finalizedAt: string,
+) {
+  const [employeeResult, measurablesResult, prioritiesResult] = await Promise.all([
+    supabase
+      .from("profiles")
+      .select("business_role_id")
+      .eq("id", review.employee_id)
+      .maybeSingle(),
+    supabase
+      .from("performance_measurables")
+      .select("id, name, target, unit, status")
+      .eq("scope", "employee")
+      .eq("employee_id", review.employee_id),
+    supabase
+      .from("quarterly_priorities")
+      .select("id, title, quarter, year, status, percent_complete, due_date")
+      .eq("owner_profile_id", review.employee_id)
+      .order("year", { ascending: false })
+      .order("quarter", { ascending: false }),
+  ]);
+
+  const businessRoleId = employeeResult.data?.business_role_id ?? null;
+  const roleExpectations = businessRoleId
+    ? await supabase
+        .from("knowledge_items")
+        .select("id, title, slug, updated_at")
+        .eq("type", "role_expectation")
+        .eq("business_role_id", businessRoleId)
+        .eq("status", "published")
+    : { data: [], error: null };
+
+  const measurableIds = (measurablesResult.data ?? []).map((measurable) => measurable.id);
+  const entries = measurableIds.length > 0
+    ? await supabase
+        .from("performance_scorecard_entries")
+        .select("id, measurable_id, period_start, period_end, target_snapshot, actual_value, status")
+        .in("measurable_id", measurableIds)
+        .order("period_start", { ascending: false })
+    : { data: [], error: null };
+
+  const latestEntries = new Map<string, unknown>();
+  for (const entry of entries.data ?? []) {
+    if (!latestEntries.has(entry.measurable_id)) {
+      latestEntries.set(entry.measurable_id, entry);
+    }
+  }
+
+  return {
+    finalized_at: finalizedAt,
+    finalized_by: finalizedBy,
+    employee_id: review.employee_id,
+    manager_id: review.manager_id,
+    role_expectations: roleExpectations.data ?? [],
+    measurables: (measurablesResult.data ?? []).map((measurable) => ({
+      id: measurable.id,
+      name: measurable.name,
+      target: measurable.target,
+      unit: measurable.unit,
+      status: measurable.status,
+      latest_entry: latestEntries.get(measurable.id) ?? null,
+    })),
+    priorities: prioritiesResult.data ?? [],
+  } as unknown as Json;
 }

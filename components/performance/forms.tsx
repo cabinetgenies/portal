@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/form";
 import {
   addIssueNote,
+  addMeetingParticipant,
   completeActionItem,
   completeMeeting,
   createActionItem,
@@ -27,6 +28,8 @@ import {
   recordDecision,
   recordScorecardEntry,
   resolveIssue,
+  removeMeetingParticipant,
+  submitReviewInput,
   updatePriorityStatus,
   updateReview,
 } from "@/lib/performance/actions";
@@ -548,17 +551,15 @@ export function DecisionForm({
 
 export function ReviewForm({
   employees,
-  managers,
 }: {
   employees: readonly SelectOption[];
-  managers: readonly SelectOption[];
 }) {
   const [state, formAction] = useActionState(createReview, undefined);
 
   return (
     <form action={formAction}>
       <FormShell state={state}>
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid gap-4 sm:grid-cols-3">
           <Field label="Employee" htmlFor="review-employee" error={fieldError(state, "employeeId")}>
             <Select id="review-employee" name="employeeId" required>
               <option value="">Choose an employee</option>
@@ -569,36 +570,16 @@ export function ReviewForm({
               ))}
             </Select>
           </Field>
-          <Field label="Manager" htmlFor="review-manager">
-            <Select id="review-manager" name="managerId">
-              {options(managers, "You (the signed-in manager)")}
-            </Select>
-          </Field>
-        </div>
-
-        <div className="grid gap-4 sm:grid-cols-4">
           <Field label="Period start" htmlFor="review-period-start">
             <TextInput id="review-period-start" name="periodStart" type="date" />
           </Field>
           <Field label="Period end" htmlFor="review-period-end">
             <TextInput id="review-period-end" name="periodEnd" type="date" />
           </Field>
-          <Field label="Scheduled date" htmlFor="review-scheduled">
-            <TextInput id="review-scheduled" name="scheduledDate" type="date" />
-          </Field>
-          <Field label="Status" htmlFor="review-status">
-            <Select id="review-status" name="status" defaultValue="not_started">
-              <option value="not_started">Not Started</option>
-              <option value="in_progress">In Progress</option>
-              <option value="employee_input">Employee Input</option>
-              <option value="manager_review">Manager Review</option>
-              <option value="complete">Complete</option>
-            </Select>
-          </Field>
         </div>
 
-        <Field label="Manager notes" htmlFor="review-manager-notes">
-          <Textarea id="review-manager-notes" name="managerNotes" rows={3} />
+        <Field label="Scheduled date" htmlFor="review-scheduled">
+          <TextInput id="review-scheduled" name="scheduledDate" type="date" />
         </Field>
 
         <SubmitButton label="Create review" pendingLabel="Creating…" size="sm" />
@@ -665,6 +646,66 @@ export function CompleteMeetingForm({ meetingId }: { meetingId: string }) {
   );
 }
 
+export function AddMeetingParticipantForm({
+  meetingId,
+  participants,
+}: {
+  meetingId: string;
+  participants: readonly SelectOption[];
+}) {
+  const [state, formAction] = useActionState(addMeetingParticipant, undefined);
+
+  return (
+    <form action={formAction}>
+      <FormShell state={state}>
+        <input type="hidden" name="meetingId" value={meetingId} />
+        <div className="grid gap-3 sm:grid-cols-3">
+          <Field label="Participant" htmlFor={`participant-${meetingId}`}>
+            <Select id={`participant-${meetingId}`} name="profileId" required>
+              <option value="">Choose a participant</option>
+              {participants.map((participant) => (
+                <option key={participant.value} value={participant.value}>
+                  {participant.label}
+                </option>
+              ))}
+            </Select>
+          </Field>
+          <div className="flex items-end">
+            <SubmitButton label="Add participant" pendingLabel="Adding…" size="sm" />
+          </div>
+        </div>
+      </FormShell>
+    </form>
+  );
+}
+
+export function RemoveMeetingParticipantForm({
+  meetingId,
+  profileId,
+  label,
+}: {
+  meetingId: string;
+  profileId: string;
+  label: string;
+}) {
+  const [state, formAction] = useActionState(removeMeetingParticipant, undefined);
+
+  return (
+    <form action={formAction}>
+      <FormShell state={state}>
+        <input type="hidden" name="meetingId" value={meetingId} />
+        <input type="hidden" name="profileId" value={profileId} />
+        <SubmitButton
+          label={`Remove ${label}`}
+          pendingLabel="Removing…"
+          variant="ghost"
+          size="sm"
+        />
+      </FormShell>
+    </form>
+  );
+}
+
 export function PriorityStatusForm({
   priorityId,
   status,
@@ -709,16 +750,40 @@ export function PriorityStatusForm({
   );
 }
 
-export function ReviewStatusForm({
+export function EmployeeReviewInputForm({
   reviewId,
-  status,
-  notesField,
   notes,
 }: {
   reviewId: string;
-  status: string;
-  notesField: "manager_notes" | "employee_notes";
   notes: string;
+}) {
+  const [state, formAction] = useActionState(submitReviewInput, undefined);
+
+  return (
+    <form action={formAction}>
+      <FormShell state={state}>
+        <input type="hidden" name="reviewId" value={reviewId} />
+        <Field label="Employee input" htmlFor={`review-input-${reviewId}`}>
+          <Textarea id={`review-input-${reviewId}`} name="notes" rows={3} defaultValue={notes} />
+        </Field>
+        <SubmitButton label="Submit input" pendingLabel="Submitting…" size="sm" />
+      </FormShell>
+    </form>
+  );
+}
+
+export function ManagerReviewForm({
+  reviewId,
+  status,
+  managerNotes,
+  overallSummary,
+  developmentActions,
+}: {
+  reviewId: string;
+  status: string;
+  managerNotes: string;
+  overallSummary: string;
+  developmentActions: string;
 }) {
   const [state, formAction] = useActionState(updateReview, undefined);
 
@@ -726,8 +791,7 @@ export function ReviewStatusForm({
     <form action={formAction}>
       <FormShell state={state}>
         <input type="hidden" name="reviewId" value={reviewId} />
-        <input type="hidden" name="notesField" value={notesField} />
-        <div className="grid gap-3 sm:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-3">
           <Field label="Status" htmlFor={`review-status-${reviewId}`}>
             <Select id={`review-status-${reviewId}`} name="status" defaultValue={status}>
               <option value="not_started">Not Started</option>
@@ -737,13 +801,17 @@ export function ReviewStatusForm({
               <option value="complete">Complete</option>
             </Select>
           </Field>
-          <Field label={notesField === "employee_notes" ? "Employee notes" : "Manager notes"} htmlFor={`review-notes-${reviewId}`}>
-            <Textarea id={`review-notes-${reviewId}`} name="notes" rows={2} defaultValue={notes} />
+          <Field label="Manager notes" htmlFor={`manager-notes-${reviewId}`}>
+            <Textarea id={`manager-notes-${reviewId}`} name="managerNotes" rows={3} defaultValue={managerNotes} />
           </Field>
-          <div className="flex items-end">
-            <SubmitButton label="Update" pendingLabel="Saving…" size="sm" />
-          </div>
+          <Field label="Overall summary" htmlFor={`review-summary-${reviewId}`}>
+            <Textarea id={`review-summary-${reviewId}`} name="overallSummary" rows={3} defaultValue={overallSummary} />
+          </Field>
         </div>
+        <Field label="Development actions" htmlFor={`review-development-${reviewId}`}>
+          <Textarea id={`review-development-${reviewId}`} name="developmentActions" rows={3} defaultValue={developmentActions} />
+        </Field>
+        <SubmitButton label="Save manager review" pendingLabel="Saving…" size="sm" />
       </FormShell>
     </form>
   );

@@ -1,6 +1,11 @@
 import { EmptyState } from "@/components/empty-state/empty-state";
 import { PerformanceIcon } from "@/components/icons";
-import { ReviewForm, ReviewStatusForm, type SelectOption } from "@/components/performance/forms";
+import {
+  EmployeeReviewInputForm,
+  ManagerReviewForm,
+  ReviewForm,
+  type SelectOption,
+} from "@/components/performance/forms";
 import { StatusBadge } from "@/components/ui/badge";
 import { Panel } from "@/components/ui/panel";
 import { Table, TableWrap, Td, Th } from "@/components/ui/table";
@@ -8,6 +13,7 @@ import { requireSession } from "@/lib/auth/dal";
 import { reviewStatusLabel, reviewStatusTone } from "@/lib/performance/model";
 import {
   listReviews,
+  listReviewManagerNotes,
   listVisibleProfileOptions,
   profileNamesFor,
 } from "@/lib/performance/queries";
@@ -21,8 +27,9 @@ export default async function ReviewsPage() {
   const session = await requireSession();
   const canCreateReview = session.capabilities.includes("view:performance-team");
 
-  const [reviews, profiles] = await Promise.all([
+  const [reviews, managerNotes, profiles] = await Promise.all([
     listReviews(),
+    listReviewManagerNotes(),
     canCreateReview ? listVisibleProfileOptions() : Promise.resolve([]),
   ]);
 
@@ -32,6 +39,9 @@ export default async function ReviewsPage() {
   }));
   const names = await profileNamesFor(
     reviews.flatMap((review) => [review.employee_id, review.manager_id]),
+  );
+  const managerNotesByReview = new Map(
+    managerNotes.map((note) => [note.review_id, note.body]),
   );
 
   return (
@@ -90,7 +100,7 @@ export default async function ReviewsPage() {
           title="Create a review"
           description="A manager creates the review and can return to it for employee input and manager review stages."
         >
-          <ReviewForm employees={employeeOptions} managers={employeeOptions} />
+          <ReviewForm employees={employeeOptions} />
         </Panel>
       ) : null}
 
@@ -103,8 +113,10 @@ export default async function ReviewsPage() {
           <div className="space-y-4">
             {reviews.map((review) => {
               const isEmployee = review.employee_id === session.userId;
-              const notesField = isEmployee ? "employee_notes" : "manager_notes";
-              const notes = isEmployee ? review.employee_notes : review.manager_notes;
+              const canManage =
+                session.capabilities.includes("manage:performance") ||
+                session.capabilities.includes("administer:portal") ||
+                review.manager_id === session.userId;
 
               return (
                 <div key={review.id} className="rounded-xl border border-line bg-surface-muted p-4">
@@ -112,12 +124,21 @@ export default async function ReviewsPage() {
                     {names.get(review.employee_id) ?? "Employee"} ·{" "}
                     {formatText(review.overall_summary, "No summary yet")}
                   </p>
-                  <ReviewStatusForm
-                    reviewId={review.id}
-                    status={review.status}
-                    notesField={notesField}
-                    notes={notes ?? ""}
-                  />
+                  {isEmployee && review.status !== "complete" ? (
+                    <EmployeeReviewInputForm
+                      reviewId={review.id}
+                      notes={review.employee_notes ?? ""}
+                    />
+                  ) : null}
+                  {canManage ? (
+                    <ManagerReviewForm
+                      reviewId={review.id}
+                      status={review.status}
+                      managerNotes={managerNotesByReview.get(review.id) ?? ""}
+                      overallSummary={review.overall_summary ?? ""}
+                      developmentActions={review.development_actions ?? ""}
+                    />
+                  ) : null}
                 </div>
               );
             })}
@@ -127,4 +148,3 @@ export default async function ReviewsPage() {
     </div>
   );
 }
-

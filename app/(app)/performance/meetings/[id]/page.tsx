@@ -5,10 +5,12 @@ import { EmptyState } from "@/components/empty-state/empty-state";
 import { PerformanceIcon } from "@/components/icons";
 import {
   ActionItemForm,
+  AddMeetingParticipantForm,
   CompleteMeetingForm,
   DecisionForm,
   HeadlineForm,
   IssueForm,
+  RemoveMeetingParticipantForm,
   type SelectOption,
 } from "@/components/performance/forms";
 import { StatusBadge } from "@/components/ui/badge";
@@ -31,6 +33,7 @@ import {
   listIssues,
   listMeetingAgendaSections,
   listMeetingHeadlines,
+  listMeetingParticipants,
   listVisibleProfileOptions,
   profileNamesFor,
 } from "@/lib/performance/queries";
@@ -47,12 +50,16 @@ export default async function MeetingDetailPage({
 }) {
   const session = await requireSession();
   const canManage = session.capabilities.includes("manage:performance");
+  const canManageMeeting =
+    session.capabilities.includes("manage:performance") ||
+    session.capabilities.includes("administer:portal");
   const { id } = await params;
   const meeting = await getMeeting(id);
 
   if (!meeting) notFound();
+  const canManageThisMeeting = canManageMeeting || meeting.created_by === session.userId;
 
-  const [sections, headlines, issues, actions, decisions, notes, catalog, profiles] =
+  const [sections, headlines, issues, actions, decisions, notes, participants, catalog, profiles] =
     await Promise.all([
       listMeetingAgendaSections(),
       listMeetingHeadlines(),
@@ -60,8 +67,9 @@ export default async function MeetingDetailPage({
       listActionItems(),
       listDecisions(),
       listIssueNotes(),
+      listMeetingParticipants(),
       loadExperienceCatalog(),
-      canManage ? listVisibleProfileOptions() : Promise.resolve([]),
+      canManageThisMeeting ? listVisibleProfileOptions() : Promise.resolve([]),
     ]);
 
   const meetingSections = sections
@@ -88,12 +96,16 @@ export default async function MeetingDetailPage({
     value: issue.id,
     label: issue.title,
   }));
+  const meetingParticipants = participants.filter(
+    (participant) => participant.meeting_id === meeting.id,
+  );
 
   const names = await profileNamesFor([
     ...meetingIssues.map((issue) => issue.owner_profile_id),
     ...meetingActions.map((action) => action.owner_profile_id),
     ...meetingDecisions.map((decision) => decision.decided_by),
     ...issueNotesForMeeting.map((note) => note.author_profile_id),
+    ...meetingParticipants.map((participant) => participant.profile_id),
   ]);
 
   const orderedSections = meetingSections.length > 0
@@ -134,6 +146,42 @@ export default async function MeetingDetailPage({
         {canManage && meeting.status !== "completed" ? (
           <div className="pt-2">
             <CompleteMeetingForm meetingId={meeting.id} />
+          </div>
+        ) : null}
+      </Panel>
+
+      <Panel
+        id="meeting-participants"
+        title="Participants"
+        description="Authorized organizers can add or remove participants. Meeting access is enforced in Postgres, not only by the page."
+      >
+        {meetingParticipants.length === 0 ? (
+          <p className="text-sm text-ink-muted">No participants have been added yet.</p>
+        ) : (
+          <ul className="divide-y divide-line text-sm">
+            {meetingParticipants.map((participant) => (
+              <li
+                key={participant.id}
+                className="flex items-center justify-between gap-3 py-3"
+              >
+                <span>{names.get(participant.profile_id) ?? "Participant"}</span>
+                {canManageThisMeeting ? (
+                  <RemoveMeetingParticipantForm
+                    meetingId={meeting.id}
+                    profileId={participant.profile_id}
+                    label={names.get(participant.profile_id) ?? "participant"}
+                  />
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        )}
+        {canManageThisMeeting ? (
+          <div className="pt-2">
+            <AddMeetingParticipantForm
+              meetingId={meeting.id}
+              participants={profileOptions}
+            />
           </div>
         ) : null}
       </Panel>
