@@ -1,6 +1,7 @@
 import { Brand } from "@/components/app-shell/brand";
 import { NavList } from "@/components/app-shell/nav-list";
 import { UserPanel, type SessionUser } from "@/components/app-shell/user-panel";
+import { AssistantLaunchLink } from "@/components/assistant/assistant-launch-link";
 import type { NavSection } from "@/lib/permissions/navigation";
 
 /**
@@ -24,6 +25,7 @@ export function Sidebar({
       <div className="flex-1 overflow-y-auto">
         <NavList sections={sections} />
       </div>
+      <AssistantLaunchLink />
       <UserPanel user={user} />
     </aside>
   );

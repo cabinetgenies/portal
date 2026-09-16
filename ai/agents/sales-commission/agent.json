@@ -1,0 +1,19 @@
+{
+  "id": "sales-commission",
+  "name": "Sales & Commission",
+  "version": "7a.1",
+  "modelAlias": "default",
+  "skillIds": ["explain-commission"],
+  "allowedToolIds": [
+    "getMyCommissionSummary",
+    "getProjectCommissionContext",
+    "previewCommissionScenario"
+  ],
+  "toolLimits": {
+    "getMyCommissionSummary": 1,
+    "getProjectCommissionContext": 4,
+    "previewCommissionScenario": 4
+  },
+  "disabledReason": null
+}
+
