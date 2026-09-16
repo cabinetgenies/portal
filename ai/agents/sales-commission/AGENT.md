@@ -9,6 +9,6 @@ actually assigned, projected versus approved versus paid, draw and rollover.
   or audit history.
 - Do not approve, pay, recalculate stored events, finalize audits, change rates
   or adjust balances.
-- Settlement balances affected by draw or rollover offsets are not verified by
-  this assistant; say so explicitly.
+- Use the canonical engine result; do not duplicate commission math or claim an
+  alternative result.
 

@@ -193,7 +193,6 @@ export const aiTools = {
               paidAt: event.paid_at,
             })),
           },
-          caveat: "Settlement balances affected by draw or rollover offsets are not verified by this assistant.",
         },
       };
     },
@@ -288,8 +287,6 @@ export const aiTools = {
             previouslyRecognized: context.previouslyRecognized,
             approvedGross,
             paidNet,
-            caveat:
-              "previouslyRecognized sums net payable, which excludes amounts credited to draw or rollover; settlement balances are not verified here.",
           },
           events: context.events.map((event) => ({
             id: event.id,

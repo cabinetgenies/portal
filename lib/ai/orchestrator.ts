@@ -96,12 +96,24 @@ function agentToolDefinitions(
   return tools;
 }
 
-function sanitizeSpecialistForSynthesis(result: SpecialistResult) {
+function sanitizeSpecialistForSynthesis(result: SpecialistResult, evidence: EvidenceRegistry) {
+  const sources = (result.sources ?? [])
+    .map((source) => evidence.toReference(source.id))
+    .filter((reference): reference is NonNullable<typeof reference> => reference !== null);
+
   return {
     status: result.status,
     summary: result.summary,
     facts: result.facts,
     assumptions: result.assumptions,
+    risks: result.risks ?? [],
+    recommended_actions: result.recommended_actions ?? [],
+    actions_taken: result.actions_taken ?? [],
+    actions_requested: result.actions_requested ?? [],
+    requires_approval: result.requires_approval ?? false,
+    escalation: result.escalation ?? null,
+    sources,
+    confidence: result.confidence ?? null,
     missing_information: result.missing_information,
     proposed_actions: result.proposed_actions,
     warnings: result.warnings,
@@ -310,7 +322,9 @@ export async function runOrchestrator(input: OrchestratorInput): Promise<Orchest
         role: "user",
         content: JSON.stringify({
           request: userMessage,
-          specialist_results: [...specialistResults.values()].map(sanitizeSpecialistForSynthesis),
+          specialist_results: [...specialistResults.values()].map((result) =>
+            sanitizeSpecialistForSynthesis(result, evidence),
+          ),
           available_sources: sourceList,
         }),
       },

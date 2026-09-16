@@ -155,7 +155,7 @@
     "expected": {
       "agents": ["sales-commission"],
       "noBusinessWrites": true,
-      "mustMention": ["not verified", "settlement", "overstate"]
+      "mustMention": ["5,000", "remaining"]
     }
   },
   {

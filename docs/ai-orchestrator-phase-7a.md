@@ -91,7 +91,7 @@ Generic public prompts are not company policy.
 
 ## 5. Schema, RLS and retention
 
-Additive migration: `supabase/migrations/20260915260000_ai_orchestrator.sql`.
+Additive migration: `supabase/migrations/20260915270000_ai_orchestrator.sql`.
 
 Tables:
 
@@ -132,36 +132,21 @@ them as company-wide approved. It never indexes private HR, personnel reviews or
 contracts. When no published content matches, the assistant returns that fact
 rather than fabricating policy.
 
-### Commission settlement regression
+### Commission settlement recognition
 
-`previouslyRecognizedCommission` (and `recognizedFromEvents`) sums non-voided
-event `net_payable`. That excludes amounts credited to draw or rollover, and can
-include unsettled states.
-
-Reproduction: a `$5,000` deposit fully credited against draw stores
-`gross_commission = 5000` and `net_payable = 0`. A final audited gross
-entitlement of `$10,000` then computes:
-
-```text
-previously recognized = 0
-final true-up         = 10,000 - 0 = 10,000
-correct true-up       = 10,000 - 5,000 = 5,000
-```
-
-The remaining entitlement is therefore **overstated by `$5,000`**. The
-regression is captured in `lib/commission/settlement-regression.test.ts`.
-
-This phase does **not** silently change compensation rules, historical events or
-balances. The assistant disables any claim that affected settlement balances are
-verified and says so explicitly. Read-only rate explanations and isolated
-what-if calculations remain available through the deterministic engine.
+The canonical engine now recognizes prior commission from `gross_commission`
+(credited before draw/rollover offsets) rather than `net_payable`. The AI
+assistant calls the same `getJobCommissionContext` / `listEmployeeCommissionSummaries`
+functions and does not duplicate commission math. It does not recalculate or
+alter stored events, balances, rates or history. Isolated what-if calculations
+remain transient and never update the project.
 
 ## 7. Tests and evaluation
 
-`npm test` runs 299 deterministic tests and passes, including:
+`npm test` runs the deterministic domain tests and passes, including:
 
 - registry validation and source-id revalidation;
-- the drawn-down deposit settlement regression;
+- canonical commission settlement recognition coverage;
 - the 32-case evaluation catalog invariants.
 
 The evaluation catalog is `ai/evals/cases.json` (32 labeled cases across
@@ -207,7 +192,7 @@ No service-role key is required by the assistant.
 Enable:
 
 1. Set `AI_MODEL` and `AI_API_KEY` in the server environment.
-2. Apply `supabase/migrations/20260915260000_ai_orchestrator.sql`.
+2. Apply `supabase/migrations/20260915270000_ai_orchestrator.sql`.
 3. Open Admin → AI, enable the `orchestrator` agent.
 4. Map `orchestrator` (and the specialists to pilot) to a business role.
 
