@@ -41,36 +41,51 @@ export type ToolManifest = {
   capabilities: readonly string[];
 };
 
+const DEFERRED_SPECIALIST_REASON =
+  "Deferred while Ask BOS runs as a single permission-aware assistant. Reserved for a future execution engine.";
+
 export const AGENT_MANIFESTS: readonly AgentManifest[] = [
   {
     id: ORCHESTRATOR_AGENT_ID,
-    name: "Company Orchestrator",
+    name: "Ask BOS",
     description:
-      "The single logical assistant that plans each request, delegates to specialists and produces the final human-facing answer.",
-    version: "7a.1",
+      "The single permission-aware Cabinet Genies assistant for approved knowledge, commission questions, analysis and communication drafts.",
+    version: "7a.2",
     modelAlias: "default",
-    skillIds: [],
-    allowedToolIds: ["searchApprovedKnowledge"],
-    toolLimits: { searchApprovedKnowledge: 2 },
+    skillIds: ["find-approved-procedure", "explain-commission", "draft-customer-update"],
+    allowedToolIds: [
+      "searchApprovedKnowledge",
+      "readApprovedKnowledgeItem",
+      "getMyCommissionSummary",
+      "getProjectCommissionContext",
+      "previewCommissionScenario",
+    ],
+    toolLimits: {
+      searchApprovedKnowledge: 4,
+      readApprovedKnowledgeItem: 6,
+      getMyCommissionSummary: 1,
+      getProjectCommissionContext: 4,
+      previewCommissionScenario: 4,
+    },
     disabledReason: null,
   },
   {
     id: "company-guide",
     name: "Company Guide",
     description:
-      "Searches approved, published knowledge and explains steps, forms and role expectations with exact source references.",
+      "Legacy specialist manifest retained for future execution-engine work. Ask BOS now handles approved knowledge directly.",
     version: "7a.1",
     modelAlias: "default",
     skillIds: ["find-approved-procedure"],
     allowedToolIds: ["searchApprovedKnowledge", "readApprovedKnowledgeItem"],
     toolLimits: { searchApprovedKnowledge: 4, readApprovedKnowledgeItem: 6 },
-    disabledReason: null,
+    disabledReason: DEFERRED_SPECIALIST_REASON,
   },
   {
     id: "sales-commission",
     name: "Sales & Commission",
     description:
-      "Explains a permitted project's assigned commission plan, projected versus approved versus paid, and draw/rollover using the deterministic financial engine.",
+      "Legacy specialist manifest retained for future execution-engine work. Ask BOS now handles permitted commission questions directly.",
     version: "7a.1",
     modelAlias: "default",
     skillIds: ["explain-commission"],
@@ -84,34 +99,32 @@ export const AGENT_MANIFESTS: readonly AgentManifest[] = [
       getProjectCommissionContext: 4,
       previewCommissionScenario: 4,
     },
-    disabledReason: null,
+    disabledReason: DEFERRED_SPECIALIST_REASON,
   },
   {
     id: "communications",
     name: "Communications",
     description:
-      "Drafts emails and messages using only provided or permitted facts. Produces drafts, never sends anything.",
+      "Legacy specialist manifest retained for future execution-engine work. Ask BOS now drafts communications directly.",
     version: "7a.1",
     modelAlias: "default",
     skillIds: ["draft-customer-update"],
     allowedToolIds: [],
     toolLimits: {},
-    disabledReason: null,
+    disabledReason: DEFERRED_SPECIALIST_REASON,
   },
   {
     id: "leadership",
     name: "Leadership",
     description:
-      "Conditional specialist that prepares a meeting brief from authorized Phase 6 scorecards, priorities, issues and actions.",
+      "Reserved specialist for a future execution engine. Leadership AI is not part of the Ask BOS release.",
     version: "7a.1",
     modelAlias: "default",
     skillIds: [],
     allowedToolIds: ["getLeadershipMeetingContext"],
     toolLimits: { getLeadershipMeetingContext: 2 },
-    // Phase 6 exists, but its schema/services were not yet separately re-verified
-    // for this assistant in the first release, so it stays registered but off.
     disabledReason:
-      "Requires verified Phase 6 leadership tool authorization before it can be enabled.",
+      "Leadership AI is deferred and requires separate authorization review before any future enablement.",
   },
 ] as const;
 
@@ -223,9 +236,8 @@ export function validateRegistry() {
   }
 
   if (!agentIds.has(ORCHESTRATOR_AGENT_ID)) {
-    throw new Error("The orchestrator agent is missing.");
+    throw new Error("The Ask BOS assistant manifest is missing.");
   }
 
   return { agents: AGENT_MANIFESTS.length, skills: SKILL_MANIFESTS.length, tools: TOOL_MANIFESTS.length };
 }
-
