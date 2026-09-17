@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 import { ProjectTabs } from "@/components/projects/project-tabs";
 import { StatusBadge } from "@/components/ui/badge";
 import { buttonClassName } from "@/components/ui/button";
+import { requireSession } from "@/lib/auth/dal";
 import { getProjectShell } from "@/lib/projects/shell";
 import { PROJECT_ROUTES } from "@/lib/routes";
 import { formatDate, formatText } from "@/lib/utils/format";
@@ -17,9 +18,10 @@ export default async function ProjectLayout({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const project = await getProjectShell(id);
+  const [project, session] = await Promise.all([getProjectShell(id), requireSession()]);
 
   if (!project) notFound();
+  const canManageJobs = session.capabilities.includes("manage:jobs");
 
   return (
     <div className="space-y-5">
@@ -45,12 +47,22 @@ export default async function ProjectLayout({
             </div>
           </div>
 
-          <Link
-            href={PROJECT_ROUTES.overview}
-            className={buttonClassName({ variant: "secondary", size: "sm" })}
-          >
-            Back to projects
-          </Link>
+          <div className="flex flex-wrap items-center gap-2">
+            {canManageJobs ? (
+              <Link
+                href={`${PROJECT_ROUTES.project(id)}?edit=1`}
+                className={buttonClassName({ variant: "secondary", size: "sm" })}
+              >
+                Edit project
+              </Link>
+            ) : null}
+            <Link
+              href={PROJECT_ROUTES.overview}
+              className={buttonClassName({ variant: "secondary", size: "sm" })}
+            >
+              Back to projects
+            </Link>
+          </div>
         </div>
 
         <div className="mt-5 border-t border-line">
