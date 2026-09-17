@@ -78,69 +78,110 @@ export default async function ProjectSalesPage({ params }: { params: Promise<{ i
         </div>
       ) : null}
 
-      <div className="grid gap-5 xl:grid-cols-[minmax(0,1.45fr)_minmax(340px,.55fr)]">
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,1.15fr)_minmax(360px,.85fr)]">
         <Panel
-          title="Financial inputs"
-          description="Maintain the revenue and cost inputs used by the commission calculation."
-          className="h-fit"
+          title="Financial summary"
+          description="The current revenue and cost picture used for commission calculations."
         >
           <dl className="grid gap-3 sm:grid-cols-2">
             <Summary label="Original contract" value={formatMoney(jobInputs.contractRevenue)} />
             <Summary label="Original costs" value={formatMoney(jobInputs.originalCost)} />
             <Summary label="Change-order revenue" value={formatMoney(changeOrderRollUp.revenue)} />
             <Summary label="Change-order cost" value={formatMoney(changeOrderRollUp.cost)} />
+            <Summary label="Burden" value={formatPercent(jobInputs.burdenPercent)} />
+            <Summary label="Warranty / service" value={formatPercent(jobInputs.warrantyContingencyPercent)} />
           </dl>
 
-          <div className="border-t border-line pt-5">
-            {canEditFinancials ? (
-              <JobFinancialsForm job={job} costRates={costRateDefaults} />
-            ) : (
-              <p className="text-sm leading-6 text-ink-muted">Your role can view these figures but cannot change them.</p>
-            )}
-          </div>
+          {canEditFinancials ? (
+            <details className="group rounded-xl border border-line bg-surface-muted/30">
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3.5 text-sm font-medium text-ink">
+                <span>Edit financial inputs</span>
+                <span className="text-xs text-ink-subtle group-open:hidden">Open</span>
+                <span className="hidden text-xs text-ink-subtle group-open:inline">Close</span>
+              </summary>
+              <div className="border-t border-line px-4 py-5">
+                <JobFinancialsForm job={job} costRates={costRateDefaults} />
+              </div>
+            </details>
+          ) : (
+            <p className="text-sm leading-6 text-ink-muted">Your role can view these figures but cannot change them.</p>
+          )}
         </Panel>
 
-        <div className="h-fit xl:sticky xl:top-6">
-          <LiveCalculationPanel calculation={liveCalculation} />
-        </div>
+        <Panel
+          title="Commission preview"
+          description="A quick read of the commission impact from the current financials."
+        >
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
+            <PreviewRow label="Applicable tier" value={liveCalculation.commission.tierLabel ?? "No matching tier"} />
+            <PreviewRow label="Effective rate" value={formatPercent(liveCalculation.commission.effectiveRate)} />
+            <PreviewRow label="Projected commission" value={formatMoney(liveCalculation.commission.projectedGrossCommission)} emphasized />
+            <PreviewRow label="Estimated remaining" value={formatMoney(liveCalculation.commission.estimatedRemaining)} emphasized />
+          </div>
+
+          <details className="group rounded-xl border border-line bg-surface-muted/30">
+            <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3.5 text-sm font-medium text-ink">
+              <span>View full calculation</span>
+              <span className="text-xs text-ink-subtle group-open:hidden">Open</span>
+              <span className="hidden text-xs text-ink-subtle group-open:inline">Close</span>
+            </summary>
+            <div className="border-t border-line p-3">
+              <LiveCalculationPanel calculation={liveCalculation} sticky={false} title="Calculation detail" />
+            </div>
+          </details>
+        </Panel>
       </div>
 
       <Panel
         title="Commission change orders"
         description="Only the financial impact needed for commission lives here. Operational change-order management stays in Buildertrend."
       >
-        <div className="mb-5 grid gap-3 sm:grid-cols-3">
+        <div className="grid gap-3 sm:grid-cols-3">
           <Summary label="Active change orders" value={String(activeChangeOrders.length)} />
           <Summary label="Revenue impact" value={formatMoney(changeOrderRollUp.revenue)} />
           <Summary label="Cost impact" value={formatMoney(changeOrderRollUp.cost)} />
         </div>
 
-        <div className="space-y-5">
-          {activeChangeOrders.length === 0 ? (
-            <p className="rounded-xl border border-dashed border-line-strong bg-surface-muted/30 px-4 py-8 text-center text-sm text-ink-muted">No active financial change orders.</p>
-          ) : (
-            <ul className="space-y-3">
-              {activeChangeOrders.map((changeOrder) => (
-                <ChangeOrderCard key={changeOrder.id} jobId={job.id} changeOrder={changeOrder} />
+        {activeChangeOrders.length > 0 ? (
+          <ul className="space-y-3">
+            {activeChangeOrders.map((changeOrder) => (
+              <ChangeOrderCard key={changeOrder.id} jobId={job.id} changeOrder={changeOrder} />
+            ))}
+          </ul>
+        ) : (
+          <div className="rounded-xl border border-dashed border-line-strong bg-surface-muted/20 px-4 py-6 text-center">
+            <p className="text-sm font-medium text-ink">No commission change orders</p>
+            <p className="mt-1 text-xs leading-5 text-ink-muted">
+              Add one only when a change order affects the commission calculation.
+            </p>
+          </div>
+        )}
+
+        {canEditFinancials ? (
+          <details className="group rounded-xl border border-line bg-surface-muted/30">
+            <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3.5 text-sm font-medium text-ink">
+              <span>Add change order</span>
+              <span className="text-xs text-ink-subtle group-open:hidden">Open form</span>
+              <span className="hidden text-xs text-ink-subtle group-open:inline">Close form</span>
+            </summary>
+            <div className="border-t border-line px-4 py-5">
+              <ChangeOrderCreateForm jobId={job.id} />
+            </div>
+          </details>
+        ) : null}
+
+        {removedChangeOrders.length > 0 ? (
+          <details className="rounded-xl border border-line bg-surface-muted/30 px-4 py-3">
+            <summary className="cursor-pointer text-sm font-medium text-ink">
+              Removed change orders ({removedChangeOrders.length})
+            </summary>
+            <div className="mt-3 space-y-1 text-xs text-ink-muted">
+              {removedChangeOrders.map((changeOrder) => (
+                <p key={changeOrder.id}>{changeOrderLabel(changeOrder)} · removed from current totals</p>
               ))}
-            </ul>
-          )}
-
-          {canEditFinancials ? <ChangeOrderCreateForm jobId={job.id} /> : null}
-
-          {removedChangeOrders.length > 0 ? (
-            <details className="rounded-xl border border-line bg-surface-muted/30 px-4 py-3">
-              <summary className="cursor-pointer text-sm font-medium text-ink">
-                Removed change orders ({removedChangeOrders.length})
-              </summary>
-              <div className="mt-3 space-y-1 text-xs text-ink-muted">
-                {removedChangeOrders.map((changeOrder) => (
-                  <p key={changeOrder.id}>{changeOrderLabel(changeOrder)} · removed from current totals</p>
-                ))}
-              </div>
-            </details>
-          ) : null}
-        </div>
+            </div>
+          </details>
+        ) : null}
       </Panel>
     </div>
   );
@@ -160,6 +201,17 @@ function Summary({ label, value }: { label: string; value: string }) {
     <div className="rounded-xl border border-line bg-surface-muted/40 p-4">
       <dt className="text-xs font-medium tracking-[0.1em] text-ink-subtle uppercase">{label}</dt>
       <dd className="mt-2 font-mono text-sm font-medium tabular-nums text-ink">{value}</dd>
+    </div>
+  );
+}
+
+function PreviewRow({ label, value, emphasized = false }: { label: string; value: string; emphasized?: boolean }) {
+  return (
+    <div className="flex items-center justify-between gap-4 rounded-xl border border-line bg-surface-muted/40 px-4 py-3.5">
+      <span className="text-xs font-medium tracking-[0.08em] text-ink-subtle uppercase">{label}</span>
+      <span className={emphasized ? "font-mono text-base font-semibold tabular-nums text-ink" : "text-sm font-medium text-ink"}>
+        {value}
+      </span>
     </div>
   );
 }
