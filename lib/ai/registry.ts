@@ -50,12 +50,13 @@ export const AGENT_MANIFESTS: readonly AgentManifest[] = [
     name: "Ask BOS",
     description:
       "The single permission-aware Cabinet Genies assistant for approved knowledge, commission questions, analysis and communication drafts.",
-    version: "7a.2",
+    version: "7a.3",
     modelAlias: "default",
     skillIds: ["find-approved-procedure", "explain-commission", "draft-customer-update"],
     allowedToolIds: [
       "searchApprovedKnowledge",
       "readApprovedKnowledgeItem",
+      "getCompanyCommissionStructure",
       "getMyCommissionSummary",
       "getProjectCommissionContext",
       "previewCommissionScenario",
@@ -63,6 +64,7 @@ export const AGENT_MANIFESTS: readonly AgentManifest[] = [
     toolLimits: {
       searchApprovedKnowledge: 4,
       readApprovedKnowledgeItem: 6,
+      getCompanyCommissionStructure: 2,
       getMyCommissionSummary: 1,
       getProjectCommissionContext: 4,
       previewCommissionScenario: 4,
@@ -142,10 +144,10 @@ export const SKILL_MANIFESTS: readonly SkillManifest[] = [
     id: "explain-commission",
     name: "Explain commission",
     description:
-      "Explain a project's commission using the deterministic engine; never change rates, balances or history.",
-    version: "7a.1",
+      "Explain company, project or employee commission using the deterministic compensation configuration and engine; never change rates, balances or history.",
+    version: "7a.2",
     body:
-      "Use the read-only commission tools. Explain the version actually assigned, projected versus approved versus paid, draw and rollover from the canonical engine result. Do not recalculate or alter stored events, balances, rates or history. What-if calculations are transient and never update the project.",
+      "For company-level commission-structure questions, use getCompanyCommissionStructure when authorized and treat the compensation plan/version/tier tables as the system of record. For employee or project questions, use the appropriate read-only commission tools. Explain the version actually assigned, projected versus approved versus paid, draw and rollover from the canonical engine result. Do not recalculate or alter stored events, balances, rates or history. What-if calculations are transient and never update the project.",
   },
   {
     id: "draft-customer-update",
@@ -172,6 +174,13 @@ export const TOOL_MANIFESTS: readonly ToolManifest[] = [
     description:
       "Read one published knowledge item by id and return its approved content.",
     capabilities: [],
+  },
+  {
+    id: "getCompanyCommissionStructure",
+    name: "Company commission structure",
+    description:
+      "Return active compensation plans, current effective versions and tier rates from the authoritative compensation configuration.",
+    capabilities: ["view:compensation-config"],
   },
   {
     id: "getMyCommissionSummary",
