@@ -78,68 +78,73 @@ export default async function ProjectSalesPage({ params }: { params: Promise<{ i
         </div>
       ) : null}
 
-      <div className="grid gap-5 xl:grid-cols-[minmax(0,1.15fr)_minmax(360px,.85fr)]">
-        <Panel
-          title="Financial summary"
-          description="The current revenue and cost picture used for commission calculations."
-        >
-          <dl className="grid gap-3 sm:grid-cols-2">
-            <Summary label="Original contract" value={formatMoney(jobInputs.contractRevenue)} />
-            <Summary label="Original costs" value={formatMoney(jobInputs.originalCost)} />
-            <Summary label="Change-order revenue" value={formatMoney(changeOrderRollUp.revenue)} />
-            <Summary label="Change-order cost" value={formatMoney(changeOrderRollUp.cost)} />
-            <Summary label="Burden" value={formatPercent(jobInputs.burdenPercent)} />
-            <Summary label="Warranty / service" value={formatPercent(jobInputs.warrantyContingencyPercent)} />
-          </dl>
+      <Panel
+        title="Financial summary"
+        description="The current project financials used by the commission engine."
+      >
+        <div className="grid gap-3 md:grid-cols-3">
+          <Summary label="Original contract" value={formatMoney(jobInputs.contractRevenue)} />
+          <Summary label="Original costs" value={formatMoney(jobInputs.originalCost)} />
+          <Summary label="Change orders" value={`${formatMoney(changeOrderRollUp.revenue)} rev · ${formatMoney(changeOrderRollUp.cost)} cost`} />
+          <Summary label="Burden" value={formatPercent(jobInputs.burdenPercent)} />
+          <Summary label="Warranty / service" value={formatPercent(jobInputs.warrantyContingencyPercent)} />
+          <Summary label="Direct cost" value={formatMoney(liveCalculation.cost.directJobCost)} />
+        </div>
 
-          {canEditFinancials ? (
-            <details className="group rounded-xl border border-line bg-surface-muted/30">
-              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3.5 text-sm font-medium text-ink">
-                <span>Edit financial inputs</span>
-                <span className="text-xs text-ink-subtle group-open:hidden">Open</span>
-                <span className="hidden text-xs text-ink-subtle group-open:inline">Close</span>
-              </summary>
-              <div className="border-t border-line px-4 py-5">
-                <JobFinancialsForm job={job} costRates={costRateDefaults} />
-              </div>
-            </details>
-          ) : (
-            <p className="text-sm leading-6 text-ink-muted">Your role can view these figures but cannot change them.</p>
-          )}
-        </Panel>
-
-        <Panel
-          title="Commission preview"
-          description="A quick read of the commission impact from the current financials."
-        >
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
-            <PreviewRow label="Applicable tier" value={liveCalculation.commission.tierLabel ?? "No matching tier"} />
-            <PreviewRow label="Effective rate" value={formatPercent(liveCalculation.commission.effectiveRate)} />
-            <PreviewRow label="Projected commission" value={formatMoney(liveCalculation.commission.projectedGrossCommission)} emphasized />
-            <PreviewRow label="Estimated remaining" value={formatMoney(liveCalculation.commission.estimatedRemaining)} emphasized />
-          </div>
-
+        {canEditFinancials ? (
           <details className="group rounded-xl border border-line bg-surface-muted/30">
             <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3.5 text-sm font-medium text-ink">
-              <span>View full calculation</span>
-              <span className="text-xs text-ink-subtle group-open:hidden">Open</span>
-              <span className="hidden text-xs text-ink-subtle group-open:inline">Close</span>
+              <span>Edit financial inputs</span>
+              <span className="text-xs text-ink-subtle group-open:hidden">Open form</span>
+              <span className="hidden text-xs text-ink-subtle group-open:inline">Close form</span>
             </summary>
-            <div className="border-t border-line p-3">
-              <LiveCalculationPanel calculation={liveCalculation} sticky={false} title="Calculation detail" />
+            <div className="border-t border-line px-4 py-5">
+              <JobFinancialsForm job={job} costRates={costRateDefaults} />
             </div>
           </details>
-        </Panel>
-      </div>
+        ) : (
+          <p className="text-sm leading-6 text-ink-muted">Your role can view these figures but cannot change them.</p>
+        )}
+      </Panel>
+
+      <Panel
+        title="Commission preview"
+        description="The commission impact of the current project financials."
+      >
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <PreviewCard label="Tier" value={liveCalculation.commission.tierLabel ?? "No matching tier"} />
+          <PreviewCard label="Rate" value={formatPercent(liveCalculation.commission.effectiveRate)} />
+          <PreviewCard label="Projected commission" value={formatMoney(liveCalculation.commission.projectedGrossCommission)} emphasized />
+          <PreviewCard label="Remaining" value={formatMoney(liveCalculation.commission.estimatedRemaining)} emphasized />
+        </div>
+
+        <details className="group rounded-xl border border-line bg-surface-muted/30">
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3.5 text-sm font-medium text-ink">
+            <span>View full calculation</span>
+            <span className="text-xs text-ink-subtle group-open:hidden">Open details</span>
+            <span className="hidden text-xs text-ink-subtle group-open:inline">Close details</span>
+          </summary>
+          <div className="border-t border-line p-4">
+            <LiveCalculationPanel calculation={liveCalculation} sticky={false} title="Calculation detail" />
+          </div>
+        </details>
+      </Panel>
 
       <Panel
         title="Commission change orders"
-        description="Only the financial impact needed for commission lives here. Operational change-order management stays in Buildertrend."
+        description="Only change orders that affect commission need to be tracked here. Operational change orders stay in Buildertrend."
       >
-        <div className="grid gap-3 sm:grid-cols-3">
-          <Summary label="Active change orders" value={String(activeChangeOrders.length)} />
-          <Summary label="Revenue impact" value={formatMoney(changeOrderRollUp.revenue)} />
-          <Summary label="Cost impact" value={formatMoney(changeOrderRollUp.cost)} />
+        <div className="flex flex-col gap-3 rounded-xl border border-line bg-surface-muted/30 p-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-sm font-medium text-ink">
+              {activeChangeOrders.length === 0
+                ? "No commission change orders"
+                : `${activeChangeOrders.length} active commission change order${activeChangeOrders.length === 1 ? "" : "s"}`}
+            </p>
+            <p className="mt-1 text-xs text-ink-muted">
+              Revenue impact {formatMoney(changeOrderRollUp.revenue)} · Cost impact {formatMoney(changeOrderRollUp.cost)}
+            </p>
+          </div>
         </div>
 
         {activeChangeOrders.length > 0 ? (
@@ -148,19 +153,12 @@ export default async function ProjectSalesPage({ params }: { params: Promise<{ i
               <ChangeOrderCard key={changeOrder.id} jobId={job.id} changeOrder={changeOrder} />
             ))}
           </ul>
-        ) : (
-          <div className="rounded-xl border border-dashed border-line-strong bg-surface-muted/20 px-4 py-6 text-center">
-            <p className="text-sm font-medium text-ink">No commission change orders</p>
-            <p className="mt-1 text-xs leading-5 text-ink-muted">
-              Add one only when a change order affects the commission calculation.
-            </p>
-          </div>
-        )}
+        ) : null}
 
         {canEditFinancials ? (
           <details className="group rounded-xl border border-line bg-surface-muted/30">
             <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3.5 text-sm font-medium text-ink">
-              <span>Add change order</span>
+              <span>Add commission change order</span>
               <span className="text-xs text-ink-subtle group-open:hidden">Open form</span>
               <span className="hidden text-xs text-ink-subtle group-open:inline">Close form</span>
             </summary>
@@ -200,18 +198,18 @@ function Summary({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-xl border border-line bg-surface-muted/40 p-4">
       <dt className="text-xs font-medium tracking-[0.1em] text-ink-subtle uppercase">{label}</dt>
-      <dd className="mt-2 font-mono text-sm font-medium tabular-nums text-ink">{value}</dd>
+      <dd className="mt-2 text-sm font-medium text-ink">{value}</dd>
     </div>
   );
 }
 
-function PreviewRow({ label, value, emphasized = false }: { label: string; value: string; emphasized?: boolean }) {
+function PreviewCard({ label, value, emphasized = false }: { label: string; value: string; emphasized?: boolean }) {
   return (
-    <div className="flex items-center justify-between gap-4 rounded-xl border border-line bg-surface-muted/40 px-4 py-3.5">
-      <span className="text-xs font-medium tracking-[0.08em] text-ink-subtle uppercase">{label}</span>
-      <span className={emphasized ? "font-mono text-base font-semibold tabular-nums text-ink" : "text-sm font-medium text-ink"}>
+    <div className={`rounded-xl border p-4 ${emphasized ? "border-accent/50 bg-accent-soft" : "border-line bg-surface-muted/40"}`}>
+      <p className="text-xs font-medium tracking-[0.08em] text-ink-subtle uppercase">{label}</p>
+      <p className={emphasized ? "mt-2 font-mono text-lg font-semibold tabular-nums text-ink" : "mt-2 text-sm font-semibold text-ink"}>
         {value}
-      </span>
+      </p>
     </div>
   );
 }
