@@ -2,6 +2,7 @@
 
 import { useActionState } from "react";
 
+import { JobAdjustmentForm } from "@/components/commission/job-adjustment-form";
 import { ActionButtonForm } from "@/components/ui/action-button-form";
 import { StatusBadge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -21,9 +22,11 @@ import {
 } from "@/lib/commission/audit";
 import { changeOrderLabel } from "@/lib/commission/change-orders";
 import type { LiveCalculation } from "@/lib/commission/live-calculation";
+import { ADJUSTMENT_TYPE_LABELS, isAdjustmentType } from "@/lib/commission/types";
 import type {
   CommissionAuditRow,
   JobChangeOrderRow,
+  JobFinancialAdjustmentRow,
 } from "@/lib/supabase/database.types";
 import { formatDateTime, formatMoney, formatPercent } from "@/lib/utils/format";
 
@@ -108,6 +111,7 @@ export function FinalAuditPanel({
   latestFinalized,
   calculation,
   changeOrders,
+  adjustments,
   blockers,
   canManageAudit,
   trueUp,
@@ -119,6 +123,7 @@ export function FinalAuditPanel({
   latestFinalized: CommissionAuditRow | null;
   calculation: LiveCalculation;
   changeOrders: JobChangeOrderRow[];
+  adjustments: JobFinancialAdjustmentRow[];
   blockers: readonly string[];
   canManageAudit: boolean;
   trueUp: { status: string; netPayable: number } | null;
@@ -165,16 +170,15 @@ export function FinalAuditPanel({
       {state === "not_started" ? (
         <div className="space-y-3">
           <p className="text-sm leading-6 text-ink-muted">
-            This job has not been audited. The figures everywhere else on this page are the
-            live estimate — commission already recognized is based on them. The final audit
-            is the authoritative record, and it is a deliberate step: start it here, review
-            the complete picture, correct anything that is wrong, then finalize.
+            Begin the audit when the project is financially complete. You will review the
+            final revenue and costs, record any commission-specific corrections, then lock a
+            final snapshot before the true-up is created.
           </p>
           {canManageAudit ? (
             <ActionButtonForm
               action={beginCommissionAudit}
               fields={{ jobId }}
-              label="Begin Final Commission Audit"
+              label="Begin final commission audit"
               pendingLabel="Opening…"
             />
           ) : (
@@ -186,138 +190,126 @@ export function FinalAuditPanel({
       ) : null}
 
       {view ? (
-        <div className="space-y-5">
-          <div className="rounded-lg border border-line bg-surface-muted p-4">
-            <p className="text-xs font-semibold tracking-[0.12em] text-ink-subtle uppercase">
+        <div className="space-y-6">
+          <div className="rounded-xl border border-line bg-surface-muted/45 p-4">
+            <p className="text-sm font-semibold text-ink">
               {showingFinalized
                 ? `Finalized audit · revision ${latestFinalized?.revision}`
-                : `Audit review · revision ${openAudit?.revision} (live figures)`}
+                : `Audit review · revision ${openAudit?.revision}`}
             </p>
-            <p className="mt-1 text-xs leading-5 text-ink-subtle">
+            <p className="mt-1 text-xs leading-5 text-ink-muted">
               {showingFinalized
-                ? "These are the figures that were audited and locked. Editing the job's financials later does not change them — the difference is recognized through the final true-up."
-                : "These are the job's current figures. Correct anything wrong in Financials or Change orders above; this review updates with them."}
+                ? "These figures are locked to this finalized audit revision."
+                : "The figures below update as you record audit adjustments. Finalize only after the ending financials are correct."}
             </p>
           </div>
 
-          <section className="space-y-2">
-            <h3 className="text-xs font-semibold tracking-[0.12em] text-ink-subtle uppercase">
-              Original job
-            </h3>
-            <dl className="grid gap-x-6 gap-y-3 sm:grid-cols-2 lg:grid-cols-4">
-              <Figure label="Original contract price" value={formatMoney(view.originalContractPrice)} />
-              <Figure label="Original costs" value={formatMoney(view.originalCost)} />
-              <Figure
-                label="Change order revenue"
-                value={formatMoney(view.changeOrderRevenue)}
-              />
-              <Figure label="Change order costs" value={formatMoney(view.changeOrderCost)} />
-            </dl>
-          </section>
-
-          <section className="space-y-2">
-            <h3 className="text-xs font-semibold tracking-[0.12em] text-ink-subtle uppercase">
-              Change orders
-            </h3>
-            {activeChangeOrders.length === 0 ? (
-              <p className="text-sm text-ink-muted">No active change orders.</p>
-            ) : (
-              <ul className="divide-y divide-line rounded-lg border border-line bg-surface">
-                {activeChangeOrders.map((changeOrder) => (
-                  <li
-                    key={changeOrder.id}
-                    className="flex flex-wrap items-baseline justify-between gap-2 px-4 py-2.5 text-sm"
-                  >
-                    <span className="text-ink">{changeOrderLabel(changeOrder)}</span>
-                    <span className="font-mono text-xs tabular-nums text-ink-muted">
-                      revenue {formatMoney(changeOrder.revenue)} · cost{" "}
-                      {formatMoney(changeOrder.cost)}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
-
-          <section className="space-y-2">
-            <h3 className="text-xs font-semibold tracking-[0.12em] text-ink-subtle uppercase">
-              Cost
-            </h3>
-            <dl className="grid gap-x-6 gap-y-3 sm:grid-cols-2 lg:grid-cols-4">
-              <Figure label="Direct job cost" value={formatMoney(view.directJobCost)} />
-              <Figure
-                label={`Burden (${formatPercent(view.burdenPercent, 2)})`}
-                value={formatMoney(view.burdenCost)}
-              />
-              <Figure
-                label={`Warranty contingency (${formatPercent(
-                  view.warrantyContingencyPercent,
-                  2,
-                )})`}
-                value={formatMoney(view.warrantyServiceContingency)}
-              />
-              <Figure label="FINAL TOTAL COST" value={formatMoney(view.totalCost)} emphasis />
-            </dl>
-          </section>
-
-          <section className="space-y-2">
-            <h3 className="text-xs font-semibold tracking-[0.12em] text-ink-subtle uppercase">
-              Final result
-            </h3>
-            <dl className="grid gap-x-6 gap-y-3 sm:grid-cols-2 lg:grid-cols-4">
-              <Figure label="FINAL TOTAL REVENUE" value={formatMoney(view.totalRevenue)} emphasis />
-              <Figure label="FINAL GROSS PROFIT" value={formatMoney(view.grossProfit)} emphasis />
-              <Figure label="FINAL GP %" value={formatPercent(view.grossProfitPercent)} emphasis />
-              <Figure
-                label="Applicable tier"
-                value={view.tierLabel ?? "No matching tier"}
-              />
-              <Figure label="Standard rate" value={formatPercent(view.standardCommissionRate)} />
-              <Figure
-                label="Draw reduction"
-                value={
-                  view.drawRateReduction > 0
-                    ? `− ${formatPercent(view.drawRateReduction)}`
-                    : "Not on draw"
-                }
-              />
-              <Figure
-                label="Final effective rate"
-                value={formatPercent(view.effectiveCommissionRate)}
-                emphasis
-              />
-              <Figure
-                label="Final gross commission"
-                value={formatMoney(view.finalGrossCommission)}
-                emphasis
-              />
-              <Figure
-                label="Previously recognized / paid"
-                value={formatMoney(view.previouslyRecognized)}
-              />
-              <Figure
-                label={`FINAL TRUE-UP — ${
-                  outcome ? FINAL_TRUE_UP_OUTCOME_LABELS[outcome] : ""
-                }`}
-                value={formatMoney(view.finalTrueUp)}
-                emphasis
-              />
-            </dl>
+          <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <AuditMetric label="Final revenue" value={formatMoney(view.totalRevenue)} />
+            <AuditMetric label="Final costs" value={formatMoney(view.totalCost)} />
+            <AuditMetric label="Final gross profit" value={formatMoney(view.grossProfit)} />
+            <AuditMetric label="Final GP %" value={formatPercent(view.grossProfitPercent)} />
           </section>
 
           {openAudit ? (
-            <div className="space-y-3 border-t border-line pt-4">
+            <section className="space-y-4 rounded-xl border border-line bg-surface p-4 sm:p-5">
+              <div>
+                <h3 className="text-sm font-semibold text-ink">Audit adjustments</h3>
+                <p className="mt-1 max-w-3xl text-xs leading-5 text-ink-muted">
+                  Record final corrections or commission exclusions here. Adjustments are
+                  append-only and immediately recalculate the audited revenue, costs, GP,
+                  commission tier, and final true-up shown on this page.
+                </p>
+              </div>
+
+              {adjustments.length > 0 ? (
+                <div className="overflow-hidden rounded-lg border border-line">
+                  <div className="divide-y divide-line">
+                    {adjustments.map((adjustment) => (
+                      <div
+                        key={adjustment.id}
+                        className="grid gap-1 px-3 py-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:gap-4"
+                      >
+                        <div>
+                          <p className="text-sm font-medium text-ink">
+                            {isAdjustmentType(adjustment.adjustment_type)
+                              ? ADJUSTMENT_TYPE_LABELS[adjustment.adjustment_type]
+                              : adjustment.adjustment_type.replaceAll("_", " ")}
+                          </p>
+                          <p className="mt-0.5 text-xs text-ink-muted">{adjustment.reason}</p>
+                        </div>
+                        <span className="text-sm font-semibold tabular-nums text-ink">
+                          {formatMoney(adjustment.amount)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <p className="rounded-lg border border-dashed border-line-strong px-4 py-5 text-center text-sm text-ink-muted">
+                  No audit adjustments recorded.
+                </p>
+              )}
+
+              {canManageAudit ? <JobAdjustmentForm jobId={jobId} /> : null}
+            </section>
+          ) : null}
+
+          <div className="grid gap-5 lg:grid-cols-2">
+            <section className="space-y-3 rounded-xl border border-line bg-surface p-4">
+              <h3 className="text-sm font-semibold text-ink">Revenue & change orders</h3>
+              <dl className="divide-y divide-line">
+                <DetailRow label="Original contract" value={formatMoney(view.originalContractPrice)} />
+                <DetailRow label="Change order revenue" value={formatMoney(view.changeOrderRevenue)} />
+                <DetailRow label="Final total revenue" value={formatMoney(view.totalRevenue)} strong />
+              </dl>
+
+              {activeChangeOrders.length > 0 ? (
+                <div className="border-t border-line pt-3">
+                  <p className="mb-2 text-xs font-medium text-ink-subtle">Change orders</p>
+                  <ul className="space-y-2">
+                    {activeChangeOrders.map((changeOrder) => (
+                      <li key={changeOrder.id} className="flex items-center justify-between gap-3 text-xs">
+                        <span className="truncate text-ink-muted">{changeOrderLabel(changeOrder)}</span>
+                        <span className="shrink-0 tabular-nums text-ink">
+                          {formatMoney(changeOrder.revenue)} / {formatMoney(changeOrder.cost)}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+            </section>
+
+            <section className="space-y-3 rounded-xl border border-line bg-surface p-4">
+              <h3 className="text-sm font-semibold text-ink">Cost & commission result</h3>
+              <dl className="divide-y divide-line">
+                <DetailRow label="Original costs" value={formatMoney(view.originalCost)} />
+                <DetailRow label="Change order costs" value={formatMoney(view.changeOrderCost)} />
+                <DetailRow label="Burden" value={formatMoney(view.burdenCost)} />
+                <DetailRow label="Warranty / service" value={formatMoney(view.warrantyServiceContingency)} />
+                <DetailRow label="Final total cost" value={formatMoney(view.totalCost)} strong />
+                <DetailRow label="Applicable tier" value={view.tierLabel ?? "No matching tier"} />
+                <DetailRow label="Effective rate" value={formatPercent(view.effectiveCommissionRate)} />
+                <DetailRow label="Final gross commission" value={formatMoney(view.finalGrossCommission)} strong />
+                <DetailRow label="Previously recognized" value={formatMoney(view.previouslyRecognized)} />
+                <DetailRow
+                  label={outcome ? `Final true-up · ${FINAL_TRUE_UP_OUTCOME_LABELS[outcome]}` : "Final true-up"}
+                  value={formatMoney(view.finalTrueUp)}
+                  strong
+                />
+              </dl>
+            </section>
+          </div>
+
+          {openAudit ? (
+            <div className="space-y-4 border-t border-line pt-5">
               {blockers.length > 0 ? (
                 <div className="space-y-2">
-                  <p className="text-sm font-medium text-ink">
-                    Before this audit can be finalized:
-                  </p>
+                  <p className="text-sm font-medium text-ink">Before this audit can be finalized:</p>
                   <ul className="space-y-1.5">
                     {blockers.map((blocker) => (
-                      <li
-                        key={blocker}
-                        className="flex items-start gap-2 text-sm leading-6 text-ink-muted"
-                      >
+                      <li key={blocker} className="flex items-start gap-2 text-sm leading-6 text-ink-muted">
                         <InfoIcon className="mt-0.5 h-3.5 w-3.5 shrink-0 text-ink-subtle" />
                         <span>{blocker}</span>
                       </li>
@@ -325,12 +317,9 @@ export function FinalAuditPanel({
                   </ul>
                 </div>
               ) : (
-                <p className="text-sm leading-6 text-ink-muted">
-                  Everything needed is present. Finalizing snapshots these figures, the plan
-                  version, the tier and rates and the true-up above, records who finalized it
-                  and when, and records the GP audit date. It does not create the final
-                  true-up — that stays a separate step in the Commission section.
-                </p>
+                <div className="rounded-lg border border-line bg-accent-soft px-3 py-3 text-sm text-accent-strong">
+                  Audit is ready to finalize. Finalizing locks the figures above as the authoritative commission snapshot.
+                </div>
               )}
 
               {canManageAudit ? (
@@ -352,7 +341,7 @@ export function FinalAuditPanel({
               <p className="text-sm leading-6 text-ink-muted">
                 {trueUp && trueUp.status !== "voided"
                   ? `The final true-up for this audit exists (${trueUp.status.replace("_", " ")}, ${formatMoney(trueUp.netPayable)} net). Approve and pay it through the Commission section.`
-                  : "Create the final true-up from the Commission section, which uses this finalized snapshot rather than the live estimate."}
+                  : "Create the final true-up from the Commission section. It will use this finalized snapshot rather than the live estimate."}
               </p>
               {canManageAudit ? (
                 <div className="flex flex-wrap items-start gap-3">
@@ -363,9 +352,7 @@ export function FinalAuditPanel({
                     pendingLabel="Re-opening…"
                   />
                   <p className="max-w-xl text-xs leading-5 text-ink-subtle">
-                    Re-opening keeps this revision as history and starts the next revision in
-                    review. It is only possible while no final true-up exists — a recognized
-                    payout is never overwritten.
+                    Re-opening keeps this revision as history and starts the next revision in review. It is only possible while no final true-up exists.
                   </p>
                 </div>
               ) : null}
@@ -376,18 +363,13 @@ export function FinalAuditPanel({
 
       {audits.length > 0 ? (
         <section className="space-y-2 border-t border-line pt-4">
-          <h3 className="text-xs font-semibold tracking-[0.12em] text-ink-subtle uppercase">
-            Audit history
-          </h3>
+          <h3 className="text-xs font-semibold tracking-[0.08em] text-ink-subtle uppercase">Audit history</h3>
           <ul className="space-y-1 text-xs text-ink-muted">
             {audits.map((audit) => (
               <li key={audit.id}>
-                Revision {audit.revision} · {audit.status.replace("_", " ")} · started{" "}
-                {formatDateTime(audit.started_at)}
+                Revision {audit.revision} · {audit.status.replace("_", " ")} · started {formatDateTime(audit.started_at)}
                 {audit.finalized_at
-                  ? ` · finalized ${formatDateTime(audit.finalized_at)} at ${formatMoney(
-                      audit.final_true_up,
-                    )} true-up`
+                  ? ` · finalized ${formatDateTime(audit.finalized_at)} at ${formatMoney(audit.final_true_up)} true-up`
                   : ""}
               </li>
             ))}
@@ -414,9 +396,7 @@ function FinalizeForm({
       <input type="hidden" name="jobId" value={jobId} />
       <input type="hidden" name="auditId" value={auditId} />
       {disabled ? (
-        <Button type="button" disabled variant="secondary">
-          Finalize audit
-        </Button>
+        <Button type="button" disabled variant="secondary">Finalize audit</Button>
       ) : (
         <SubmitButton label="Finalize audit" pendingLabel="Finalizing…" />
       )}
@@ -425,29 +405,20 @@ function FinalizeForm({
   );
 }
 
-function Figure({
-  label,
-  value,
-  emphasis = false,
-}: {
-  label: string;
-  value: string;
-  emphasis?: boolean;
-}) {
+function AuditMetric({ label, value }: { label: string; value: string }) {
   return (
-    <div className="min-w-0 space-y-0.5">
-      <dt className="text-xs font-medium tracking-[0.08em] text-ink-subtle uppercase">
-        {label}
-      </dt>
-      <dd
-        className={
-          emphasis
-            ? "font-mono text-sm font-semibold tabular-nums text-ink"
-            : "font-mono text-sm tabular-nums text-ink"
-        }
-      >
-        {value}
-      </dd>
+    <div className="rounded-xl border border-line bg-surface p-4">
+      <p className="text-xs font-medium tracking-[0.08em] text-ink-subtle uppercase">{label}</p>
+      <p className="mt-2 text-lg font-semibold tabular-nums tracking-tight text-ink">{value}</p>
+    </div>
+  );
+}
+
+function DetailRow({ label, value, strong = false }: { label: string; value: string; strong?: boolean }) {
+  return (
+    <div className="flex items-center justify-between gap-4 py-2.5 first:pt-0 last:pb-0">
+      <dt className={strong ? "text-sm font-semibold text-ink" : "text-sm text-ink-muted"}>{label}</dt>
+      <dd className={strong ? "text-sm font-semibold tabular-nums text-ink" : "text-sm tabular-nums text-ink"}>{value}</dd>
     </div>
   );
 }
