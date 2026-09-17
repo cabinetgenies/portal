@@ -14,16 +14,17 @@ export const SALES_ROUTES = {
 /**
  * Canonical project routes.
  *
- * A project is the shared parent entity: sales and commissions are views and
- * workflows over the same record, so the project's identity lives here and
- * nowhere else. Everything that links to a project — the project list, the
- * commission pipeline, the designer dashboard, the quick actions — points at
- * these paths.
+ * A project is the shared parent entity. Project-level sections live under the
+ * project record so opening a project is the one entry point for its sales,
+ * commission and audit context.
  */
 export const PROJECT_ROUTES = {
   overview: "/projects",
   new: "/projects/new",
   project: (projectId: string) => `/projects/${projectId}`,
+  sales: (projectId: string) => `/projects/${projectId}/sales`,
+  commission: (projectId: string) => `/projects/${projectId}/commission`,
+  history: (projectId: string) => `/projects/${projectId}/history`,
 } as const;
 
 export const COMMISSION_ROUTES = {
