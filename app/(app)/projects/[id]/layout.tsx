@@ -23,35 +23,26 @@ export default async function ProjectLayout({
 
   return (
     <div className="space-y-5">
-      <section className="overflow-hidden rounded-2xl border border-line bg-surface">
-        <div className="flex flex-col gap-5 p-5 sm:p-6 lg:flex-row lg:items-start lg:justify-between">
-          <div className="min-w-0 space-y-3">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-xs font-semibold tracking-[0.14em] text-ink-subtle uppercase">
-                {project.projectNumber ? `Project ${project.projectNumber}` : "Project"}
-              </span>
-              <StatusBadge label={project.statusLabel} tone={project.statusTone} />
-            </div>
+      <section className="rounded-2xl border border-line bg-surface px-5 pt-5 sm:px-6 sm:pt-6">
+        <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+          <div className="min-w-0">
+            <p className="text-xs text-ink-subtle">
+              Projects <span className="px-1.5">/</span> {project.name}
+            </p>
 
-            <div>
+            <div className="mt-3 flex flex-wrap items-center gap-2.5">
               <h1 className="text-2xl font-semibold tracking-tight text-ink sm:text-[1.75rem]">
                 {project.name}
               </h1>
-              <p className="mt-1 text-sm text-ink-muted">
-                {formatText(project.customerName, "No customer recorded")}
-              </p>
+              <StatusBadge label={project.statusLabel} tone={project.statusTone} />
             </div>
 
-            <dl className="flex flex-wrap gap-x-6 gap-y-2 text-xs">
-              <div className="flex gap-1.5">
-                <dt className="text-ink-subtle">Designer</dt>
-                <dd className="font-medium text-ink">{formatText(project.designerName, "Unassigned")}</dd>
-              </div>
-              <div className="flex gap-1.5">
-                <dt className="text-ink-subtle">Sold</dt>
-                <dd className="font-medium text-ink">{formatDate(project.soldDate)}</dd>
-              </div>
-            </dl>
+            <div className="mt-2 flex flex-wrap items-center gap-x-5 gap-y-1.5 text-xs text-ink-muted">
+              {project.projectNumber ? <span>Project #{project.projectNumber}</span> : null}
+              <span>{formatText(project.customerName, "No customer recorded")}</span>
+              <span>Designer: {formatText(project.designerName, "Unassigned")}</span>
+              <span>Sold: {formatDate(project.soldDate)}</span>
+            </div>
           </div>
 
           <Link
@@ -62,7 +53,7 @@ export default async function ProjectLayout({
           </Link>
         </div>
 
-        <div className="border-t border-line bg-surface-muted/40 p-2 sm:px-4">
+        <div className="mt-5 border-t border-line">
           <ProjectTabs projectId={id} />
         </div>
       </section>

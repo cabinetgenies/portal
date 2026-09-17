@@ -1,11 +1,12 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { FinalAuditPanel } from "@/components/commission/final-audit-panel";
 import { JobCommissionPanel } from "@/components/commission/job-commission-panel";
 import { JobCompensationPlanForm } from "@/components/commission/job-plan-form";
 import { EmptyState } from "@/components/empty-state/empty-state";
-import { StatusBadge } from "@/components/ui/badge";
 import { Panel } from "@/components/ui/panel";
+import { buttonClassName } from "@/components/ui/button";
 import { requireSession } from "@/lib/auth/dal";
 import { listCompensationPlanOptions } from "@/lib/compensation/queries";
 import { auditReadiness, deriveFinalAuditState } from "@/lib/commission/audit";
@@ -21,12 +22,20 @@ import { toNumber } from "@/lib/commission/financials";
 import { buildLiveCalculation } from "@/lib/commission/live-calculation";
 import { financialInputsFromJob, getJobDetail } from "@/lib/commission/queries";
 import { tierWindowsFromRows } from "@/lib/commission/job-entry";
+import { PROJECT_ROUTES } from "@/lib/routes";
 import { formatDate, formatMoney, formatPercent } from "@/lib/utils/format";
 
 export const metadata = { title: "Project commission" };
 
-export default async function ProjectCommissionPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function ProjectCommissionPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ edit?: string; audit?: string }>;
+}) {
   const { id } = await params;
+  const query = await searchParams;
   const session = await requireSession();
   const detail = await getJobDetail(id);
   if (!detail) notFound();
@@ -73,135 +82,174 @@ export default async function ProjectCommissionPage({ params }: { params: Promis
     calculation: liveCalculation,
     hasPlanVersion: planVersion !== null,
   });
-  const planOptions = canViewConfig && canManageJobs ? await listCompensationPlanOptions() : [];
-  const indicativeBand =
-    canViewConfig && planVersion
-      ? {
-          label: liveCalculation.commission.tierLabel,
-          rate: liveCalculation.commission.standardRate,
-        }
-      : null;
+  const planOptions =
+    canViewConfig && canManageJobs && query.edit === "plan"
+      ? await listCompensationPlanOptions()
+      : [];
   const recognizedNetPayable = (commissionContext?.events ?? [])
     .filter((event) => event.status === "approved" || event.status === "paid")
     .reduce((total, event) => total + toNumber(event.net_payable), 0);
+  const paidToDate = (commissionContext?.events ?? [])
+    .filter((event) => event.status === "paid")
+    .reduce((total, event) => total + toNumber(event.net_payable), 0);
+  const projectedCommission = liveCalculation.commission.projectedGrossCommission;
+  const remainingCommission = liveCalculation.commission.estimatedRemaining;
+  const auditReady = auditBlockers.length === 0 && planVersion !== null;
 
   return (
     <div className="space-y-5">
+      <div>
+        <h2 className="text-lg font-semibold tracking-tight text-ink">Commission summary</h2>
+        <p className="mt-1 text-sm text-ink-muted">Plan, payout, and final-audit status for this project.</p>
+      </div>
+
       <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <Metric label="Commissionable GP" value={formatMoney(job.commissionable_gross_profit)} />
-        <Metric label="Commissionable GP %" value={formatPercent(job.commissionable_gp_percent)} />
-        <Metric
-          label="Current rate"
-          value={indicativeBand ? formatPercent(indicativeBand.rate) : "—"}
-          emphasized
-        />
+        <Metric label="Effective rate" value={formatPercent(liveCalculation.commission.effectiveRate)} />
+        <Metric label="Projected commission" value={formatMoney(projectedCommission)} emphasized />
         <Metric label="Recognized commission" value={formatMoney(recognizedNetPayable)} />
       </section>
 
-      <div className="grid gap-5 xl:grid-cols-[minmax(0,.75fr)_minmax(0,1.25fr)]">
+      <div className="grid gap-5 xl:grid-cols-3">
         <Panel
-          title="Commission setup"
-          description="The plan and version attached to this project. Sold projects keep the version they were sold under."
-          className="h-fit"
+          title="Commission plan"
+          description="The plan version locked to this project's sold date."
+          actions={
+            canManageJobs && canViewConfig ? (
+              <Link
+                href={`${PROJECT_ROUTES.commission(id)}?edit=plan`}
+                className={buttonClassName({ variant: "secondary", size: "sm" })}
+              >
+                Edit
+              </Link>
+            ) : null
+          }
         >
           {canViewConfig ? (
-            <div className="space-y-5">
-              {plan && planVersion ? (
-                <div className="space-y-3 rounded-xl border border-line bg-surface-muted/40 p-4">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <StatusBadge label={`${plan.name} · ${planVersion.version_name}`} tone="info" />
-                    {indicativeBand ? (
-                      <StatusBadge
-                        label={`${indicativeBand.label ?? "Current tier"} · ${formatPercent(indicativeBand.rate)}`}
-                        tone="positive"
-                      />
-                    ) : null}
-                  </div>
-                  <dl className="grid gap-3 sm:grid-cols-2">
-                    <Summary label="Effective from" value={formatDate(planVersion.effective_from)} />
-                    <Summary
-                      label="Effective through"
-                      value={planVersion.effective_to ? formatDate(planVersion.effective_to) : "Open"}
-                    />
-                  </dl>
-                </div>
-              ) : (
-                <div className="rounded-xl border border-dashed border-line-strong bg-surface-muted/30 p-5 text-sm text-ink-muted">
-                  No compensation plan version is attached to this project yet.
-                </div>
-              )}
-
-              {canManageJobs ? (
-                <div className="border-t border-line pt-5">
-                  <JobCompensationPlanForm
-                    jobId={job.id}
-                    plans={planOptions}
-                    currentPlanId={job.compensation_plan_id}
-                    currentVersionId={job.compensation_plan_version_id}
-                    soldDate={job.sold_date}
-                  />
-                </div>
-              ) : null}
-            </div>
+            plan && planVersion ? (
+              <dl className="space-y-3">
+                <InfoRow label="Plan" value={plan.name} />
+                <InfoRow label="Plan version" value={planVersion.version_name} />
+                <InfoRow label="Applicable tier" value={liveCalculation.commission.tierLabel ?? "No matching tier"} />
+                <InfoRow label="Standard rate" value={formatPercent(liveCalculation.commission.standardRate)} />
+                <InfoRow label="Effective rate" value={formatPercent(liveCalculation.commission.effectiveRate)} />
+                <InfoRow label="Effective from" value={formatDate(planVersion.effective_from)} />
+              </dl>
+            ) : (
+              <EmptyState title="No plan version attached" description="Attach the version that covered the project's sold date before calculating commission." />
+            )
           ) : (
-            <EmptyState
-              title="Commission plan details are restricted"
-              description="Only authorized roles can see the plan and tiers attached to this project."
-            />
+            <EmptyState title="Commission plan restricted" description="Your role cannot view compensation plan configuration." />
           )}
         </Panel>
 
-        <div className="space-y-5">
-          {commissionContext ? (
-            <JobCommissionPanel
-              context={commissionContext}
-              canCalculate={canCalculate}
-              canViewConfig={canViewConfig}
-              canSubmit={canSubmit}
-              canApprove={canApprove}
-              canPay={canPay}
-              canVoid={canVoid}
-              hasFinalizedAudit={latestFinalized !== null}
-            />
-          ) : (
-            <EmptyState
-              title="Commission context unavailable"
-              description="This project does not currently have commission context available for your role."
-            />
-          )}
-        </div>
+        <Panel title="Payout preview" description="A simple view of the current projected payout.">
+          <dl className="space-y-3">
+            <InfoRow label="Projected commission" value={formatMoney(projectedCommission)} strong />
+            <InfoRow label="Paid to date" value={formatMoney(paidToDate)} />
+            <InfoRow label="Recognized total" value={formatMoney(recognizedNetPayable)} />
+            <InfoRow label="Estimated remaining" value={formatMoney(remainingCommission)} strong />
+            <InfoRow label="Deposit target" value={formatMoney(liveCalculation.commission.depositTarget)} />
+          </dl>
+          <div className="rounded-lg border border-line bg-surface-muted/40 px-3 py-2.5 text-xs leading-5 text-ink-muted">
+            This is a live estimate from the current project financials. Final payout is based on the finalized audit snapshot.
+          </div>
+        </Panel>
+
+        <Panel
+          title="Audit readiness"
+          description="What remains before the final commission can be closed."
+          actions={
+            canCalculate ? (
+              <Link
+                href={`${PROJECT_ROUTES.commission(id)}?audit=1`}
+                className={buttonClassName({ variant: "secondary", size: "sm" })}
+              >
+                Open final audit
+              </Link>
+            ) : null
+          }
+        >
+          <ul className="space-y-3">
+            <Readiness ok={planVersion !== null} label="Commission plan version attached" />
+            <Readiness ok={auditBlockers.length === 0} label="Financial audit checks clear" />
+            <Readiness ok={activeChangeOrders.length === 0} label="No active commission change orders" />
+            <Readiness ok={latestFinalized !== null} label="Final audit completed" />
+          </ul>
+          <div className={`rounded-lg border px-3 py-2.5 text-xs leading-5 ${auditReady ? "border-line bg-accent-soft text-accent-strong" : "border-line bg-surface-muted/40 text-ink-muted"}`}>
+            {latestFinalized
+              ? "The final audit has been completed."
+              : auditReady
+                ? "The project is ready to begin the final commission audit."
+                : `${auditBlockers.length} blocking item${auditBlockers.length === 1 ? "" : "s"} remain before finalization.`}
+          </div>
+        </Panel>
       </div>
 
-      <Panel
-        title="Final commission audit"
-        description="Close the loop only after the project financials are complete. Finalizing snapshots the authoritative commission picture."
-      >
-        <div className="mb-5 grid gap-3 sm:grid-cols-3">
-          <Summary label="Audit state" value={auditState.replaceAll("_", " ")} />
-          <Summary label="Audit revisions" value={String(audits.length)} />
-          <Summary label="Blocking items" value={String(auditBlockers.length)} />
-        </div>
-
-        <FinalAuditPanel
-          jobId={job.id}
-          state={auditState}
-          audits={audits}
-          openAudit={openAudit}
-          latestFinalized={latestFinalized}
-          calculation={liveCalculation}
-          changeOrders={changeOrders}
-          blockers={auditBlockers}
-          canManageAudit={canCalculate}
-          trueUp={
-            finalTrueUpEvent
-              ? {
-                  status: finalTrueUpEvent.status,
-                  netPayable: toNumber(finalTrueUpEvent.net_payable),
-                }
-              : null
+      {canViewConfig && canManageJobs && query.edit === "plan" ? (
+        <Panel
+          title="Edit commission plan"
+          description="Attach the compensation plan version that governs this project."
+          actions={
+            <Link href={PROJECT_ROUTES.commission(id)} className={buttonClassName({ variant: "secondary", size: "sm" })}>
+              Cancel
+            </Link>
           }
+        >
+          <JobCompensationPlanForm
+            jobId={job.id}
+            plans={planOptions}
+            currentPlanId={job.compensation_plan_id}
+            currentVersionId={job.compensation_plan_version_id}
+            soldDate={job.sold_date}
+          />
+        </Panel>
+      ) : null}
+
+      {commissionContext ? (
+        <JobCommissionPanel
+          context={commissionContext}
+          canCalculate={canCalculate}
+          canViewConfig={canViewConfig}
+          canSubmit={canSubmit}
+          canApprove={canApprove}
+          canPay={canPay}
+          canVoid={canVoid}
+          hasFinalizedAudit={latestFinalized !== null}
         />
-      </Panel>
+      ) : null}
+
+      {canCalculate && query.audit === "1" ? (
+        <Panel
+          title="Final commission audit"
+          description="Review and finalize the authoritative commission snapshot."
+          actions={
+            <Link href={PROJECT_ROUTES.commission(id)} className={buttonClassName({ variant: "secondary", size: "sm" })}>
+              Close audit
+            </Link>
+          }
+        >
+          <FinalAuditPanel
+            jobId={job.id}
+            state={auditState}
+            audits={audits}
+            openAudit={openAudit}
+            latestFinalized={latestFinalized}
+            calculation={liveCalculation}
+            changeOrders={changeOrders}
+            blockers={auditBlockers}
+            canManageAudit={canCalculate}
+            trueUp={
+              finalTrueUpEvent
+                ? {
+                    status: finalTrueUpEvent.status,
+                    netPayable: toNumber(finalTrueUpEvent.net_payable),
+                  }
+                : null
+            }
+          />
+        </Panel>
+      ) : null}
     </div>
   );
 }
@@ -209,17 +257,28 @@ export default async function ProjectCommissionPage({ params }: { params: Promis
 function Metric({ label, value, emphasized = false }: { label: string; value: string; emphasized?: boolean }) {
   return (
     <div className={`rounded-xl border p-4 ${emphasized ? "border-accent bg-accent-soft" : "border-line bg-surface"}`}>
-      <p className="text-xs font-medium tracking-[0.1em] text-ink-subtle uppercase">{label}</p>
+      <p className="text-xs font-medium tracking-[0.08em] text-ink-subtle uppercase">{label}</p>
       <p className="mt-2 font-mono text-xl font-semibold tabular-nums text-ink">{value}</p>
     </div>
   );
 }
 
-function Summary({ label, value }: { label: string; value: string }) {
+function InfoRow({ label, value, strong = false }: { label: string; value: string; strong?: boolean }) {
   return (
-    <div className="rounded-xl border border-line bg-surface px-3.5 py-3">
-      <dt className="text-xs text-ink-subtle">{label}</dt>
-      <dd className="mt-1 text-sm font-medium capitalize text-ink">{value}</dd>
+    <div className="flex items-start justify-between gap-4">
+      <dt className="text-sm text-ink-muted">{label}</dt>
+      <dd className={strong ? "text-right font-mono text-sm font-semibold tabular-nums text-ink" : "text-right text-sm font-medium text-ink"}>{value}</dd>
     </div>
+  );
+}
+
+function Readiness({ ok, label }: { ok: boolean; label: string }) {
+  return (
+    <li className="flex items-center gap-2.5 text-sm text-ink">
+      <span className={`flex h-5 w-5 items-center justify-center rounded-full text-[11px] font-bold ${ok ? "bg-accent-soft text-accent-strong" : "bg-surface-muted text-ink-subtle"}`}>
+        {ok ? "✓" : "·"}
+      </span>
+      <span>{label}</span>
+    </li>
   );
 }

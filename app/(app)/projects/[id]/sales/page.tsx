@@ -1,10 +1,11 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { ChangeOrderCard, ChangeOrderCreateForm } from "@/components/commission/job-change-orders";
 import { JobFinancialsForm } from "@/components/commission/job-financials-form";
-import { LiveCalculationPanel } from "@/components/commission/live-calculation-panel";
 import { AlertIcon } from "@/components/icons";
 import { Panel } from "@/components/ui/panel";
+import { buttonClassName } from "@/components/ui/button";
 import { requireSession } from "@/lib/auth/dal";
 import { financialInputsFromJob, getJobDetail } from "@/lib/commission/queries";
 import {
@@ -13,16 +14,24 @@ import {
   jobCostRateDefaults,
   settingsSnapshot,
 } from "@/lib/commission/event-queries";
-import { changeOrderLabel, changeOrderTotalsFromRows } from "@/lib/commission/change-orders";
+import { changeOrderTotalsFromRows } from "@/lib/commission/change-orders";
 import { buildLiveCalculation } from "@/lib/commission/live-calculation";
 import { tierWindowsFromRows } from "@/lib/commission/job-entry";
 import { toNumber } from "@/lib/commission/financials";
+import { PROJECT_ROUTES } from "@/lib/routes";
 import { formatMoney, formatPercent } from "@/lib/utils/format";
 
 export const metadata = { title: "Project sales" };
 
-export default async function ProjectSalesPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function ProjectSalesPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ edit?: string; add?: string }>;
+}) {
   const { id } = await params;
+  const query = await searchParams;
   const session = await requireSession();
   const detail = await getJobDetail(id);
   if (!detail) notFound();
@@ -59,128 +68,117 @@ export default async function ProjectSalesPage({ params }: { params: Promise<{ i
 
   return (
     <div className="space-y-5">
+      <div>
+        <h2 className="text-lg font-semibold tracking-tight text-ink">Financial summary</h2>
+        <p className="mt-1 text-sm text-ink-muted">The sales-side economics used by the commission engine.</p>
+      </div>
+
       <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <Metric label="Revenue" value={formatMoney(job.actual_total_revenue)} />
-        <Metric label="Total cost" value={formatMoney(job.actual_total_cost)} />
-        <Metric label="Gross profit" value={formatMoney(job.job_gross_profit)} />
-        <Metric label="GP %" value={formatPercent(job.job_gp_percent)} emphasized />
+        <Metric label="Original contract" value={formatMoney(jobInputs.contractRevenue)} />
+        <Metric label="Total costs" value={formatMoney(liveCalculation.cost.totalCost)} />
+        <Metric label="Gross profit" value={formatMoney(liveCalculation.profit.grossProfit)} />
+        <Metric label="GP %" value={formatPercent(liveCalculation.profit.grossProfitPercent)} emphasized />
       </section>
+
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,.85fr)_minmax(0,1.15fr)]">
+        <Panel
+          title="Pricing & cost details"
+          description="The current financial inputs behind the project gross profit."
+          actions={
+            canEditFinancials ? (
+              <Link
+                href={`${PROJECT_ROUTES.sales(id)}?edit=financials`}
+                className={buttonClassName({ variant: "secondary", size: "sm" })}
+              >
+                Edit financials
+              </Link>
+            ) : null
+          }
+        >
+          <dl className="divide-y divide-line">
+            <Row label="Original contract price" value={formatMoney(liveCalculation.revenue.originalContractPrice)} />
+            <Row label="Change-order revenue" value={formatMoney(liveCalculation.revenue.changeOrderRevenue)} />
+            <Row label="Total revenue" value={formatMoney(liveCalculation.revenue.totalRevenue)} strong />
+            <Row label="Original direct costs" value={formatMoney(liveCalculation.cost.originalCost)} />
+            <Row label="Change-order costs" value={formatMoney(liveCalculation.cost.changeOrderCost)} />
+            <Row label={`Burden (${formatPercent(liveCalculation.cost.burdenPercent)})`} value={formatMoney(liveCalculation.cost.burdenCost)} />
+            <Row
+              label={`Warranty / service (${formatPercent(liveCalculation.cost.warrantyContingencyPercent)})`}
+              value={formatMoney(liveCalculation.cost.warrantyServiceContingency)}
+            />
+            <Row label="Total costs" value={formatMoney(liveCalculation.cost.totalCost)} strong />
+          </dl>
+        </Panel>
+
+        <Panel
+          title="Change orders"
+          description="Only commission-impacting revenue and cost changes are tracked here."
+          actions={
+            canEditFinancials ? (
+              <Link
+                href={`${PROJECT_ROUTES.sales(id)}?add=change-order`}
+                className={buttonClassName({ size: "sm" })}
+              >
+                Add change order
+              </Link>
+            ) : null
+          }
+        >
+          {activeChangeOrders.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-line-strong px-4 py-10 text-center">
+              <p className="text-sm font-medium text-ink">No commission change orders</p>
+              <p className="mt-1 text-xs leading-5 text-ink-muted">Add one only when a change changes the financial basis for commission.</p>
+            </div>
+          ) : (
+            <ul className="space-y-3">
+              {activeChangeOrders.map((changeOrder) => (
+                <ChangeOrderCard key={changeOrder.id} jobId={job.id} changeOrder={changeOrder} />
+              ))}
+            </ul>
+          )}
+
+          {removedChangeOrders.length > 0 ? (
+            <p className="text-xs text-ink-subtle">{removedChangeOrders.length} removed change order{removedChangeOrders.length === 1 ? "" : "s"} are retained in project history.</p>
+          ) : null}
+        </Panel>
+      </div>
 
       {recognizedEvents.length > 0 ? (
         <div role="status" className="flex items-start gap-3 rounded-xl border border-line bg-accent-soft px-4 py-3.5">
           <AlertIcon className="mt-0.5 h-4 w-4 shrink-0 text-accent-strong" />
-          <div>
-            <p className="text-sm font-medium text-accent-strong">Commission history already exists</p>
-            <p className="mt-0.5 text-sm leading-6 text-accent-strong">
-              {recognizedEvents.length} approved or paid event{recognizedEvents.length === 1 ? "" : "s"} total {formatMoney(recognizedNetPayable)} net payable. Editing current financials will not rewrite recognized commission history.
-            </p>
-          </div>
+          <p className="text-sm leading-6 text-accent-strong">
+            {recognizedEvents.length} approved or paid commission event{recognizedEvents.length === 1 ? "" : "s"} already exist ({formatMoney(recognizedNetPayable)} net payable). Editing current financials does not rewrite recognized commission history.
+          </p>
         </div>
       ) : null}
 
-      <Panel
-        title="Financial summary"
-        description="The current project financials used by the commission engine."
-      >
-        <div className="grid gap-3 md:grid-cols-3">
-          <Summary label="Original contract" value={formatMoney(jobInputs.contractRevenue)} />
-          <Summary label="Original costs" value={formatMoney(jobInputs.originalCost)} />
-          <Summary label="Change orders" value={`${formatMoney(changeOrderRollUp.revenue)} rev · ${formatMoney(changeOrderRollUp.cost)} cost`} />
-          <Summary label="Burden" value={formatPercent(jobInputs.burdenPercent)} />
-          <Summary label="Warranty / service" value={formatPercent(jobInputs.warrantyContingencyPercent)} />
-          <Summary label="Direct cost" value={formatMoney(liveCalculation.cost.directJobCost)} />
-        </div>
+      {canEditFinancials && query.edit === "financials" ? (
+        <Panel
+          title="Edit financials"
+          description="Update the revenue and cost inputs used by the commission calculation."
+          actions={
+            <Link href={PROJECT_ROUTES.sales(id)} className={buttonClassName({ variant: "secondary", size: "sm" })}>
+              Cancel
+            </Link>
+          }
+        >
+          <JobFinancialsForm job={job} costRates={costRateDefaults} />
+        </Panel>
+      ) : null}
 
-        {canEditFinancials ? (
-          <details className="group rounded-xl border border-line bg-surface-muted/30">
-            <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3.5 text-sm font-medium text-ink">
-              <span>Edit financial inputs</span>
-              <span className="text-xs text-ink-subtle group-open:hidden">Open form</span>
-              <span className="hidden text-xs text-ink-subtle group-open:inline">Close form</span>
-            </summary>
-            <div className="border-t border-line px-4 py-5">
-              <JobFinancialsForm job={job} costRates={costRateDefaults} />
-            </div>
-          </details>
-        ) : (
-          <p className="text-sm leading-6 text-ink-muted">Your role can view these figures but cannot change them.</p>
-        )}
-      </Panel>
-
-      <Panel
-        title="Commission preview"
-        description="The commission impact of the current project financials."
-      >
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <PreviewCard label="Tier" value={liveCalculation.commission.tierLabel ?? "No matching tier"} />
-          <PreviewCard label="Rate" value={formatPercent(liveCalculation.commission.effectiveRate)} />
-          <PreviewCard label="Projected commission" value={formatMoney(liveCalculation.commission.projectedGrossCommission)} emphasized />
-          <PreviewCard label="Remaining" value={formatMoney(liveCalculation.commission.estimatedRemaining)} emphasized />
-        </div>
-
-        <details className="group rounded-xl border border-line bg-surface-muted/30">
-          <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3.5 text-sm font-medium text-ink">
-            <span>View full calculation</span>
-            <span className="text-xs text-ink-subtle group-open:hidden">Open details</span>
-            <span className="hidden text-xs text-ink-subtle group-open:inline">Close details</span>
-          </summary>
-          <div className="border-t border-line p-4">
-            <LiveCalculationPanel calculation={liveCalculation} sticky={false} title="Calculation detail" />
-          </div>
-        </details>
-      </Panel>
-
-      <Panel
-        title="Commission change orders"
-        description="Only change orders that affect commission need to be tracked here. Operational change orders stay in Buildertrend."
-      >
-        <div className="flex flex-col gap-3 rounded-xl border border-line bg-surface-muted/30 p-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <p className="text-sm font-medium text-ink">
-              {activeChangeOrders.length === 0
-                ? "No commission change orders"
-                : `${activeChangeOrders.length} active commission change order${activeChangeOrders.length === 1 ? "" : "s"}`}
-            </p>
-            <p className="mt-1 text-xs text-ink-muted">
-              Revenue impact {formatMoney(changeOrderRollUp.revenue)} · Cost impact {formatMoney(changeOrderRollUp.cost)}
-            </p>
-          </div>
-        </div>
-
-        {activeChangeOrders.length > 0 ? (
-          <ul className="space-y-3">
-            {activeChangeOrders.map((changeOrder) => (
-              <ChangeOrderCard key={changeOrder.id} jobId={job.id} changeOrder={changeOrder} />
-            ))}
-          </ul>
-        ) : null}
-
-        {canEditFinancials ? (
-          <details className="group rounded-xl border border-line bg-surface-muted/30">
-            <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3.5 text-sm font-medium text-ink">
-              <span>Add commission change order</span>
-              <span className="text-xs text-ink-subtle group-open:hidden">Open form</span>
-              <span className="hidden text-xs text-ink-subtle group-open:inline">Close form</span>
-            </summary>
-            <div className="border-t border-line px-4 py-5">
-              <ChangeOrderCreateForm jobId={job.id} />
-            </div>
-          </details>
-        ) : null}
-
-        {removedChangeOrders.length > 0 ? (
-          <details className="rounded-xl border border-line bg-surface-muted/30 px-4 py-3">
-            <summary className="cursor-pointer text-sm font-medium text-ink">
-              Removed change orders ({removedChangeOrders.length})
-            </summary>
-            <div className="mt-3 space-y-1 text-xs text-ink-muted">
-              {removedChangeOrders.map((changeOrder) => (
-                <p key={changeOrder.id}>{changeOrderLabel(changeOrder)} · removed from current totals</p>
-              ))}
-            </div>
-          </details>
-        ) : null}
-      </Panel>
+      {canEditFinancials && query.add === "change-order" ? (
+        <Panel
+          title="Add commission change order"
+          description="Record only the revenue and cost impact needed by the commission calculation."
+          actions={
+            <Link href={PROJECT_ROUTES.sales(id)} className={buttonClassName({ variant: "secondary", size: "sm" })}>
+              Cancel
+            </Link>
+          }
+        >
+          <ChangeOrderCreateForm jobId={job.id} />
+        </Panel>
+      ) : null}
     </div>
   );
 }
@@ -188,28 +186,17 @@ export default async function ProjectSalesPage({ params }: { params: Promise<{ i
 function Metric({ label, value, emphasized = false }: { label: string; value: string; emphasized?: boolean }) {
   return (
     <div className={`rounded-xl border p-4 ${emphasized ? "border-accent bg-accent-soft" : "border-line bg-surface"}`}>
-      <p className="text-xs font-medium tracking-[0.1em] text-ink-subtle uppercase">{label}</p>
+      <p className="text-xs font-medium tracking-[0.08em] text-ink-subtle uppercase">{label}</p>
       <p className="mt-2 font-mono text-xl font-semibold tabular-nums text-ink">{value}</p>
     </div>
   );
 }
 
-function Summary({ label, value }: { label: string; value: string }) {
+function Row({ label, value, strong = false }: { label: string; value: string; strong?: boolean }) {
   return (
-    <div className="rounded-xl border border-line bg-surface-muted/40 p-4">
-      <dt className="text-xs font-medium tracking-[0.1em] text-ink-subtle uppercase">{label}</dt>
-      <dd className="mt-2 text-sm font-medium text-ink">{value}</dd>
-    </div>
-  );
-}
-
-function PreviewCard({ label, value, emphasized = false }: { label: string; value: string; emphasized?: boolean }) {
-  return (
-    <div className={`rounded-xl border p-4 ${emphasized ? "border-accent/50 bg-accent-soft" : "border-line bg-surface-muted/40"}`}>
-      <p className="text-xs font-medium tracking-[0.08em] text-ink-subtle uppercase">{label}</p>
-      <p className={emphasized ? "mt-2 font-mono text-lg font-semibold tabular-nums text-ink" : "mt-2 text-sm font-semibold text-ink"}>
-        {value}
-      </p>
+    <div className="flex items-center justify-between gap-4 py-3 first:pt-0 last:pb-0">
+      <dt className={strong ? "text-sm font-semibold text-ink" : "text-sm text-ink-muted"}>{label}</dt>
+      <dd className={strong ? "font-mono text-sm font-semibold tabular-nums text-ink" : "font-mono text-sm tabular-nums text-ink"}>{value}</dd>
     </div>
   );
 }
