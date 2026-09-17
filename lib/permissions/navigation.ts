@@ -70,10 +70,9 @@ type DomainDefinition = {
 const BOS_DOMAINS: readonly DomainDefinition[] = [
   {
     label: "Projects",
-    description: "Project lifecycle, sales context and project records.",
+    description: "Shared project records used across the BOS.",
     icon: "projects",
-    moduleKeys: ["projects", "sales"],
-    childLabels: { sales: "Sales" },
+    moduleKeys: ["projects"],
   },
   {
     label: "Operations",
