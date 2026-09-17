@@ -18,14 +18,6 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
  * sales and commissions are views over the same record, so the project list and
  * the project detail page read this module and nothing owns a second copy of it.
  *
- * Nothing here recalculates anything. Revenue, cost, gross profit and GP% are the
- * stored figures the commission domain already derives; the projected commission
- * comes from the commission engine's own view model
- * (`projectedCommissionForJob`), and the audit state from the same
- * `deriveFinalAuditState` the audit workflow uses. When a viewer's role cannot
- * read commission configuration — a project manager, say — those two columns
- * degrade to "not available" rather than inventing a number.
- *
  * Buildertrend remains the execution system of record. There is deliberately no
  * schedule, task list, calendar or daily log here.
  */
@@ -47,7 +39,6 @@ export type ProjectSummary = {
   cost: number;
   grossProfit: number;
   gpPercent: number;
-  /** Null when the viewer's role cannot read commission configuration. */
   projectedCommission: number | null;
   auditState: FinalAuditState | null;
   auditStateLabel: string | null;
@@ -55,16 +46,10 @@ export type ProjectSummary = {
 
 export type ProjectListResult = {
   items: ProjectSummary[];
-  /** A real read failure, as opposed to an empty list. */
   failed: boolean;
-  /**
-   * "available"   the commission view model resolved for this viewer
-   * "unavailable" the commission tables could not be read at all
-   */
   commission: "available" | "unavailable";
 };
 
-/** The light shape the dashboard widget uses. */
 export type ProjectListItem = {
   id: string;
   name: string;
@@ -72,6 +57,21 @@ export type ProjectListItem = {
   statusLabel: string;
   statusTone: StatusTone;
   soldDate: string | null;
+  href: string;
+};
+
+export type ProjectRegistryItem = {
+  id: string;
+  name: string;
+  projectNumber: string | null;
+  customerName: string | null;
+  designerName: string | null;
+  designerId: string | null;
+  status: string;
+  statusLabel: string;
+  statusTone: StatusTone;
+  soldDate: string | null;
+  createdAt: string;
   href: string;
 };
 
@@ -96,9 +96,6 @@ async function loadJobs({
       .order("created_at", { ascending: false })
       .limit(limit);
 
-    // "own" is the dashboard's "my projects"; "visible" is everything the
-    // viewer's role lets them read, which is what Row Level Security already
-    // decided. Neither widens access.
     if (scope === "own" && profileId) {
       query = query.eq("sales_designer_id", profileId);
     }
@@ -126,11 +123,76 @@ function designerName(profile: ProfileRow | undefined | null) {
 }
 
 /**
- * The canonical project list.
+ * Lightweight registry query for the Projects index.
  *
- * One row per project with the figures the portal actually stores, and commission
- * columns sourced from the existing commission engine rather than derived again.
+ * It deliberately selects identity/navigation fields only. Finance and commission
+ * data stay out of the registry data path even for viewers who are allowed to see
+ * them elsewhere.
  */
+export async function listProjectRegistry({
+  profileId,
+  scope = "visible",
+  limit = 1000,
+}: {
+  profileId: string | null;
+  scope?: ProjectScope;
+  limit?: number;
+}): Promise<{ items: ProjectRegistryItem[]; failed: boolean }> {
+  if (!isSupabaseConfigured) {
+    return { items: [], failed: true };
+  }
+
+  try {
+    const supabase = await createSupabaseServerClient();
+    let query = supabase
+      .from("jobs")
+      .select("id, job_name, job_number, customer_name, sales_designer_id, status, sold_date, created_at")
+      .order("created_at", { ascending: false })
+      .limit(limit);
+
+    if (scope === "own" && profileId) {
+      query = query.eq("sales_designer_id", profileId);
+    }
+
+    const { data, error } = await query;
+
+    if (error) {
+      console.error("Could not load project registry:", error.message);
+      return { items: [], failed: true };
+    }
+
+    const rows = data ?? [];
+    const profilesById = await loadProfilesById(
+      rows
+        .map((job) => job.sales_designer_id)
+        .filter((id): id is string => Boolean(id)),
+    );
+
+    return {
+      items: rows.map((job) => ({
+        id: job.id,
+        name: job.job_name,
+        projectNumber: job.job_number,
+        customerName: job.customer_name,
+        designerId: job.sales_designer_id,
+        designerName: designerName(
+          job.sales_designer_id ? profilesById.get(job.sales_designer_id) : null,
+        ),
+        status: job.status,
+        statusLabel: jobStatusLabel(job.status),
+        statusTone: jobStatusTone(job.status),
+        soldDate: job.sold_date,
+        createdAt: job.created_at,
+        href: PROJECT_ROUTES.project(job.id),
+      })),
+      failed: false,
+    };
+  } catch (error) {
+    console.error("Could not load project registry:", error);
+    return { items: [], failed: true };
+  }
+}
+
 export async function listProjectSummaries({
   profileId,
   scope = "visible",
@@ -155,8 +217,6 @@ export async function listProjectSummaries({
   );
   const auditsByJob = await loadAuditRows(jobs.map((job) => job.id));
 
-  // The commission view model: projections and the final true-up status. A role
-  // that cannot read commission configuration gets nulls, not a guess.
   let workspace: Awaited<ReturnType<typeof loadCommissionWorkspace>> | null = null;
 
   try {
@@ -213,7 +273,6 @@ export async function listProjectSummaries({
   };
 }
 
-/** The dashboard widget's lighter view of the same records. */
 export async function listVisibleProjects({
   profileId,
   scope = "own",
@@ -249,8 +308,6 @@ async function loadProfilesById(ids: readonly string[]): Promise<Map<string, Pro
     const supabase = await createSupabaseServerClient();
     const { data, error } = await supabase.from("profiles").select("*").in("id", unique);
 
-    // Row Level Security may legitimately hide a designer's profile from a
-    // viewer; the column then reads as unknown rather than failing the page.
     if (error) {
       console.error("Could not load project designers:", error.message);
       return profiles;
