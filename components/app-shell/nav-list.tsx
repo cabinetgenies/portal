@@ -138,7 +138,7 @@ export function NavList({
                                   ? cn(
                                       "focus-visible:outline-white/70",
                                       childActive
-                                        ? "bg-white/8 text-white"
+                                        ? "bg-white/[0.08] text-white"
                                         : "text-white/55 hover:bg-white/5 hover:text-white/90",
                                     )
                                   : cn(
