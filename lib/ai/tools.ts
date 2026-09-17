@@ -9,6 +9,7 @@ import {
   settingsSnapshot,
   tiersForVersion,
 } from "@/lib/commission/event-queries";
+import { listCompensationPlans, todayIso } from "@/lib/compensation/queries";
 import {
   listMeasurables,
   listPriorities,
@@ -140,6 +141,88 @@ export const aiTools = {
           status: item.status,
           updatedAt: item.updated_at,
           body: item.body ?? "",
+        },
+      };
+    },
+  },
+
+  getCompanyCommissionStructure: {
+    description:
+      "Return the authoritative active company compensation plans, current effective versions and tier rates. Use this for company-level commission-structure questions.",
+    inputSchema: z.object({}),
+    async execute(_input: unknown, ctx: AiToolContext): Promise<AiToolResult> {
+      if (!hasCapability(ctx.session.capabilities, ["view:compensation-config"])) {
+        return {
+          status: "denied",
+          message: "Your role cannot read company compensation configuration.",
+        };
+      }
+
+      const today = todayIso();
+      const plans = (await listCompensationPlans()).filter((plan) => plan.active);
+      const structures = plans
+        .map((plan) => {
+          const currentVersion = plan.versions.find(
+            (version) =>
+              version.active &&
+              version.effective_from <= today &&
+              (version.effective_to === null || version.effective_to >= today),
+          );
+          if (!currentVersion) return null;
+
+          const planEvidence = ctx.evidence.register({
+            recordType: "compensation_plan",
+            recordId: plan.id,
+            title: plan.name,
+            version: plan.updated_at,
+            sensitivity: "financial",
+          });
+          const versionEvidence = ctx.evidence.register({
+            recordType: "compensation_plan_version",
+            recordId: currentVersion.id,
+            title: `${plan.name} · ${currentVersion.version_name}`,
+            version: currentVersion.updated_at,
+            sensitivity: "financial",
+          });
+
+          return {
+            sourceIds: [planEvidence.id, versionEvidence.id],
+            planId: plan.id,
+            planName: plan.name,
+            description: plan.description,
+            participantKind: plan.participant_kind,
+            planType: plan.plan_type,
+            version: {
+              id: currentVersion.id,
+              name: currentVersion.version_name,
+              effectiveFrom: currentVersion.effective_from,
+              effectiveTo: currentVersion.effective_to,
+              notes: currentVersion.notes,
+            },
+            tiers: currentVersion.tiers.map((tier) => ({
+              id: tier.id,
+              label: tier.label,
+              lowerGpPercent: tier.lower_gp_percent,
+              lowerThresholdType: tier.lower_threshold_type,
+              upperGpPercent: tier.upper_gp_percent,
+              upperThresholdType: tier.upper_threshold_type,
+              rate: tier.rate,
+              sortOrder: tier.sort_order,
+            })),
+          };
+        })
+        .filter((plan): plan is NonNullable<typeof plan> => plan !== null);
+
+      return {
+        status: "ok",
+        data: {
+          effectiveDate: today,
+          sourceOfTruth: "compensation configuration",
+          plans: structures,
+          note:
+            structures.length === 0
+              ? "No active compensation plan version is currently effective."
+              : "These rows are the authoritative compensation configuration visible to your signed-in role.",
         },
       };
     },
@@ -441,4 +524,3 @@ export const aiTools = {
 } as const;
 
 export type AiToolId = keyof typeof aiTools;
-
