@@ -21,7 +21,7 @@ import { toNumber } from "@/lib/commission/financials";
 import { buildLiveCalculation } from "@/lib/commission/live-calculation";
 import { financialInputsFromJob, getJobDetail } from "@/lib/commission/queries";
 import { tierWindowsFromRows } from "@/lib/commission/job-entry";
-import { formatDate, formatPercent } from "@/lib/utils/format";
+import { formatDate, formatMoney, formatPercent } from "@/lib/utils/format";
 
 export const metadata = { title: "Project commission" };
 
@@ -81,66 +81,107 @@ export default async function ProjectCommissionPage({ params }: { params: Promis
           rate: liveCalculation.commission.standardRate,
         }
       : null;
+  const recognizedNetPayable = (commissionContext?.events ?? [])
+    .filter((event) => event.status === "approved" || event.status === "paid")
+    .reduce((total, event) => total + toNumber(event.net_payable), 0);
 
   return (
-    <div className="space-y-6">
-      <Panel
-        title="Commission setup"
-        description="The compensation plan version governing this project. Sold projects keep the version they were sold under."
-      >
-        {canViewConfig ? (
-          <div className="space-y-5">
-            {plan && planVersion ? (
-              <div className="flex flex-wrap items-center gap-2">
-                <StatusBadge label={`${plan.name} · ${planVersion.version_name}`} tone="info" />
-                <span className="text-xs text-ink-muted">
-                  Effective {formatDate(planVersion.effective_from)} → {planVersion.effective_to ? formatDate(planVersion.effective_to) : "open"}
-                </span>
-                {indicativeBand ? (
-                  <span className="text-xs text-ink-muted">
-                    Current band: {indicativeBand.label ?? "unnamed"} ({formatPercent(indicativeBand.rate)})
-                  </span>
-                ) : null}
-              </div>
-            ) : (
-              <p className="text-sm leading-6 text-ink-muted">No compensation plan version is attached to this project yet.</p>
-            )}
-
-            {canManageJobs ? (
-              <JobCompensationPlanForm
-                jobId={job.id}
-                plans={planOptions}
-                currentPlanId={job.compensation_plan_id}
-                currentVersionId={job.compensation_plan_version_id}
-                soldDate={job.sold_date}
-              />
-            ) : null}
-          </div>
-        ) : (
-          <EmptyState
-            title="Commission plan details are restricted"
-            description="Only authorized roles can see the plan and tiers attached to this project."
-          />
-        )}
-      </Panel>
-
-      {commissionContext ? (
-        <JobCommissionPanel
-          context={commissionContext}
-          canCalculate={canCalculate}
-          canViewConfig={canViewConfig}
-          canSubmit={canSubmit}
-          canApprove={canApprove}
-          canPay={canPay}
-          canVoid={canVoid}
-          hasFinalizedAudit={latestFinalized !== null}
+    <div className="space-y-5">
+      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <Metric label="Commissionable GP" value={formatMoney(job.commissionable_gross_profit)} />
+        <Metric label="Commissionable GP %" value={formatPercent(job.commissionable_gp_percent)} />
+        <Metric
+          label="Current rate"
+          value={indicativeBand ? formatPercent(indicativeBand.rate) : "—"}
+          emphasized
         />
-      ) : null}
+        <Metric label="Recognized commission" value={formatMoney(recognizedNetPayable)} />
+      </section>
+
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,.75fr)_minmax(0,1.25fr)]">
+        <Panel
+          title="Commission setup"
+          description="The plan and version attached to this project. Sold projects keep the version they were sold under."
+          className="h-fit"
+        >
+          {canViewConfig ? (
+            <div className="space-y-5">
+              {plan && planVersion ? (
+                <div className="space-y-3 rounded-xl border border-line bg-surface-muted/40 p-4">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <StatusBadge label={`${plan.name} · ${planVersion.version_name}`} tone="info" />
+                    {indicativeBand ? (
+                      <StatusBadge
+                        label={`${indicativeBand.label ?? "Current tier"} · ${formatPercent(indicativeBand.rate)}`}
+                        tone="positive"
+                      />
+                    ) : null}
+                  </div>
+                  <dl className="grid gap-3 sm:grid-cols-2">
+                    <Summary label="Effective from" value={formatDate(planVersion.effective_from)} />
+                    <Summary
+                      label="Effective through"
+                      value={planVersion.effective_to ? formatDate(planVersion.effective_to) : "Open"}
+                    />
+                  </dl>
+                </div>
+              ) : (
+                <div className="rounded-xl border border-dashed border-line-strong bg-surface-muted/30 p-5 text-sm text-ink-muted">
+                  No compensation plan version is attached to this project yet.
+                </div>
+              )}
+
+              {canManageJobs ? (
+                <div className="border-t border-line pt-5">
+                  <JobCompensationPlanForm
+                    jobId={job.id}
+                    plans={planOptions}
+                    currentPlanId={job.compensation_plan_id}
+                    currentVersionId={job.compensation_plan_version_id}
+                    soldDate={job.sold_date}
+                  />
+                </div>
+              ) : null}
+            </div>
+          ) : (
+            <EmptyState
+              title="Commission plan details are restricted"
+              description="Only authorized roles can see the plan and tiers attached to this project."
+            />
+          )}
+        </Panel>
+
+        <div className="space-y-5">
+          {commissionContext ? (
+            <JobCommissionPanel
+              context={commissionContext}
+              canCalculate={canCalculate}
+              canViewConfig={canViewConfig}
+              canSubmit={canSubmit}
+              canApprove={canApprove}
+              canPay={canPay}
+              canVoid={canVoid}
+              hasFinalizedAudit={latestFinalized !== null}
+            />
+          ) : (
+            <EmptyState
+              title="Commission context unavailable"
+              description="This project does not currently have commission context available for your role."
+            />
+          )}
+        </div>
+      </div>
 
       <Panel
-        title="Final audit"
-        description="Finalize the authoritative commission picture for this project after the financials are complete."
+        title="Final commission audit"
+        description="Close the loop only after the project financials are complete. Finalizing snapshots the authoritative commission picture."
       >
+        <div className="mb-5 grid gap-3 sm:grid-cols-3">
+          <Summary label="Audit state" value={auditState.replaceAll("_", " ")} />
+          <Summary label="Audit revisions" value={String(audits.length)} />
+          <Summary label="Blocking items" value={String(auditBlockers.length)} />
+        </div>
+
         <FinalAuditPanel
           jobId={job.id}
           state={auditState}
@@ -161,6 +202,24 @@ export default async function ProjectCommissionPage({ params }: { params: Promis
           }
         />
       </Panel>
+    </div>
+  );
+}
+
+function Metric({ label, value, emphasized = false }: { label: string; value: string; emphasized?: boolean }) {
+  return (
+    <div className={`rounded-xl border p-4 ${emphasized ? "border-accent bg-accent-soft" : "border-line bg-surface"}`}>
+      <p className="text-xs font-medium tracking-[0.1em] text-ink-subtle uppercase">{label}</p>
+      <p className="mt-2 font-mono text-xl font-semibold tabular-nums text-ink">{value}</p>
+    </div>
+  );
+}
+
+function Summary({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-xl border border-line bg-surface px-3.5 py-3">
+      <dt className="text-xs text-ink-subtle">{label}</dt>
+      <dd className="mt-1 text-sm font-medium capitalize text-ink">{value}</dd>
     </div>
   );
 }

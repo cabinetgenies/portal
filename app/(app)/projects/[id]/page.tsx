@@ -27,44 +27,62 @@ export default async function ProjectOverviewPage({
   const canManageJobs = session.capabilities.includes("manage:jobs");
   const designers = canManageJobs ? await listSalesDesignerOptions() : [];
 
-  return (
-    <Panel
-      title="Overview"
-      description="The shared Cabinet Genies project record. Buildertrend remains the source of truth for project management and execution."
-    >
-      <dl className="grid gap-x-8 gap-y-4 sm:grid-cols-2 lg:grid-cols-4">
-        <ReadOnly label="Project name" value={job.job_name} />
-        <ReadOnly label="Project number" value={formatText(job.job_number)} />
-        <ReadOnly label="Customer" value={formatText(job.customer_name)} />
-        <ReadOnly label="Status" value={jobStatusLabel(job.status)} />
-        <ReadOnly
-          label="Sales designer"
-          value={formatText(designer ? designerDisplayName(designer) : null)}
-        />
-        <ReadOnly label="Sold date" value={formatDate(job.sold_date)} />
-        <ReadOnly label="Created" value={formatDate(job.created_at)} />
-        <ReadOnly label="Buildertrend" value="Managed in Buildertrend" />
-      </dl>
+  const facts = [
+    { label: "Project number", value: formatText(job.job_number) },
+    { label: "Customer", value: formatText(job.customer_name) },
+    { label: "Status", value: jobStatusLabel(job.status) },
+    {
+      label: "Sales designer",
+      value: formatText(designer ? designerDisplayName(designer) : null),
+    },
+    { label: "Sold date", value: formatDate(job.sold_date) },
+    { label: "Created", value: formatDate(job.created_at) },
+  ];
 
-      {canManageJobs ? (
-        <div className="border-t border-line pt-5">
-          <h3 className="pb-4 text-xs font-semibold tracking-[0.12em] text-ink-subtle uppercase">
-            Edit project identity
-          </h3>
-          <JobOverviewForm designers={designers} job={job} />
+  return (
+    <div className="grid gap-5 xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,.65fr)]">
+      <Panel
+        title="Project details"
+        description="The shared Cabinet Genies record used by sales, commission and other BOS modules."
+        className="h-fit"
+      >
+        <dl className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {facts.map((fact) => (
+            <div key={fact.label} className="rounded-xl border border-line bg-surface-muted/45 p-4">
+              <dt className="text-xs font-medium tracking-[0.1em] text-ink-subtle uppercase">
+                {fact.label}
+              </dt>
+              <dd className="mt-2 text-sm font-medium text-ink">{fact.value}</dd>
+            </div>
+          ))}
+        </dl>
+
+        <div className="rounded-xl border border-line bg-surface-muted/35 p-4">
+          <p className="text-xs font-medium tracking-[0.1em] text-ink-subtle uppercase">Project management</p>
+          <p className="mt-2 text-sm font-medium text-ink">Buildertrend</p>
+          <p className="mt-1 text-sm leading-6 text-ink-muted">
+            Scheduling, selections, field activity and project execution remain in Buildertrend. This portal only stores the project context Cabinet Genies needs outside Buildertrend.
+          </p>
         </div>
-      ) : null}
-    </Panel>
-  );
-}
+      </Panel>
 
-function ReadOnly({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="space-y-1">
-      <dt className="text-xs font-medium tracking-[0.12em] text-ink-subtle uppercase">
-        {label}
-      </dt>
-      <dd className="text-sm text-ink">{value}</dd>
+      <Panel
+        title="Edit project"
+        description={
+          canManageJobs
+            ? "Keep the shared project identity accurate for every connected module."
+            : "Project identity is managed by authorized users."
+        }
+        className="h-fit"
+      >
+        {canManageJobs ? (
+          <JobOverviewForm designers={designers} job={job} />
+        ) : (
+          <p className="text-sm leading-6 text-ink-muted">
+            You can view this project record, but your role cannot edit its shared identity fields.
+          </p>
+        )}
+      </Panel>
     </div>
   );
 }
