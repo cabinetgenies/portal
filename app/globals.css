@@ -22,7 +22,8 @@
   --color-accent-soft: #f5eee1;
 
   --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
-  --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, monospace;
+  /* Keep financial/KPI values in the same clean family as the rest of the app. */
+  --font-mono: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
 }
 
 :root {
