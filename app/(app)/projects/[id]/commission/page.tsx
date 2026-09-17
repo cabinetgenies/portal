@@ -20,7 +20,11 @@ import {
 } from "@/lib/commission/event-queries";
 import { toNumber } from "@/lib/commission/financials";
 import { buildLiveCalculation } from "@/lib/commission/live-calculation";
-import { financialInputsFromJob, getJobDetail } from "@/lib/commission/queries";
+import {
+  adjustmentInputsFromRows,
+  financialInputsFromJob,
+  getJobDetail,
+} from "@/lib/commission/queries";
 import { tierWindowsFromRows } from "@/lib/commission/job-entry";
 import { PROJECT_ROUTES } from "@/lib/routes";
 import { formatDate, formatMoney, formatPercent } from "@/lib/utils/format";
@@ -40,7 +44,7 @@ export default async function ProjectCommissionPage({
   const detail = await getJobDetail(id);
   if (!detail) notFound();
 
-  const { job, changeOrders, plan, planVersion, planVersionTiers } = detail;
+  const { job, adjustments, changeOrders, plan, planVersion, planVersionTiers } = detail;
   const canManageJobs = session.capabilities.includes("manage:jobs");
   const canViewConfig = session.capabilities.includes("view:compensation-config");
   const canCalculate = session.capabilities.includes("calculate:commission");
@@ -61,6 +65,7 @@ export default async function ProjectCommissionPage({
       changeOrderRevenue: changeOrderRollUp.revenue,
       changeOrderCost: changeOrderRollUp.cost,
     },
+    adjustments: adjustmentInputsFromRows(adjustments),
     tiers: tierWindowsFromRows(planVersionTiers),
     minimumGpStandard: 0,
     settings: settingsSnapshot(commissionSettings),
@@ -104,9 +109,9 @@ export default async function ProjectCommissionPage({
       </div>
 
       <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <Metric label="Commissionable GP" value={formatMoney(job.commissionable_gross_profit)} />
+        <Metric label="Commissionable GP" value={formatMoney(liveCalculation.commission.commissionableGrossProfit)} />
         <Metric label="Effective rate" value={formatPercent(liveCalculation.commission.effectiveRate)} />
-        <Metric label="Projected commission" value={formatMoney(projectedCommission)} emphasized />
+        <Metric label="Projected commission" value={formatMoney(projectedCommission)} />
         <Metric label="Recognized commission" value={formatMoney(recognizedNetPayable)} />
       </section>
 
@@ -152,7 +157,7 @@ export default async function ProjectCommissionPage({
             <InfoRow label="Deposit target" value={formatMoney(liveCalculation.commission.depositTarget)} />
           </dl>
           <div className="rounded-lg border border-line bg-surface-muted/40 px-3 py-2.5 text-xs leading-5 text-ink-muted">
-            This is a live estimate from the current project financials. Final payout is based on the finalized audit snapshot.
+            This is a live estimate from the current project financials and any recorded commission adjustments. Final payout is based on the finalized audit snapshot.
           </div>
         </Panel>
 
@@ -173,14 +178,14 @@ export default async function ProjectCommissionPage({
           <ul className="space-y-3">
             <Readiness ok={planVersion !== null} label="Commission plan version attached" />
             <Readiness ok={auditBlockers.length === 0} label="Financial audit checks clear" />
-            <Readiness ok={activeChangeOrders.length === 0} label="No active commission change orders" />
+            <Readiness ok={openAudit !== null || latestFinalized !== null} label="Audit workflow started" />
             <Readiness ok={latestFinalized !== null} label="Final audit completed" />
           </ul>
           <div className={`rounded-lg border px-3 py-2.5 text-xs leading-5 ${auditReady ? "border-line bg-accent-soft text-accent-strong" : "border-line bg-surface-muted/40 text-ink-muted"}`}>
             {latestFinalized
               ? "The final audit has been completed."
               : auditReady
-                ? "The project is ready to begin the final commission audit."
+                ? "The project is ready for final commission review."
                 : `${auditBlockers.length} blocking item${auditBlockers.length === 1 ? "" : "s"} remain before finalization.`}
           </div>
         </Panel>
@@ -222,7 +227,7 @@ export default async function ProjectCommissionPage({
       {canCalculate && query.audit === "1" ? (
         <Panel
           title="Final commission audit"
-          description="Review and finalize the authoritative commission snapshot."
+          description="Review the ending financials, make any necessary audit adjustments, then finalize the authoritative commission snapshot."
           actions={
             <Link href={PROJECT_ROUTES.commission(id)} className={buttonClassName({ variant: "secondary", size: "sm" })}>
               Close audit
@@ -237,6 +242,7 @@ export default async function ProjectCommissionPage({
             latestFinalized={latestFinalized}
             calculation={liveCalculation}
             changeOrders={changeOrders}
+            adjustments={adjustments}
             blockers={auditBlockers}
             canManageAudit={canCalculate}
             trueUp={
@@ -254,11 +260,11 @@ export default async function ProjectCommissionPage({
   );
 }
 
-function Metric({ label, value, emphasized = false }: { label: string; value: string; emphasized?: boolean }) {
+function Metric({ label, value }: { label: string; value: string }) {
   return (
-    <div className={`rounded-xl border p-4 ${emphasized ? "border-accent bg-accent-soft" : "border-line bg-surface"}`}>
+    <div className="rounded-xl border border-line bg-surface p-4">
       <p className="text-xs font-medium tracking-[0.08em] text-ink-subtle uppercase">{label}</p>
-      <p className="mt-2 font-mono text-xl font-semibold tabular-nums text-ink">{value}</p>
+      <p className="mt-2 text-xl font-semibold tabular-nums tracking-tight text-ink">{value}</p>
     </div>
   );
 }
@@ -267,7 +273,7 @@ function InfoRow({ label, value, strong = false }: { label: string; value: strin
   return (
     <div className="flex items-start justify-between gap-4">
       <dt className="text-sm text-ink-muted">{label}</dt>
-      <dd className={strong ? "text-right font-mono text-sm font-semibold tabular-nums text-ink" : "text-right text-sm font-medium text-ink"}>{value}</dd>
+      <dd className={strong ? "text-right text-sm font-semibold tabular-nums text-ink" : "text-right text-sm font-medium text-ink"}>{value}</dd>
     </div>
   );
 }
