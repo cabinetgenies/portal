@@ -3,14 +3,16 @@ import { notFound } from "next/navigation";
 
 import { JobOverviewForm } from "@/components/commission/job-forms";
 import { EmptyState } from "@/components/empty-state/empty-state";
+import { ProjectTeam } from "@/components/projects/project-team";
 import { Panel } from "@/components/ui/panel";
 import { buttonClassName } from "@/components/ui/button";
 import { requireSession } from "@/lib/auth/dal";
 import { listSalesDesignerOptions } from "@/lib/compensation/queries";
 import { getJobDetail } from "@/lib/commission/queries";
 import { jobStatusLabel } from "@/lib/commission/types";
+import { listProjectTeam, listProjectTeamOptions } from "@/lib/projects/team";
 import { PROJECT_ROUTES } from "@/lib/routes";
-import { formatDate, formatDateTime, formatText } from "@/lib/utils/format";
+import { formatDate, formatDateTime, formatMoney, formatPercent, formatText } from "@/lib/utils/format";
 
 export const metadata = { title: "Project overview" };
 
@@ -31,37 +33,30 @@ export default async function ProjectOverviewPage({
   const { job, designer, auditEvents } = detail;
   const canManageJobs = session.capabilities.includes("manage:jobs");
   const canViewHistory = session.capabilities.includes("view:compensation-config");
-  const designers = canManageJobs && query.edit === "1" ? await listSalesDesignerOptions() : [];
+  const [designers, projectTeam, teamOptions] = await Promise.all([
+    canManageJobs && query.edit === "1" ? listSalesDesignerOptions() : Promise.resolve([]),
+    listProjectTeam(id),
+    canManageJobs ? listProjectTeamOptions() : Promise.resolve([]),
+  ]);
   const designerName = formatText(designer ? designerDisplayName(designer) : null, "Unassigned");
   const recentActivity = canViewHistory ? auditEvents.slice(0, 4) : [];
 
   return (
     <div className="space-y-5">
       <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <Metric label="Status" value={jobStatusLabel(job.status)} />
-        <Metric label="Project number" value={formatText(job.job_number)} />
-        <Metric label="Sales designer" value={designerName} />
-        <Metric label="Sold date" value={formatDate(job.sold_date)} />
+        <Metric label="Total revenue" value={formatMoney(job.actual_total_revenue)} />
+        <Metric label="Total costs" value={formatMoney(job.actual_total_cost)} />
+        <Metric label="Gross profit" value={formatMoney(job.job_gross_profit)} />
+        <Metric label="GP %" value={formatPercent(job.job_gp_percent)} />
       </section>
 
-      <div className="grid gap-5 xl:grid-cols-[minmax(0,1.35fr)_minmax(300px,.65fr)]">
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,1.15fr)_minmax(280px,.7fr)_minmax(260px,.55fr)]">
         <Panel
           title="Project details"
           description="The shared project identity used by Cabinet Genies modules outside Buildertrend."
-          actions={
-            canManageJobs ? (
-              <Link
-                href={`${PROJECT_ROUTES.project(id)}?edit=1`}
-                className={buttonClassName({ variant: "secondary", size: "sm" })}
-              >
-                Edit project
-              </Link>
-            ) : null
-          }
         >
           <dl className="grid gap-x-8 gap-y-5 sm:grid-cols-2">
             <Fact label="Customer" value={formatText(job.customer_name)} />
-            <Fact label="Project name" value={job.job_name} />
             <Fact label="Project number" value={formatText(job.job_number)} />
             <Fact label="Status" value={jobStatusLabel(job.status)} />
             <Fact label="Sales designer" value={designerName} />
@@ -70,23 +65,31 @@ export default async function ProjectOverviewPage({
           </dl>
         </Panel>
 
+        <Panel title="Project team" description="People connected to this project in the BOS.">
+          <ProjectTeam
+            jobId={job.id}
+            members={projectTeam}
+            options={teamOptions}
+            canEdit={canManageJobs}
+            salesDesignerId={job.sales_designer_id}
+            salesDesignerName={designerName}
+          />
+        </Panel>
+
         <div className="space-y-5">
-          <Panel title="Project owner" description="Primary sales ownership for this project.">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-surface-muted text-sm font-semibold text-ink">
-                {initials(designerName)}
-              </div>
-              <div>
-                <p className="text-sm font-semibold text-ink">{designerName}</p>
-                <p className="text-xs text-ink-muted">Sales designer</p>
-              </div>
+          <Panel title="Buildertrend" description="Project execution stays in Buildertrend.">
+            <div className="space-y-3 text-sm leading-6 text-ink-muted">
+              <p>Scheduling, selections, field activity, service, and project management remain in Buildertrend.</p>
+              <p className="text-xs text-ink-subtle">This portal holds only the project context Buildertrend cannot provide to the BOS.</p>
             </div>
           </Panel>
 
-          <Panel title="Buildertrend" description="Project execution stays in Buildertrend.">
-            <div className="space-y-2 text-sm leading-6 text-ink-muted">
-              <p>Scheduling, selections, field activity, service, and project management remain outside this portal.</p>
-              <p className="text-xs text-ink-subtle">This record exists so commissions, forms, and other BOS modules can reference the same project.</p>
+          <Panel title="Project status" description="High-level context only.">
+            <div className="space-y-2">
+              <p className="text-sm font-semibold text-ink">{jobStatusLabel(job.status)}</p>
+              <p className="text-xs leading-5 text-ink-muted">
+                Sold {formatDate(job.sold_date)} · Designer {designerName}
+              </p>
             </div>
           </Panel>
         </div>
@@ -101,7 +104,7 @@ export default async function ProjectOverviewPage({
               href={PROJECT_ROUTES.history(id)}
               className={buttonClassName({ variant: "secondary", size: "sm" })}
             >
-              View history
+              View all
             </Link>
           }
         >
@@ -147,7 +150,7 @@ function Metric({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-xl border border-line bg-surface p-4">
       <p className="text-xs font-medium tracking-[0.08em] text-ink-subtle uppercase">{label}</p>
-      <p className="mt-2 truncate text-base font-semibold text-ink">{value}</p>
+      <p className="mt-2 text-xl font-semibold tabular-nums tracking-tight text-ink">{value}</p>
     </div>
   );
 }
@@ -171,11 +174,6 @@ function designerDisplayName(designer: {
   return combined || designer.display_name || designer.email || "—";
 }
 
-function initials(value: string) {
-  const parts = value.split(/\s|@/).filter(Boolean).slice(0, 2);
-  return parts.map((part) => part[0]?.toUpperCase() ?? "").join("") || "—";
-}
-
 function auditActionLabel(action: string) {
   switch (action) {
     case "job_created": return "Project created";
@@ -185,6 +183,8 @@ function auditActionLabel(action: string) {
     case "commission_plan_assigned": return "Commission plan assigned";
     case "job_financials_changed": return "Financials updated";
     case "financial_adjustment_created": return "Financial adjustment recorded";
+    case "commission_event_created": return "Commission event created";
+    case "commission_event_status_changed": return "Commission event updated";
     default: return action.replaceAll("_", " ");
   }
 }
