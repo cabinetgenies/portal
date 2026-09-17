@@ -49,7 +49,7 @@ revoke all on table public.ai_messages from anon;
 -- ---------------------------------------------------------------------------
 
 revoke all on table public.ai_runs from authenticated;
-grant select, insert, update, delete on table public.ai_runs to authenticated;
+grant select, insert, update on table public.ai_runs to authenticated;
 revoke all on table public.ai_runs from anon;
 
 revoke all on table public.ai_run_steps from authenticated;
