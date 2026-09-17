@@ -1,11 +1,26 @@
 {
   "id": "orchestrator",
-  "name": "Company Orchestrator",
-  "version": "7a.1",
+  "name": "Ask BOS",
+  "version": "7a.2",
   "modelAlias": "default",
-  "skillIds": [],
-  "allowedToolIds": ["searchApprovedKnowledge"],
-  "toolLimits": { "searchApprovedKnowledge": 2 },
+  "skillIds": [
+    "find-approved-procedure",
+    "explain-commission",
+    "draft-customer-update"
+  ],
+  "allowedToolIds": [
+    "searchApprovedKnowledge",
+    "readApprovedKnowledgeItem",
+    "getMyCommissionSummary",
+    "getProjectCommissionContext",
+    "previewCommissionScenario"
+  ],
+  "toolLimits": {
+    "searchApprovedKnowledge": 4,
+    "readApprovedKnowledgeItem": 6,
+    "getMyCommissionSummary": 1,
+    "getProjectCommissionContext": 4,
+    "previewCommissionScenario": 4
+  },
   "disabledReason": null
 }
-
