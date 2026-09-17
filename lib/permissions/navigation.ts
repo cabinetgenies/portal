@@ -73,39 +73,33 @@ const BOS_DOMAINS: readonly DomainDefinition[] = [
     description: "Project lifecycle, sales context and project records.",
     icon: "projects",
     moduleKeys: ["projects", "sales"],
-    childLabels: { projects: "Overview", sales: "Sales" },
+    childLabels: { sales: "Sales" },
   },
   {
     label: "Operations",
     description: "Operational workflows, approvals, inventory and delivery support.",
     icon: "operations",
     moduleKeys: ["operations", "requests", "inventory"],
-    childLabels: {
-      operations: "Overview",
-      requests: "Requests & Approvals",
-      inventory: "Inventory",
-    },
+    childLabels: { requests: "Requests & Approvals", inventory: "Inventory" },
   },
   {
     label: "People",
     description: "People, accountability, performance and leadership cadence.",
     icon: "people",
     moduleKeys: ["people", "performance"],
-    childLabels: { people: "Team", performance: "Performance & Leadership" },
+    childLabels: { performance: "Performance & Leadership" },
   },
   {
     label: "Finance",
     description: "Financial visibility, compensation and reporting.",
     icon: "reports",
     moduleKeys: ["commissions"],
-    childLabels: { commissions: "Commissions" },
   },
   {
     label: "Knowledge",
     description: "SOPs, training, policies, playbooks, forms and role expectations.",
     icon: "knowledge",
     moduleKeys: ["knowledge"],
-    childLabels: { knowledge: "Knowledge Home" },
   },
 ] as const;
 
@@ -113,24 +107,25 @@ function domainItem(
   domain: DomainDefinition,
   modules: RoleExperience["modules"],
 ): NavItem | null {
-  const children = domain.moduleKeys
+  const visibleModules = domain.moduleKeys
     .map((key) => modules.find((module) => module.key === key))
-    .filter((module): module is NonNullable<typeof module> => Boolean(module))
-    .map((module) => ({
+    .filter((module): module is NonNullable<typeof module> => Boolean(module));
+
+  if (visibleModules.length === 0) return null;
+
+  const [overview, ...secondary] = visibleModules;
+
+  return {
+    label: domain.label,
+    href: overview.href,
+    icon: domain.icon,
+    description: domain.description,
+    children: secondary.map((module) => ({
       label: domain.childLabels?.[module.key] ?? module.name,
       href: module.href,
       icon: module.iconKey,
       description: module.description,
-    }));
-
-  if (children.length === 0) return null;
-
-  return {
-    label: domain.label,
-    href: children[0]?.href ?? null,
-    icon: domain.icon,
-    description: domain.description,
-    children,
+    })),
   };
 }
 
@@ -138,8 +133,8 @@ function domainItem(
  * Sidebar information architecture for a resolved role experience.
  *
  * The BOS has a deliberately small set of top-level business domains. Existing
- * role/module visibility still decides which child destinations are present.
- * Ask BOS remains a shell-level action rather than a business domain.
+ * role/module visibility still decides which destinations exist underneath each
+ * domain. Ask BOS remains a shell-level action rather than a business domain.
  */
 export function navigationForExperience(experience: RoleExperience): NavSection[] {
   const home = experience.modules.find((module) => module.key === "home");
