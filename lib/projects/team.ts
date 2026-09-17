@@ -24,7 +24,8 @@ export type ProjectTeamOption = {
 
 export async function listProjectTeam(jobId: string): Promise<ProjectTeamMember[]> {
   const supabase = await createSupabaseServerClient();
-  const { data, error } = await supabase
+  const db = supabase as any;
+  const { data, error } = await db
     .from("job_team_members")
     .select("id, profile_id, role_label, sort_order, profiles!job_team_members_profile_id_fkey(display_name, first_name, last_name, email)")
     .eq("job_id", jobId)
@@ -63,7 +64,7 @@ export async function listProjectTeamOptions(): Promise<ProjectTeamOption[]> {
     return [];
   }
 
-  return (data ?? []).map((profile: any) => {
+  return (data ?? []).map((profile) => {
     const combined = [profile.first_name, profile.last_name].filter(Boolean).join(" ");
     return {
       id: profile.id,
@@ -88,7 +89,8 @@ export async function addProjectTeamMember(
   if (roleLabel.length < 2) return failureState("Enter the team member's project role.");
 
   const supabase = await createSupabaseServerClient();
-  const { error } = await supabase.from("job_team_members").insert({
+  const db = supabase as any;
+  const { error } = await db.from("job_team_members").insert({
     job_id: jobId,
     profile_id: profileId,
     role_label: roleLabel,
@@ -115,7 +117,8 @@ export async function updateProjectTeamMember(
   if (roleLabel.length < 2) return failureState("Enter the team member's project role.");
 
   const supabase = await createSupabaseServerClient();
-  const { error } = await supabase
+  const db = supabase as any;
+  const { error } = await db
     .from("job_team_members")
     .update({ role_label: roleLabel })
     .eq("id", memberId)
@@ -138,7 +141,8 @@ export async function removeProjectTeamMember(
   if (!jobId || !memberId) return failureState("That project team member is unavailable.");
 
   const supabase = await createSupabaseServerClient();
-  const { error } = await supabase
+  const db = supabase as any;
+  const { error } = await db
     .from("job_team_members")
     .delete()
     .eq("id", memberId)
